@@ -19,7 +19,7 @@ import { format } from 'date-fns'
 import 'vditor/dist/index.css'
 import { captureCaretAnchor, restoreCaretAnchor } from './caret-anchor'
 import { lang } from './lang'
-import { toolbar } from './toolbar'
+import { installToolbarSelectionPreserver, toolbar } from './toolbar'
 import { initTableContextMenu } from './table-context-menu'
 import { customizeWysiwygPopover } from './wysiwyg-popover'
 import {
@@ -742,6 +742,7 @@ function initVditor(msg) {
         initializationGeneration
       )
       handleToolbarClick()
+      installToolbarSelectionPreserver(vditor)
       installWysiwygListCommands(vditor)
       if (!(window as any).__vmdDetails) {
         ;(window as any).__vmdDetails = initWysiwygDetails()

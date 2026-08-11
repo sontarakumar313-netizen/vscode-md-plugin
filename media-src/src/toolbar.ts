@@ -4,6 +4,7 @@ import {
 	getEditorSelectionContext,
 	getVisibleTextBefore,
 	getVisibleTextBeforeElement,
+	preserveEditorSelectionForToolbar,
 } from './caret-anchor'
 import { t } from './lang'
 import { confirm } from './utils'
@@ -101,9 +102,11 @@ function gapAfterBlock(value: string): string {
 
 function insertDetails(editor: any): void {
 	const source = String(editor.getValue?.() || '')
-	const rawSelection = String(editor.getSelection?.() || '')
-	const selected = rawSelection.trim()
 	const context = getEditorSelectionContext(editor)
+	const rawSelection = String(
+		editor.getSelection?.() || context?.range.toString() || ''
+	)
+	const selected = rawSelection.trim()
 
 	if (selected) {
 		const visibleBefore = getVisibleTextBefore(context)
@@ -169,6 +172,26 @@ function insertDetails(editor: any): void {
 	const before = source.slice(0, lineStart)
 	const after = source.slice(lineStart)
 	editor.setValue(`${before}${block}${gapAfterBlock(after)}${after}`)
+}
+
+const selectionPreserverToolbars = new WeakSet<HTMLElement>()
+
+/** Capture the caret before a toolbar button takes browser focus. */
+export function installToolbarSelectionPreserver(editor: any): void {
+	const toolbarElement = editor?.vditor?.toolbar?.element
+	if (
+		!(toolbarElement instanceof HTMLElement) ||
+		selectionPreserverToolbars.has(toolbarElement)
+	) {
+		return
+	}
+
+	toolbarElement.addEventListener(
+		'pointerdown',
+		() => preserveEditorSelectionForToolbar(editor),
+		true
+	)
+	selectionPreserverToolbars.add(toolbarElement)
 }
 
 async function copyToClipboard(content: string, label: string): Promise<void> {

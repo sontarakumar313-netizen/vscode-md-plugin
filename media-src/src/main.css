@@ -23,6 +23,26 @@ body,
 .vditor--dark .vditor-reset code:not(.hljs):not(.highlight-chroma) {
   background-color: rgba(66,133,244,.1);
 }
+/* WYSIWYG code blocks deliberately keep Vditor's editable source above the
+   rendered preview. Vditor normally gives the source a negative bottom margin,
+   which visually merges the two panes while the block is being edited. Restore
+   a real gap and use the active-theme focus color as a clear pane divider. */
+.vditor-wysiwyg
+  .vditor-reset
+  .vditor-wysiwyg__block[data-type='code-block']
+  > pre:first-child:not([style*='display: none']):not([style*='display:none']) {
+  margin-bottom: 0 !important;
+}
+.vditor-wysiwyg
+  .vditor-reset
+  .vditor-wysiwyg__block[data-type='code-block']
+  > pre:first-child:not([style*='display: none']):not([style*='display:none'])
+  + .vditor-wysiwyg__preview {
+  margin-top: 0.35em;
+  padding-top: 0.35em;
+  border-top: 1px solid
+    var(--vscode-focusBorder, var(--toolbar-icon-hover-color, #007fd4));
+}
 /* Keep the toolbar at the left edge; toggling the editor gutter must not move it. */
 .vditor-toolbar.vditor-toolbar--pin {
   padding-left: 5px!important;
@@ -76,14 +96,57 @@ body:not(.vmd-line-numbers-enabled) #vmd-line-number-gutter {
 }
 
 /* Vditor represents HTML details as separate opening, body, and closing blocks
-   in WYSIWYG mode. The controller marks body blocks while a disclosure is
-   closed; the native selector also covers details kept in one HTML block. */
+   in IR/WYSIWYG modes. The controller marks WYSIWYG body blocks while a
+   disclosure is closed and hides the otherwise-empty closing block in both;
+   the native selector also covers details kept in one HTML block. */
 .vditor-wysiwyg .vditor-reset details:not([open]) > :not(summary),
 .vditor-wysiwyg .vditor-reset .vmd-details-content--hidden {
   display: none !important;
 }
-.vditor-wysiwyg .vditor-reset details > summary {
+.vditor-wysiwyg .vditor-reset .vmd-details-closer,
+.vditor-ir .vditor-reset .vmd-details-closer {
+  display: none !important;
+}
+.vditor-wysiwyg .vditor-reset details > summary.vmd-details-summary {
+  position: relative;
+  padding-left: 1.15em;
+  cursor: text;
+  list-style: none;
+}
+.vditor-wysiwyg
+  .vditor-reset
+  details
+  > summary.vmd-details-summary::-webkit-details-marker {
+  display: none;
+}
+.vditor-wysiwyg .vditor-reset .vmd-details-toggle {
+  position: absolute;
+  top: 50%;
+  left: 0.15em;
+  width: 0;
+  height: 0;
+  border-top: 0.3em solid transparent;
+  border-bottom: 0.3em solid transparent;
+  border-left: 0.42em solid currentColor;
   cursor: pointer;
+  user-select: none;
+  transform: translateY(-50%);
+  transform-origin: 35% 50%;
+  transition: transform 80ms ease-out;
+}
+.vditor-wysiwyg
+  .vditor-reset
+  details[open]
+  > summary.vmd-details-summary
+  > .vmd-details-toggle {
+  transform: translateY(-50%) rotate(90deg);
+}
+.vditor-wysiwyg
+  .vditor-reset
+  details
+  > summary.vmd-details-summary:focus {
+  outline: 1px solid var(--vscode-focusBorder, var(--toolbar-icon-hover-color));
+  outline-offset: 2px;
 }
 
 /* YAML front matter. The generated table lives in a .vditor-wysiwyg__preview

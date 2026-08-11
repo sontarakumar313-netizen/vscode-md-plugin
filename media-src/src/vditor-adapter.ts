@@ -9,6 +9,7 @@ import {
   listOutdent,
 } from 'vditor/src/ts/util/fixBrowserBehavior'
 import { setSelectionFocus } from 'vditor/src/ts/util/selection'
+import { afterRenderEvent as commitWysiwygAfterRender } from 'vditor/src/ts/wysiwyg/afterRenderEvent'
 
 export type VditorMode = 'ir' | 'wysiwyg' | 'sv'
 
@@ -78,6 +79,16 @@ export function outdentVditorList(
 
 export function focusVditorRange(range: Range): void {
   setSelectionFocus(range)
+}
+
+/** Commits a DOM edit that intentionally bypasses Vditor's WYSIWYG input parser. */
+export function commitVditorWysiwygDomEdit(internal: any): void {
+  if (!internal || internal.currentMode !== 'wysiwyg') return
+  commitWysiwygAfterRender(internal, {
+    enableAddUndoStack: true,
+    enableHint: false,
+    enableInput: true,
+  })
 }
 
 export const vditorTableActions = {

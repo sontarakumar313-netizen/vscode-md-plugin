@@ -16,6 +16,32 @@ export interface CaretAnchor {
   expectedStart: number
 }
 
+const toolbarSelections = new WeakMap<object, EditorSelectionContext>()
+
+/** Saves the live editor range before a toolbar pointer event moves focus. */
+export function preserveEditorSelectionForToolbar(
+  editor: any = window.vditor
+): boolean {
+  const internal = getVditorInternals(editor)
+  const mode = getVditorMode(editor)
+  const root = getVditorEditorElement(editor)
+  const selection = window.getSelection()
+  if (!internal || !mode || !root || !selection?.rangeCount) return false
+
+  const range = selection.getRangeAt(0)
+  if (
+    !root.contains(range.startContainer) ||
+    !root.contains(range.endContainer)
+  ) {
+    return false
+  }
+
+  const savedRange = range.cloneRange()
+  toolbarSelections.set(editor, { root, range: savedRange, mode })
+  internal[mode].range = savedRange.cloneRange()
+  return true
+}
+
 export function getEditorSelectionContext(
   editor: any = window.vditor
 ): EditorSelectionContext | null {
@@ -25,12 +51,32 @@ export function getEditorSelectionContext(
   if (!internal || !mode || !root) return null
 
   const selection = window.getSelection()
-  const range =
-    selection && selection.rangeCount > 0
-      ? selection.getRangeAt(0)
-      : internal?.[mode]?.range
-  if (!range || !root.contains(range.startContainer)) return null
-  return { root, range, mode }
+  const liveRange =
+    selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
+  const toolbarSelection = toolbarSelections.get(editor)
+  const savedRange = internal?.[mode]?.range as Range | undefined
+
+  // Focusing a toolbar button can move the browser selection outside the
+  // contenteditable before its click handler runs. Vditor saves the last
+  // editor range on blur specifically for this case, so prefer the live range
+  // only while it still belongs to the active editor and otherwise fall back
+  // to that saved range.
+  for (const range of [
+    liveRange,
+    toolbarSelection?.mode === mode && toolbarSelection.root === root
+      ? toolbarSelection.range
+      : null,
+    savedRange,
+  ]) {
+    if (
+      range &&
+      root.contains(range.startContainer) &&
+      root.contains(range.endContainer)
+    ) {
+      return { root, range, mode }
+    }
+  }
+  return null
 }
 
 export function countTextOccurrences(source: string, query: string): number {

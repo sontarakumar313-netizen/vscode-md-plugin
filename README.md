@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/sontarakumar313-netizen/vscode-md-interactor/actions/workflows/release.yml"><img src="https://github.com/sontarakumar313-netizen/vscode-md-interactor/actions/workflows/release.yml/badge.svg?branch=main" alt="Build status"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/sontarakumar313-netizen/vscode-md-interactor" alt="MIT license"></a>
+  <a href="https://github.com/sontarakumar313-netizen/vscode-md-plugin/actions/workflows/release.yml"><img src="https://github.com/sontarakumar313-netizen/vscode-md-plugin/actions/workflows/release.yml/badge.svg?branch=main" alt="Build status"></a>
+  <a href="https://github.com/sontarakumar313-netizen/vscode-md-plugin/blob/main/LICENSE"><img src="https://img.shields.io/github/license/sontarakumar313-netizen/vscode-md-plugin" alt="MIT license"></a>
   <img src="https://img.shields.io/badge/VS%20Code-%5E1.51.0-007ACC?logo=visualstudiocode&logoColor=white" alt="VS Code 1.51 or later">
 </p>
 
@@ -37,8 +37,9 @@ Markdown Interactor 是一个基于 [Vditor](https://github.com/Vanessa219/vdito
 
 ### 三种编辑模式
 
-| 模式                              | 说明                                                       |
-| --------------------------------- | ---------------------------------------------------------- |
+
+| 模式                        | 说明                                                       |
+| --------------------------- | ---------------------------------------------------------- |
 | **即时渲染（IR）**          | 默认模式。保留 Markdown 编辑感，同时即时渲染当前内容。     |
 | **所见即所得（WYSIWYG）**   | 以接近最终排版的方式直接编辑文档。                         |
 | **分屏（Split View / SV）** | 左侧编辑 Markdown 源码，右侧同步预览，并支持双向滚动联动。 |
@@ -90,7 +91,7 @@ Markdown Interactor 是一个基于 [Vditor](https://github.com/Vanessa219/vdito
 
 ### 从 GitHub Releases 安装
 
-1. 打开项目的 [Releases](https://github.com/sontarakumar313-netizen/vscode-md-interactor/releases) 页面并下载最新的 `.vsix` 文件。
+1. 打开项目的 [Releases](https://github.com/sontarakumar313-netizen/vscode-md-plugin/releases) 页面并下载最新的 `.vsix` 文件。
 2. 在 VS Code 中打开命令面板。
 3. 运行 **Extensions: Install from VSIX...**。
 4. 选择下载的文件并按提示完成安装。
@@ -121,14 +122,15 @@ pnpm build
 
 ### 常用快捷键
 
-| 操作                     | Windows / Linux             | macOS                       |
-| ------------------------ | --------------------------- | --------------------------- |
-| 打开 Markdown Interactor | `Ctrl+Shift+Alt+M`        | `Cmd+Shift+Alt+M`         |
-| 保存                     | `Ctrl+S`                  | `Cmd+S`                   |
-| 查找                     | `Ctrl+F`                  | `Cmd+F`                   |
+
+| 操作                     | Windows / Linux         | macOS                   |
+| ------------------------ | ----------------------- | ----------------------- |
+| 打开 Markdown Interactor | `Ctrl+Shift+Alt+M`      | `Cmd+Shift+Alt+M`       |
+| 保存                     | `Ctrl+S`                | `Cmd+S`                 |
+| 查找                     | `Ctrl+F`                | `Cmd+F`                 |
 | 下一个 / 上一个结果      | `Enter` / `Shift+Enter` | `Enter` / `Shift+Enter` |
 | 列表缩进 / 减少缩进      | `Tab` / `Shift+Tab`     | `Tab` / `Shift+Tab`     |
-| 切换 Tab 是否移动焦点    | `Ctrl+M`                  | `Cmd+M`                   |
+| 切换 Tab 是否移动焦点    | `Ctrl+M`                | `Cmd+M`                 |
 
 在列表和表格之外，`Tab` 默认不会移出编辑器。按 `Ctrl+M`（macOS 为 `Cmd+M`）可让 `Tab`
 恢复为普通的焦点切换键，再按一次即可恢复结构化缩进行为。这与 VS Code 自身的
@@ -138,8 +140,9 @@ pnpm build
 
 在 VS Code 设置中搜索 `Markdown Interactor`，或直接配置以下项目：
 
-| 设置                                        | 默认值     | 说明                                                           |
-| ------------------------------------------- | ---------- | -------------------------------------------------------------- |
+
+| 设置                                      | 默认值   | 说明                                                           |
+| ----------------------------------------- | -------- | -------------------------------------------------------------- |
 | `markdown-interactor.imageSaveFolder`     | `assets` | 上传文件保存目录。相对路径以当前 Markdown 文件所在目录为基准。 |
 | `markdown-interactor.maxUploadSizeMB`     | `10`     | 每个上传文件的大小上限，允许范围为 1 至 100 MB。               |
 | `markdown-interactor.allowRemoteMedia`    | `true`   | 是否允许加载 Markdown 中的 HTTPS 图片和媒体。                  |
@@ -150,8 +153,9 @@ pnpm build
 
 `imageSaveFolder` 支持以下变量：
 
-| 变量                           | 含义                         |
-| ------------------------------ | ---------------------------- |
+
+| 变量                         | 含义                         |
+| ---------------------------- | ---------------------------- |
 | `${projectRoot}`             | 当前文件所属工作区的根目录   |
 | `${file}`                    | 当前 Markdown 文件的完整路径 |
 | `${fileBasenameNoExtension}` | 不含扩展名的当前文件名       |
@@ -197,15 +201,15 @@ GitHub Actions 会在代码推送到 `main` 后自动构建并打包 VSIX，无�
 
 主要源码目录：
 
-| 路径               | 作用                                             |
-| ------------------ | ------------------------------------------------ |
+
+| 路径             | 作用                                             |
+| ---------------- | ------------------------------------------------ |
 | `src/`           | VS Code Extension Host、文档同步、上传和链接处理 |
 | `media-src/src/` | Webview、Vditor、工具栏、查找、行号和交互逻辑    |
 | `scripts/`       | 构建脚本与自动化测试                             |
 | `00-styles/`     | 工作区自定义 CSS 示例                            |
-| `test/`          | 手工回归测试文档                                 |
 
-更多版本变化见 [CHANGELOG.md](CHANGELOG.md)。问题与建议请提交到 [GitHub Issues](https://github.com/sontarakumar313-netizen/vscode-md-interactor/issues)。
+更多版本变化见 [CHANGELOG.md](CHANGELOG.md)。问题与建议请提交到 [GitHub Issues](https://github.com/sontarakumar313-netizen/vscode-md-plugin/issues)。
 
 ## 致谢
 
@@ -213,4 +217,9 @@ Markdown Interactor 基于 [zaaack/vscode-markdown-editor](https://github.com/za
 
 ## 许可证
 
-本项目基于 [MIT License](LICENSE) 开源。
+本项目基于 [MIT License](https://github.com/sontarakumar313-netizen/vscode-md-plugin/blob/main/LICENSE) 开源。
+
+<details>
+<summary>这是一个标题</summary>
+这是被折叠的内容
+</details>

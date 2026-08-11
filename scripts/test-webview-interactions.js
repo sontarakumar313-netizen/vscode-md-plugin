@@ -225,6 +225,36 @@ function testPage() {
           window.getComputedStyle(mathBlock, '::before').display === 'none',
           'the math-block "$$" marker is still laid out'
         );
+        const codeBlock = root().querySelector(
+          '.vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        const codeSource = codeBlock.querySelector(':scope > pre:first-child');
+        const codePreview = codeBlock.querySelector(
+          ':scope > .vditor-wysiwyg__preview'
+        );
+        expect(
+          getComputedStyle(codeSource).display === 'none',
+          'the code source was visible before entering the code block'
+        );
+        expect(
+          parseFloat(getComputedStyle(codePreview).borderTopWidth) === 0,
+          'the code divider was visible before entering the code block'
+        );
+        codePreview.click();
+        await pause();
+        const sourceStyle = getComputedStyle(codeSource);
+        const previewStyle = getComputedStyle(codePreview);
+        expect(sourceStyle.display !== 'none', 'clicking the code preview did not reveal its source');
+        expect(parseFloat(sourceStyle.marginBottom) === 0, "the expanded code source kept Vditor's negative bottom margin");
+        expect(
+          parseFloat(previewStyle.borderTopWidth) === 1 &&
+            previewStyle.borderTopStyle === 'solid' &&
+            parseFloat(previewStyle.paddingTop) > 0 &&
+            parseFloat(previewStyle.paddingTop) <= 8 &&
+            parseFloat(previewStyle.marginTop) > 0 &&
+            parseFloat(previewStyle.marginTop) <= 8,
+          'the expanded code source and preview divider is not compact and one pixel wide'
+        );
         // Guard against over-hiding: heading labels are a different rule and stay.
         const heading = root().querySelector('h1');
         expect(heading, 'the heading fixture did not render');
@@ -706,8 +736,34 @@ function testPage() {
         const detailsBody = detailsOpener.nextElementSibling;
         expect(!!detailsBody, 'details has no editable body');
         expect(detailsBody.classList.contains('vmd-details-content--hidden'), 'closed details content is visible');
+        const detailsCloser = detailsBody.nextElementSibling;
+        expect(detailsCloser.classList.contains('vmd-details-closer'), 'details closing marker was not recognized');
+        expect(getComputedStyle(detailsCloser).display === 'none', 'details closing marker still occupies a blank line');
         expect(!/<details\\s+[^>]*\\bopen/.test(window.vditor.getValue()), 'closed details unexpectedly serialized an open attribute');
-        detailsOpener.querySelector('summary').click();
+        const detailsSummary = detailsOpener.querySelector('summary');
+        const detailsSource = detailsOpener.querySelector(':scope > pre:not(.vditor-wysiwyg__preview)');
+        expect(detailsSummary.contentEditable === 'true', 'the rendered details title is not directly editable');
+        detailsSummary.click();
+        await pause();
+        expect(getComputedStyle(detailsSource).display === 'none', 'clicking the details title revealed raw HTML source');
+        expect(detailsBody.classList.contains('vmd-details-content--hidden'), 'clicking editable title unexpectedly toggled the details body');
+        const detailsTitleText = textNode(detailsSummary);
+        detailsTitleText.data = 'Renamed title';
+        detailsSummary.dispatchEvent(new InputEvent('input', {
+          bubbles: true,
+          inputType: 'insertText',
+          data: 'Renamed title',
+        }));
+        await pause(80);
+        expect(
+          window.vditor.getValue().includes('<summary>Renamed title</summary>'),
+          'editing the rendered details title did not update its hidden HTML source'
+        );
+        expect(
+          !window.vditor.getValue().includes('vmd-details-toggle'),
+          'the details editing control leaked into Markdown'
+        );
+        detailsSummary.querySelector('.vmd-details-toggle').click();
         await pause();
         expect(!detailsBody.classList.contains('vmd-details-content--hidden'), 'details content does not open from its summary');
         expect(!/<details\\s+[^>]*\\bopen/.test(window.vditor.getValue()), 'opening details changed the Markdown source');
@@ -757,7 +813,7 @@ function testPage() {
         expect(hidden(nested[1]) && hidden(nested[2]) && hidden(nested[3]),
           'a closed outer details did not hide the nested group');
         expect(!hidden(nested[4]), "the outer group hid its own closing tag");
-        nested[0].querySelector('summary').click();
+        nested[0].querySelector('.vmd-details-toggle').click();
         await pause(40);
         expect(!hidden(nested[1]) && !hidden(nested[3]),
           'opening the outer details did not reveal the nested opener and closer');
@@ -800,6 +856,8 @@ function testPage() {
         await setMarkdown('collapsible body');
         const detailsText = textNode(root().querySelector(':scope > p'));
         select(detailsText, 0, detailsText, detailsText.textContent.length);
+        window.vditor.vditor.wysiwyg.range = window.getSelection().getRangeAt(0).cloneRange();
+        select(result.firstChild, 0, result.firstChild, 0);
         document.querySelector('.vditor-toolbar [data-type="details"]').click();
         await pause();
         expect(
@@ -833,14 +891,25 @@ function testPage() {
           'the collapsible-section insertion wrapped the first duplicate instead of the selected one'
         );
 
-        await setMarkdown('caret target');
-        const caretText = textNode(root().querySelector(':scope > p'));
+        await setMarkdown('before block\\n\\ncaret target\\n\\nafter block');
+        const caretText = textNode(root().querySelectorAll(':scope > p')[1]);
         select(caretText, 0, caretText, 0);
-        document.querySelector('.vditor-toolbar [data-type="details"]').click();
+        window.vditor.vditor.wysiwyg.range = undefined;
+        const detailsButton = document.querySelector('.vditor-toolbar [data-type="details"]');
+        detailsButton.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true,
+          cancelable: true,
+          pointerType: 'mouse',
+        }));
+        select(result.firstChild, 0, result.firstChild, 0);
+        detailsButton.click();
         await pause();
+        const caretInsertionValue = window.vditor.getValue();
         expect(
-          window.vditor.getValue().indexOf('<details>') < window.vditor.getValue().indexOf('caret target'),
-          'a collapsed selection ignored the current editor block'
+          caretInsertionValue.indexOf('<details>') > caretInsertionValue.indexOf('before block') &&
+            caretInsertionValue.indexOf('<details>') < caretInsertionValue.indexOf('caret target') &&
+            caretInsertionValue.indexOf('<details>') < caretInsertionValue.indexOf('after block'),
+          'the WYSIWYG toolbar lost the middle-document caret and appended details at the end'
         );
 
         await setMarkdown('find target');
@@ -960,12 +1029,20 @@ function testPage() {
         await setMarkdown('IR folded target');
         const irFoldedText = textNode(irRoot.querySelector(':scope > p'));
         select(irFoldedText, 0, irFoldedText, 0);
+        window.vditor.vditor.ir.range = window.getSelection().getRangeAt(0).cloneRange();
+        select(result.firstChild, 0, result.firstChild, 0);
         document.querySelector('.vditor-toolbar [data-type="details"]').click();
         await pause();
         expect(
           window.vditor.getValue().indexOf('<details>') < window.vditor.getValue().indexOf('IR folded target'),
           'IR collapsed selection did not insert the collapsible section at the current block'
         );
+        const irDetailsCloser = Array.from(irRoot.children).find(
+          (element) => element.textContent.includes('</details>')
+        );
+        expect(!!irDetailsCloser, 'IR details closing marker was not rendered');
+        expect(irDetailsCloser.classList.contains('vmd-details-closer'), 'IR details closing marker was not recognized');
+        expect(getComputedStyle(irDetailsCloser).display === 'none', 'IR details closing marker still occupies a blank line');
 
         const copyCodeFence = String.fromCharCode(96).repeat(3);
         await setMarkdown(copyCodeFence + 'js\\nconst copyTarget = 1;\\n' + copyCodeFence);
