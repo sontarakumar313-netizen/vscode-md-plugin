@@ -1,0 +1,213 @@
+/* Built-in dark theme. Workspace CSS is injected after this file and can override it. */
+:where(body[data-vmd-theme='dark']) {
+  color-scheme: dark;
+  color: #d4d4d4;
+  background: #1e1e1e;
+}
+
+:where(body[data-vmd-theme='dark']) .vditor {
+  --border-color: #3c3c3c;
+  --second-color: rgba(204, 204, 204, 0.45);
+  --panel-background-color: #1e1e1e;
+  --panel-shadow: 0 1px 2px rgba(0, 0, 0, 0.36);
+  --toolbar-background-color: #252526;
+  --toolbar-icon-color: #c5c5c5;
+  --toolbar-icon-hover-color: #4daafc;
+  --textarea-background-color: #1e1e1e;
+  --textarea-text-color: #d4d4d4;
+  --resize-icon-color: #c5c5c5;
+  --resize-background-color: #252526;
+  --resize-hover-icon-color: #ffffff;
+  --resize-hover-background-color: #0e639c;
+  --count-background-color: rgba(77, 170, 252, 0.18);
+  --heading-border-color: #3c3c3c;
+  --blockquote-color: #a0a0a0;
+  --ir-heading-color: #c586c0;
+  --ir-title-color: #a0a0a0;
+  --ir-bi-color: #569cd6;
+  --ir-link-color: #4ec9b0;
+  --ir-bracket-color: #4daafc;
+  --ir-paren-color: #dcdcaa;
+  --vmd-content-link-color: #4daafc;
+  --vmd-content-subtle-background: #252526;
+  --vmd-content-code-background: rgba(77, 170, 252, 0.16);
+  --vmd-code-block-background: #0d1117;
+  --vmd-code-block-foreground: #c9d1d9;
+  --vmd-content-selection-background: rgba(77, 170, 252, 0.28);
+}
+
+:where(body[data-vmd-theme='dark']) #app.vditor,
+:where(body[data-vmd-theme='dark']) #app .vditor-content,
+:where(body[data-vmd-theme='dark']) #app .vditor-ir,
+:where(body[data-vmd-theme='dark']) #app .vditor-wysiwyg,
+:where(body[data-vmd-theme='dark']) #app .vditor-sv,
+:where(body[data-vmd-theme='dark']) #app .vditor-preview,
+:where(body[data-vmd-theme='dark']) #app .vditor-reset {
+  color: var(--textarea-text-color);
+  background-color: var(--panel-background-color);
+}
+
+/* With the default setting enabled, use the complete active VS Code palette. */
+:where(body[data-vmd-theme='dark'][data-use-vscode-theme-color='1']) {
+  color: var(--vscode-editor-foreground, #d4d4d4);
+  background: var(--vscode-editor-background, #1e1e1e);
+}
+
+:where(body[data-vmd-theme='dark'][data-use-vscode-theme-color='1']) .vditor {
+  --border-color: var(--vscode-editorWidget-border, #3c3c3c);
+  --second-color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.45));
+  --panel-background-color: var(--vscode-editor-background, #1e1e1e);
+  --toolbar-background-color: var(--vscode-editorGroupHeader-tabsBackground, var(--vscode-editor-background, #252526));
+  --toolbar-icon-color: var(--vscode-icon-foreground, var(--vscode-editor-foreground, #c5c5c5));
+  --toolbar-icon-hover-color: var(--vscode-textLink-foreground, #4daafc);
+  --textarea-background-color: var(--vscode-editor-background, #1e1e1e);
+  --textarea-text-color: var(--vscode-editor-foreground, #d4d4d4);
+  --resize-icon-color: var(--vscode-icon-foreground, #c5c5c5);
+  --resize-background-color: var(--vscode-editorGroupHeader-tabsBackground, var(--vscode-editor-background, #252526));
+  --resize-hover-background-color: var(--vscode-button-background, #0e639c);
+  --count-background-color: var(--vscode-editor-selectionBackground, rgba(77, 170, 252, 0.18));
+  --heading-border-color: var(--vscode-editorWidget-border, #3c3c3c);
+  --blockquote-color: var(--vscode-descriptionForeground, #a0a0a0);
+  --ir-heading-color: var(--vscode-symbolIcon-classForeground, #c586c0);
+  --ir-title-color: var(--vscode-descriptionForeground, #a0a0a0);
+  --ir-bi-color: var(--vscode-symbolIcon-keywordForeground, #569cd6);
+  --ir-link-color: var(--vscode-textLink-foreground, #4ec9b0);
+  --ir-bracket-color: var(--vscode-textLink-foreground, #4daafc);
+  --ir-paren-color: var(--vscode-symbolIcon-stringForeground, #dcdcaa);
+  --vmd-content-link-color: var(--vscode-textLink-foreground, #4daafc);
+  --vmd-content-subtle-background: var(--vscode-editorWidget-background, #252526);
+  --vmd-content-code-background: var(--vscode-textCodeBlock-background, rgba(77, 170, 252, 0.16));
+  --vmd-code-block-background: var(--vscode-textCodeBlock-background, #0d1117);
+  --vmd-code-block-foreground: var(--vscode-editor-foreground, #c9d1d9);
+  --vmd-content-selection-background: var(--vscode-editor-selectionBackground, rgba(77, 170, 252, 0.28));
+}
+
+:where(body[data-vmd-theme='dark']) #app .vditor-reset a,
+:where(body[data-vmd-theme='dark']) #app .vditor-ir__link {
+  color: var(--vmd-content-link-color);
+}
+
+:where(body[data-vmd-theme='dark']) #app .vditor-reset h1,
+:where(body[data-vmd-theme='dark']) #app .vditor-reset h2 {
+  border-bottom-color: var(--heading-border-color);
+}
+
+:where(body[data-vmd-theme='dark']) #app .vditor-reset hr {
+  background-color: var(--heading-border-color);
+}
+
+:where(body[data-vmd-theme='dark']) #app .vditor-reset blockquote {
+  color: var(--blockquote-color);
+  border-left-color: var(--border-color);
+}
+
+:where(body[data-vmd-theme='dark']) #app .vditor-reset table tr {
+  background-color: var(--panel-background-color);
+  border-top-color: var(--border-color);
+}
+
+:where(body[data-vmd-theme='dark']) #app .vditor-reset table tr:nth-child(2n) {
+  background-color: var(--vmd-content-subtle-background);
+}
+
+:where(body[data-vmd-theme='dark']) #app .vditor-reset table td,
+:where(body[data-vmd-theme='dark']) #app .vditor-reset table th {
+  border-color: var(--border-color);
+}
+
+:where(body[data-vmd-theme='dark']) #app .vditor-reset code:not(.hljs):not(.highlight-chroma),
+:where(body[data-vmd-theme='dark']) #app .vditor-reset kbd {
+  color: var(--textarea-text-color);
+  background-color: var(--vmd-content-code-background);
+}
+
+/* Keep every fenced-code representation dark. The explicit highlight colors
+   are bundled fallbacks and also override a stale light stylesheet that may
+   still be finishing an asynchronous load during a VS Code theme switch. */
+:where(body[data-vmd-theme='dark']) #app .vditor-reset pre,
+:where(body[data-vmd-theme='dark']) #app .vditor-reset pre code,
+:where(body[data-vmd-theme='dark']) #app .vditor-reset code.hljs,
+:where(body[data-vmd-theme='dark']) #app .vditor-reset .highlight-chroma,
+:where(body[data-vmd-theme='dark']) #app .vditor-wysiwyg__pre,
+:where(body[data-vmd-theme='dark']) #app .vditor-ir__marker--pre {
+  color: var(--vmd-code-block-foreground);
+  background-color: var(--vmd-code-block-background);
+}
+
+:where(body[data-vmd-theme='dark']) #app .hljs-comment,
+:where(body[data-vmd-theme='dark']) #app .hljs-code,
+:where(body[data-vmd-theme='dark']) #app .hljs-formula {
+  color: #8b949e;
+}
+
+:where(body[data-vmd-theme='dark']) #app .hljs-keyword,
+:where(body[data-vmd-theme='dark']) #app .hljs-doctag,
+:where(body[data-vmd-theme='dark']) #app .hljs-template-tag,
+:where(body[data-vmd-theme='dark']) #app .hljs-template-variable,
+:where(body[data-vmd-theme='dark']) #app .hljs-type,
+:where(body[data-vmd-theme='dark']) #app .hljs-variable.language_ {
+  color: #ff7b72;
+}
+
+:where(body[data-vmd-theme='dark']) #app .hljs-title,
+:where(body[data-vmd-theme='dark']) #app .hljs-title.class_,
+:where(body[data-vmd-theme='dark']) #app .hljs-title.class_.inherited__,
+:where(body[data-vmd-theme='dark']) #app .hljs-title.function_ {
+  color: #d2a8ff;
+}
+
+:where(body[data-vmd-theme='dark']) #app .hljs-attr,
+:where(body[data-vmd-theme='dark']) #app .hljs-attribute,
+:where(body[data-vmd-theme='dark']) #app .hljs-literal,
+:where(body[data-vmd-theme='dark']) #app .hljs-meta,
+:where(body[data-vmd-theme='dark']) #app .hljs-number,
+:where(body[data-vmd-theme='dark']) #app .hljs-operator,
+:where(body[data-vmd-theme='dark']) #app .hljs-selector-attr,
+:where(body[data-vmd-theme='dark']) #app .hljs-selector-class,
+:where(body[data-vmd-theme='dark']) #app .hljs-selector-id,
+:where(body[data-vmd-theme='dark']) #app .hljs-variable {
+  color: #79c0ff;
+}
+
+:where(body[data-vmd-theme='dark']) #app .hljs-regexp,
+:where(body[data-vmd-theme='dark']) #app .hljs-string,
+:where(body[data-vmd-theme='dark']) #app .hljs-meta .hljs-string {
+  color: #a5d6ff;
+}
+
+:where(body[data-vmd-theme='dark']) #app .hljs-built_in,
+:where(body[data-vmd-theme='dark']) #app .hljs-symbol {
+  color: #ffa657;
+}
+
+:where(body[data-vmd-theme='dark']) #app .hljs-bullet,
+:where(body[data-vmd-theme='dark']) #app .hljs-selector-tag {
+  color: #7ee787;
+}
+
+:where(body[data-vmd-theme='dark']) #app .hljs-section,
+:where(body[data-vmd-theme='dark']) #app .hljs-name {
+  color: #f2cc60;
+}
+
+:where(body[data-vmd-theme='dark']) #app .hljs-emphasis {
+  font-style: italic;
+}
+
+:where(body[data-vmd-theme='dark']) #app .hljs-strong {
+  font-weight: 700;
+}
+
+:where(body[data-vmd-theme='dark']) #app .hljs-addition {
+  color: #aff5b4;
+  background-color: #033a16;
+}
+
+:where(body[data-vmd-theme='dark']) #app .hljs-deletion {
+  color: #ffdcd7;
+  background-color: #67060c;
+}
+
+:where(body[data-vmd-theme='dark']) #app .vditor-reset ::selection {
+  background-color: var(--vmd-content-selection-background);
+}

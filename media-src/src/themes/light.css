@@ -1,0 +1,122 @@
+/* Built-in light theme. Workspace CSS is injected after this file and can override it. */
+:where(body[data-vmd-theme='light']) {
+  color-scheme: light;
+  color: #1f2328;
+  background: #ffffff;
+}
+
+:where(body[data-vmd-theme='light']) .vditor {
+  --border-color: #d4d4d4;
+  --second-color: rgba(97, 97, 97, 0.45);
+  --panel-background-color: #ffffff;
+  --panel-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+  --toolbar-background-color: #f3f3f3;
+  --toolbar-icon-color: #616161;
+  --toolbar-icon-hover-color: #006ab1;
+  --textarea-background-color: #ffffff;
+  --textarea-text-color: #1f2328;
+  --resize-icon-color: #616161;
+  --resize-background-color: #f3f3f3;
+  --resize-hover-icon-color: #ffffff;
+  --resize-hover-background-color: #006ab1;
+  --count-background-color: rgba(0, 106, 177, 0.1);
+  --heading-border-color: #d4d4d4;
+  --blockquote-color: #616161;
+  --ir-heading-color: #7f3f98;
+  --ir-title-color: #616161;
+  --ir-bi-color: #0451a5;
+  --ir-link-color: #008000;
+  --ir-bracket-color: #006ab1;
+  --ir-paren-color: #267f99;
+  --vmd-content-link-color: #006ab1;
+  --vmd-content-subtle-background: #fafbfc;
+  --vmd-content-code-background: rgba(27, 31, 35, 0.06);
+  --vmd-content-selection-background: rgba(0, 106, 177, 0.22);
+}
+
+:where(body[data-vmd-theme='light']) #app.vditor,
+:where(body[data-vmd-theme='light']) #app .vditor-content,
+:where(body[data-vmd-theme='light']) #app .vditor-ir,
+:where(body[data-vmd-theme='light']) #app .vditor-wysiwyg,
+:where(body[data-vmd-theme='light']) #app .vditor-sv,
+:where(body[data-vmd-theme='light']) #app .vditor-preview,
+:where(body[data-vmd-theme='light']) #app .vditor-reset {
+  color: var(--textarea-text-color);
+  background-color: var(--panel-background-color);
+}
+
+/* With the default setting enabled, use the complete active VS Code palette. */
+:where(body[data-vmd-theme='light'][data-use-vscode-theme-color='1']) {
+  color: var(--vscode-editor-foreground, #1f2328);
+  background: var(--vscode-editor-background, #ffffff);
+}
+
+:where(body[data-vmd-theme='light'][data-use-vscode-theme-color='1']) .vditor {
+  --border-color: var(--vscode-editorWidget-border, #d4d4d4);
+  --second-color: var(--vscode-descriptionForeground, rgba(97, 97, 97, 0.45));
+  --panel-background-color: var(--vscode-editor-background, #ffffff);
+  --toolbar-background-color: var(--vscode-editorGroupHeader-tabsBackground, var(--vscode-editor-background, #f3f3f3));
+  --toolbar-icon-color: var(--vscode-icon-foreground, var(--vscode-editor-foreground, #616161));
+  --toolbar-icon-hover-color: var(--vscode-textLink-foreground, #006ab1);
+  --textarea-background-color: var(--vscode-editor-background, #ffffff);
+  --textarea-text-color: var(--vscode-editor-foreground, #1f2328);
+  --resize-icon-color: var(--vscode-icon-foreground, #616161);
+  --resize-background-color: var(--vscode-editorGroupHeader-tabsBackground, var(--vscode-editor-background, #f3f3f3));
+  --resize-hover-background-color: var(--vscode-button-background, #006ab1);
+  --count-background-color: var(--vscode-editor-selectionBackground, rgba(0, 106, 177, 0.1));
+  --heading-border-color: var(--vscode-editorWidget-border, #d4d4d4);
+  --blockquote-color: var(--vscode-descriptionForeground, #616161);
+  --ir-heading-color: var(--vscode-symbolIcon-classForeground, #7f3f98);
+  --ir-title-color: var(--vscode-descriptionForeground, #616161);
+  --ir-bi-color: var(--vscode-symbolIcon-keywordForeground, #0451a5);
+  --ir-link-color: var(--vscode-textLink-foreground, #008000);
+  --ir-bracket-color: var(--vscode-textLink-foreground, #006ab1);
+  --ir-paren-color: var(--vscode-symbolIcon-stringForeground, #267f99);
+  --vmd-content-link-color: var(--vscode-textLink-foreground, #006ab1);
+  --vmd-content-subtle-background: var(--vscode-editorWidget-background, #fafbfc);
+  --vmd-content-code-background: var(--vscode-textCodeBlock-background, rgba(27, 31, 35, 0.06));
+  --vmd-content-selection-background: var(--vscode-editor-selectionBackground, rgba(0, 106, 177, 0.22));
+}
+
+:where(body[data-vmd-theme='light']) #app .vditor-reset a,
+:where(body[data-vmd-theme='light']) #app .vditor-ir__link {
+  color: var(--vmd-content-link-color);
+}
+
+:where(body[data-vmd-theme='light']) #app .vditor-reset h1,
+:where(body[data-vmd-theme='light']) #app .vditor-reset h2 {
+  border-bottom-color: var(--heading-border-color);
+}
+
+:where(body[data-vmd-theme='light']) #app .vditor-reset hr {
+  background-color: var(--heading-border-color);
+}
+
+:where(body[data-vmd-theme='light']) #app .vditor-reset blockquote {
+  color: var(--blockquote-color);
+  border-left-color: var(--border-color);
+}
+
+:where(body[data-vmd-theme='light']) #app .vditor-reset table tr {
+  background-color: var(--panel-background-color);
+  border-top-color: var(--border-color);
+}
+
+:where(body[data-vmd-theme='light']) #app .vditor-reset table tr:nth-child(2n) {
+  background-color: var(--vmd-content-subtle-background);
+}
+
+:where(body[data-vmd-theme='light']) #app .vditor-reset table td,
+:where(body[data-vmd-theme='light']) #app .vditor-reset table th {
+  border-color: var(--border-color);
+}
+
+:where(body[data-vmd-theme='light']) #app .vditor-reset code:not(.hljs):not(.highlight-chroma),
+:where(body[data-vmd-theme='light']) #app .vditor-reset kbd {
+  color: var(--textarea-text-color);
+  background-color: var(--vmd-content-code-background);
+}
+
+:where(body[data-vmd-theme='light']) #app .vditor-reset ::selection {
+  background-color: var(--vmd-content-selection-background);
+}

@@ -1,0 +1,482 @@
+/* @import url('vditor/dist/index.css');
+@import url('jquery-confirm/css/jquery-confirm.css'); */
+body {
+  margin: 0;
+  padding: 0;
+}
+html,
+body,
+#app {
+  height: 100%;
+  width: 100%;
+}
+/* The hide-until-ready rule lives inline in the HTML <head> (see extension.ts),
+   not here: this stylesheet itself loads asynchronously over VS Code's webview
+   resource protocol, so a rule to hide #app placed in here would not even be in
+   effect yet during the exact window it needs to cover. The reveal condition is
+   still driven by the same data-vmd-ready attribute set from main.ts. */
+/* Follow the VS Code font by default without blocking a workspace theme. */
+.vditor .vditor-reset {
+  font-family: var(--vscode-editor-font-family);
+}
+/* fix code block color in dark mode */
+.vditor--dark .vditor-reset code:not(.hljs):not(.highlight-chroma) {
+  background-color: rgba(66,133,244,.1);
+}
+/* Keep the toolbar at the left edge; toggling the editor gutter must not move it. */
+.vditor-toolbar.vditor-toolbar--pin {
+  padding-left: 5px!important;
+}
+/* Vditor hides its outline toggle in SV mode even though the outline can render
+   from the visible split-preview pane. Keep the control available in every mode. */
+.vditor-toolbar .vmd-outline-toggle {
+  display: inline-flex!important;
+}
+/* Reserve gutter space in every editable mode. */
+body.vmd-line-numbers-enabled .vditor-ir .vditor-reset,
+body.vmd-line-numbers-enabled .vditor-wysiwyg .vditor-reset,
+body.vmd-line-numbers-enabled .vditor-sv {
+  padding-left: 60px!important;
+}
+#vmd-line-number-gutter {
+  position: fixed;
+  width: 32px;
+  pointer-events: none;
+  user-select: none;
+  z-index: 10;
+  overflow: hidden;
+  border-right: 1px solid rgba(128, 128, 128, 0.12);
+}
+body:not(.vmd-line-numbers-enabled) #vmd-line-number-gutter {
+  display: none;
+}
+#vmd-line-number-gutter .vmd-line-number {
+  position: absolute;
+  width: 26px;
+  text-align: right;
+  font: 11px/1 'Cascadia Code', 'Consolas', monospace;
+  color: rgba(150, 150, 150, 0.5);
+}
+.vditor-ir pre.vditor-reset {
+  position: relative;
+}
+/* Prevent the browser's native scroll-anchoring from autonomously shifting scrollTop
+   as async content above the viewport (mermaid diagrams, images, lazily-sized
+   elements) finishes rendering/loading. That happens independently of any of our own
+   JS and previously caused the reading position to visibly jump around on its own
+   while a large document's content was still settling. Our own restore logic already
+   handles reapplying a saved position across those same layout shifts explicitly. */
+.vditor-ir .vditor-reset {
+  overflow-anchor: none;
+}
+/* Unwanted WYSIWYG controls are removed in wysiwyg-popover.ts. Do not leave
+   their now-empty popover visible after Vditor positions it. */
+.vditor-wysiwyg > .vmd-wysiwyg-popover--empty {
+  display: none!important;
+}
+
+/* Vditor represents HTML details as separate opening, body, and closing blocks
+   in WYSIWYG mode. The controller marks body blocks while a disclosure is
+   closed; the native selector also covers details kept in one HTML block. */
+.vditor-wysiwyg .vditor-reset details:not([open]) > :not(summary),
+.vditor-wysiwyg .vditor-reset .vmd-details-content--hidden {
+  display: none !important;
+}
+.vditor-wysiwyg .vditor-reset details > summary {
+  cursor: pointer;
+}
+
+/* YAML front matter. The generated table lives in a .vditor-wysiwyg__preview
+   container, which Lute skips when serializing back to Markdown, so hiding the
+   source below never affects the document text. wysiwyg-front-matter.ts adds
+   --rendered only once that container exists, so the source is never hidden
+   without a replacement on screen. */
+.vditor-wysiwyg
+  .vditor-reset
+  .vmd-front-matter-block--rendered
+  > pre:not(.vditor-wysiwyg__preview) {
+  display: none;
+}
+.vditor-wysiwyg .vditor-reset .vmd-front-matter-block--hidden {
+  display: none;
+}
+.vditor-wysiwyg .vditor-reset table.vmd-front-matter {
+  display: table;
+  width: auto;
+  min-width: min(100%, 32em);
+  margin: 0 0 1em;
+  border-collapse: collapse;
+  cursor: text;
+  font-size: 0.92em;
+}
+.vditor-wysiwyg .vditor-reset table.vmd-front-matter > caption {
+  padding: 0 0 0.3em;
+  color: var(--vscode-descriptionForeground, rgba(127, 127, 127, 0.9));
+  font-size: 0.85em;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+}
+.vditor-wysiwyg .vditor-reset table.vmd-front-matter td {
+  padding: 0.24em 0.7em;
+  border: 1px solid
+    var(--vscode-editorWidget-border, var(--border-color, rgba(127, 127, 127, 0.45)));
+  vertical-align: top;
+}
+.vditor-wysiwyg .vditor-reset .vmd-front-matter__key {
+  width: 1%;
+  color: var(--vscode-symbolIcon-propertyForeground, inherit);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.vditor-wysiwyg .vditor-reset .vmd-front-matter__key--depth-1 {
+  padding-left: 1.6em;
+  font-weight: 400;
+}
+.vditor-wysiwyg .vditor-reset .vmd-front-matter__key--depth-2 {
+  padding-left: 3em;
+  font-weight: 400;
+}
+.vditor-wysiwyg .vditor-reset .vmd-front-matter__key--depth-3 {
+  padding-left: 4.4em;
+  font-weight: 400;
+}
+/* Scalar types are distinguished so `false` and `null` cannot be mistaken for
+   the strings "false" and "null" in the table. */
+.vditor-wysiwyg .vditor-reset .vmd-front-matter__value--number,
+.vditor-wysiwyg .vditor-reset .vmd-front-matter__value--boolean,
+.vditor-wysiwyg .vditor-reset .vmd-front-matter__value--date {
+  color: var(--vscode-debugTokenExpression-number, #4080c0);
+  font-variant-numeric: tabular-nums;
+}
+.vditor-wysiwyg .vditor-reset .vmd-front-matter__value--null::after {
+  content: 'null';
+  opacity: 0.6;
+  font-style: italic;
+}
+.vditor-wysiwyg .vditor-reset .vmd-front-matter__value {
+  /* Literal and folded block scalars carry real line breaks. */
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.vditor-wysiwyg .vditor-reset .vmd-front-matter__list {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.vditor-wysiwyg .vditor-reset .vmd-front-matter__list > li {
+  margin: 0;
+}
+.vditor-wysiwyg .vditor-reset .vmd-front-matter--empty {
+  margin-bottom: 1em;
+  color: var(--vscode-descriptionForeground, rgba(127, 127, 127, 0.9));
+  font-size: 0.85em;
+}
+.vditor-wysiwyg .vditor-reset .vmd-front-matter--error {
+  margin-bottom: 1em;
+  padding: 0.5em 0.7em;
+  border-left: 3px solid
+    var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground, #c04040));
+  background: var(--vscode-inputValidation-errorBackground, rgba(192, 64, 64, 0.08));
+}
+.vditor-wysiwyg .vditor-reset .vmd-front-matter__error {
+  color: var(--vscode-errorForeground, #c04040);
+  font-size: 0.9em;
+}
+/* The raw source is echoed under the error so an unparseable block can still be
+   read. It is a copy for display; the editable source is the hidden pre above. */
+.vditor-wysiwyg .vditor-reset .vmd-front-matter__raw {
+  margin: 0.4em 0 0;
+  background: none;
+  color: var(--vscode-descriptionForeground, rgba(127, 127, 127, 0.9));
+  font-size: 0.9em;
+  white-space: pre-wrap;
+}
+/* Each semantic list container has its own outline so independently-created
+   lists remain visually distinguishable. Outline does not alter Vditor's list
+   indentation or layout, and nested lists retain their own logical boundary. */
+.vditor-ir .vditor-reset ul[data-block="0"],
+.vditor-ir .vditor-reset ol[data-block="0"],
+.vditor-wysiwyg .vditor-reset ul[data-block="0"],
+.vditor-wysiwyg .vditor-reset ol[data-block="0"] {
+  outline: 1px solid var(--vscode-editorWidget-border, var(--border-color, rgba(127, 127, 127, 0.55)));
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+.vditor-ir .vditor-reset ul[data-block="0"]:focus-within,
+.vditor-ir .vditor-reset ol[data-block="0"]:focus-within,
+.vditor-wysiwyg .vditor-reset ul[data-block="0"]:focus-within,
+.vditor-wysiwyg .vditor-reset ol[data-block="0"]:focus-within {
+  outline-color: var(--vscode-focusBorder, var(--vscode-editorWidget-border, #007fd4));
+}
+
+/* Table actions shared by IR and WYSIWYG modes. */
+#vmd-table-context-menu {
+  position: fixed;
+  z-index: 10000;
+  display: none;
+  min-width: 210px;
+  max-height: calc(100vh - 16px);
+  padding: 4px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  border: 1px solid var(--vscode-menu-border, var(--border-color));
+  border-radius: 5px;
+  color: var(--vscode-menu-foreground, var(--toolbar-icon-color));
+  background: var(--vscode-menu-background, var(--panel-background-color));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  font: 13px/1.4 var(--vscode-font-family, sans-serif);
+  user-select: none;
+}
+#vmd-table-context-menu button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 28px 4px 8px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 3px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+#vmd-table-context-menu button:not(:disabled):hover,
+#vmd-table-context-menu button:not(:disabled):focus-visible {
+  color: var(--vscode-menu-selectionForeground, #fff);
+  background: var(--vscode-menu-selectionBackground, #04395e);
+  outline: none;
+}
+#vmd-table-context-menu button:disabled {
+  opacity: 0.45;
+}
+#vmd-table-context-menu .vmd-table-context-menu__icon {
+  display: inline-flex;
+  flex: 0 0 16px;
+  align-items: center;
+  justify-content: center;
+}
+#vmd-table-context-menu .vmd-table-context-menu__icon svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+#vmd-table-context-menu .vmd-table-context-menu__label {
+  flex: 1;
+}
+#vmd-table-context-menu .vmd-table-context-menu__current::after {
+  position: absolute;
+  right: 9px;
+  content: '✓';
+}
+#vmd-table-context-menu .vmd-table-context-menu__separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--vscode-menu-separatorBackground, var(--border-color));
+}
+#vmd-table-context-menu .vmd-table-context-menu__danger:not(:hover) {
+  color: var(--vscode-errorForeground, #f48771);
+}
+
+/* Vditor ships tables as display:block/width:100%, which draws a full-width
+   outer box while the table layout only occupies its content width. Render it
+   as an actual table and allow cells to wrap so preview and editor match. */
+.vditor-reset table {
+  display: table;
+  width: 100%;
+  table-layout: auto;
+  overflow: visible;
+}
+.vditor-reset table th,
+.vditor-reset table td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Vditor's setPadding() centers editable content by computing symmetric
+   left/right padding as `(containerWidth - preview.maxWidth) / 2` (maxWidth
+   defaults to 800), applied as an inline style. We override padding-left to a
+   fixed value to leave room for our own gutter/toolbar, but without an equal
+   padding-right override, wide viewports keep vditor's large computed
+   right-padding, leaving a big unused gap on the right side of the editor. */
+.vditor-reset {
+  padding-left: 35px !important;
+  padding-right: 35px !important;
+}
+
+.jconfirm {
+  color: black;
+}
+.jconfirm-buttons button {
+  text-transform: none!important;
+}
+
+/* Keep custom and bundled toolbar glyphs on the same visual grid. Vditor
+   already reserves a 25px button, so every glyph should occupy its standard
+   15px square regardless of an inline width/height attribute in the source. */
+.vditor-toolbar .vditor-tooltipped {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.vditor-toolbar .vditor-tooltipped > svg {
+  display: block;
+  flex: 0 0 15px;
+  width: 15px !important;
+  height: 15px !important;
+}
+/* The two formula controls use MathType-like visual cues: inline math is
+   surrounded by text-line fragments, while display math is separated by
+   rules above and below the centered expression. */
+.vditor-toolbar .vmd-math-toolbar-icon,
+.vditor-toolbar .vmd-details-toolbar-icon {
+  color: currentColor;
+  shape-rendering: geometricPrecision;
+}
+
+/* ── Search and replace ─────────────────────────────────────────────────── */
+#vmd-search-bar {
+  position: fixed;
+  top: 40px;
+  right: 16px;
+  z-index: 9999;
+  display: none;
+  width: min(430px, calc(100vw - 32px));
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  box-sizing: border-box;
+  border: 1px solid var(--vscode-editorWidget-border, #454545);
+  border-radius: 6px;
+  color: var(--vscode-editorWidget-foreground, #ccc);
+  background: var(--vscode-editorWidget-background, #252526);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  font-size: 13px;
+}
+#vmd-search-bar.vmd-search-bar--open {
+  display: flex;
+}
+#vmd-search-bar .vmd-search-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+#vmd-search-replace-row[hidden] {
+  display: none;
+}
+#vmd-search-input,
+#vmd-search-replace-input {
+  width: 200px;
+  min-width: 80px;
+  flex: 1 1 auto;
+  padding: 3px 6px;
+  box-sizing: border-box;
+  border: 1px solid var(--vscode-input-border, #3c3c3c);
+  border-radius: 3px;
+  color: var(--vscode-input-foreground, #ccc);
+  background: var(--vscode-input-background, #3c3c3c);
+  font-size: 13px;
+  outline: none;
+}
+#vmd-search-input:focus,
+#vmd-search-replace-input:focus {
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+#vmd-search-replace-toggle {
+  width: 22px;
+  min-width: 22px;
+  padding: 2px;
+  font-size: 14px;
+  transition: transform 120ms ease;
+}
+#vmd-search-replace-toggle[aria-expanded="true"] {
+  transform: rotate(180deg);
+}
+#vmd-search-replace-row .vmd-search-replace-indent {
+  width: 22px;
+  min-width: 22px;
+}
+#vmd-search-count {
+  min-width: 44px;
+  color: var(--vscode-descriptionForeground, #888);
+  font-size: 12px;
+  text-align: center;
+}
+#vmd-search-count.vmd-search-count--nomatch {
+  color: var(--vscode-errorForeground, #f48771);
+}
+#vmd-search-bar button {
+  min-height: 24px;
+  padding: 2px 5px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: inherit;
+  background: none;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+#vmd-search-bar button:hover:not(:disabled),
+#vmd-search-bar button:focus-visible:not(:disabled) {
+  border-color: var(--vscode-button-border, #555);
+  background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.1));
+  outline: none;
+}
+#vmd-search-bar button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+#vmd-search-replace,
+#vmd-search-replace-all {
+  white-space: nowrap;
+}
+#vmd-search-case-label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+#vmd-search-case-label:hover {
+  border-color: var(--vscode-button-border, #555);
+  background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.1));
+}
+#vmd-search-case-label input {
+  margin: 0;
+  cursor: pointer;
+}
+@media (max-width: 560px) {
+  #vmd-search-bar {
+    right: 8px;
+    width: calc(100vw - 16px);
+  }
+  #vmd-search-count {
+    min-width: 36px;
+  }
+  #vmd-search-replace,
+  #vmd-search-replace-all {
+    padding-right: 4px;
+    padding-left: 4px;
+  }
+}
+
+/* WYSIWYG mode labels every block in the left gutter: "</>" for code blocks,
+   "$$" for math, "F" for front matter. The heading labels (H1-H6) are useful
+   for telling levels apart at a glance, but the block symbols only repeat what
+   the block already looks like. Vditor sets them all in one rule
+   (_wysiwyg.less), so the block variants are switched off here.
+
+   display: none rather than content: none, because that same rule also applies
+   float: left, margin-left: -29px and padding-right: 4px. Blanking only the
+   content would leave a floated empty box still shifting the first line. */
+.vditor-wysiwyg div.vditor-wysiwyg__block::before {
+  display: none;
+}

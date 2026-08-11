@@ -1,0 +1,172 @@
+{
+  "name": "markdown-interactor",
+  "displayName": "Markdown Interactor",
+  "icon": "media/logo.png",
+  "description": "An interactive WYSIWYG Markdown editor with live rendering, diagrams, math, and custom themes.",
+  "version": "0.1.10",
+  "publisher": "sontarakumar313-netizen",
+  "author": {
+    "name": "sontarakumar313-netizen",
+    "url": "https://github.com/sontarakumar313-netizen"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/sontarakumar313-netizen/vscode-md-interactor#readme",
+  "bugs": {
+    "url": "https://github.com/sontarakumar313-netizen/vscode-md-interactor/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sontarakumar313-netizen/vscode-md-interactor.git"
+  },
+  "engines": {
+    "vscode": "^1.51.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "markdown",
+    "markdown editor",
+    "markdown interactor",
+    "interactive markdown",
+    "wysiwyg",
+    "live preview",
+    "instant rendering",
+    "vditor",
+    "mermaid",
+    "math"
+  ],
+  "activationEvents": [
+    "onCommand:markdown-interactor.openEditor",
+    "onCommand:markdown-interactor.generateWorkspaceStyle",
+    "onWebviewPanel:markdown-interactor",
+    "onLanguage:markdown",
+    "onCustomEditor:markdown-interactor.customEditor"
+  ],
+  "main": "out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "markdown-interactor.openEditor",
+        "title": "Open with Markdown Interactor",
+        "category": "Markdown Interactor"
+      },
+      {
+        "command": "markdown-interactor.generateWorkspaceStyle",
+        "title": "Generate Default Workspace CSS",
+        "category": "Markdown Interactor"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "when": "resourceLangId == markdown",
+          "command": "markdown-interactor.openEditor",
+          "group": "navigation"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "when": "resourceLangId == markdown",
+          "command": "markdown-interactor.openEditor",
+          "group": "1_open"
+        }
+      ]
+    },
+    "customEditors": [
+      {
+        "viewType": "markdown-interactor.customEditor",
+        "displayName": "Markdown Interactor",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          },
+          {
+            "filenamePattern": "*.markdown"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "configuration": {
+      "title": "Markdown Interactor",
+      "properties": {
+        "markdown-interactor.imageSaveFolder": {
+          "type": "string",
+          "default": "assets",
+          "description": "Save uploaded images to this folder. The path is relative to the Markdown file by default; use `${projectRoot}/assets` to save them under the workspace root."
+        },
+        "markdown-interactor.maxUploadSizeMB": {
+          "type": "number",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Maximum size in MB for each pasted, dropped, or uploaded image or audio file."
+        },
+        "markdown-interactor.allowRemoteMedia": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow Markdown images and media hosted on HTTPS URLs to load in the editor. Disabling this blocks remote images, video, and audio referenced by the document. It does not block remote fonts, stylesheets, or scripts, which the editor itself needs to load."
+        },
+        "markdown-interactor.useVscodeThemeColor": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Use the active VS Code theme palette throughout the Markdown editor. The built-in light/dark theme still follows the VS Code theme kind when this is disabled.\n\n[$(new-file) Generate default workspace CSS](command:markdown-interactor.generateWorkspaceStyle)"
+        },
+        "markdown-interactor.frontMatterDisplay": {
+          "type": "string",
+          "default": "table",
+          "enum": [
+            "table",
+            "codeBlock",
+            "hide"
+          ],
+          "enumDescriptions": [
+            "Show YAML front matter as a table, and switch to the raw source while the caret is inside it.",
+            "Always show YAML front matter as a code area.",
+            "Hide YAML front matter. It stays in the document and is written back unchanged."
+          ],
+          "description": "How to display YAML front matter in WYSIWYG mode. The source text is never rewritten in any of these modes."
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "key": "ctrl+shift+alt+m",
+        "command": "markdown-interactor.openEditor",
+        "mac": "cmd+shift+alt+m",
+        "when": "editorTextFocus && editorLangId == markdown"
+      }
+    ]
+  },
+  "scripts": {
+    "watch": "npm run build && concurrently --kill-others --raw \"tsc --watch -p . --preserveWatchOutput\" \"node scripts/build-media.mjs --watch\"",
+    "start": "npm run watch",
+    "build": "npm run build:extension && npm run build:webview",
+    "build:extension": "tsc -p .",
+    "build:webview": "npm run typecheck:webview && node scripts/build-media.mjs",
+    "typecheck": "tsc -p . --noEmit && npm run typecheck:webview",
+    "typecheck:webview": "tsc -p media-src/tsconfig.json --noEmit",
+    "test:sync": "npm run build:extension && node scripts/test-text-sync.js",
+    "test:lute-reflow": "npm run build:extension && node scripts/test-lute-reflow.js",
+    "test:math": "node scripts/test-math-delimiters.js",
+    "test:sv-code-indent": "node scripts/test-sv-code-indent.js",
+    "test:front-matter": "node scripts/test-front-matter.js",
+    "test:vditor-options": "node scripts/test-vditor-options.js",
+    "test:session": "node scripts/test-host-update-policy.js",
+    "test:custom-editor-startup": "node scripts/test-custom-editor-startup.js",
+    "test:link-handler": "node scripts/test-link-handler.js",
+    "test:webview-controller": "node scripts/test-webview-controller.js",
+    "test:webview-interactions": "npm run build:webview && node scripts/test-webview-interactions.js",
+    "test": "npm run test:sync && npm run test:lute-reflow && npm run test:math && npm run test:sv-code-indent && npm run test:front-matter && npm run test:vditor-options && npm run test:session && npm run test:custom-editor-startup && npm run test:link-handler && npm run test:webview-controller && npm run test:webview-interactions",
+    "pub": "npm run build && npm version patch && vsce package && vsce publish && git push origin main --tags"
+  },
+  "devDependencies": {
+    "@types/node": "^12.12.0",
+    "@types/vscode": "~1.51.0",
+    "concurrently": "^9.2.4",
+    "esbuild": "^0.28.0",
+    "typescript": "^4.2.2"
+  }
+}

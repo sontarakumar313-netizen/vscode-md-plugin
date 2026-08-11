@@ -1,0 +1,515 @@
+/*
+ * Midnight Neon — 深海霓虹暗色主题
+ *
+ * 使用：复制本文件为项目根目录 `.vscode/markdown-interactor.css`，然后在编辑器
+ * “更多”菜单中执行“刷新加载工作区 CSS”。
+ *
+ * 覆盖范围：编辑区、分屏预览、工具栏、目录、行号、查找、表格、代码块、
+ * 数学/图表容器与滚动条。不改变插件自身的布局和行号预留宽度。
+ */
+
+:root {
+  --midnight-bg: #080d18;
+  --midnight-text: #dce7ff;
+  --midnight-muted: #8392ad;
+  --midnight-border: #23314b;
+  --midnight-cyan: #4de8e8;
+  --midnight-shadow: 0 14px 40px rgba(0, 0, 0, 0.42);
+  --midnight-mono: 'JetBrains Mono', 'Cascadia Code', 'SFMono-Regular',
+    Consolas, monospace;
+}
+
+html,
+body {
+  background: #080d18;
+}
+
+#app.vditor {
+  color-scheme: dark;
+
+  --midnight-bg: #080d18;
+  --midnight-surface: #0d1424;
+  --midnight-surface-2: #121c30;
+  --midnight-surface-3: #18243a;
+  --midnight-text: #dce7ff;
+  --midnight-muted: #8392ad;
+  --midnight-faint: #53617a;
+  --midnight-border: #23314b;
+  --midnight-cyan: #4de8e8;
+  --midnight-blue: #6aa9ff;
+  --midnight-purple: #bd93ff;
+  --midnight-pink: #ff77b7;
+  --midnight-green: #7ee2a8;
+  --midnight-yellow: #ffd580;
+  --midnight-red: #ff7b8b;
+  --midnight-code: #0a1120;
+  --midnight-selection: rgba(77, 232, 232, 0.2);
+  --midnight-shadow: 0 14px 40px rgba(0, 0, 0, 0.42);
+  --midnight-font: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', 'Microsoft YaHei UI', sans-serif;
+  --midnight-mono: 'JetBrains Mono', 'Cascadia Code', 'SFMono-Regular',
+    Consolas, monospace;
+
+  /* Vditor semantic variables */
+  --border-color: var(--midnight-border);
+  --second-color: rgba(131, 146, 173, 0.42);
+  --panel-background-color: var(--midnight-surface-2);
+  --panel-shadow: var(--midnight-shadow);
+  --toolbar-background-color: var(--midnight-surface);
+  --toolbar-icon-color: var(--midnight-muted);
+  --toolbar-icon-hover-color: var(--midnight-cyan);
+  --textarea-background-color: var(--midnight-bg);
+  --textarea-text-color: var(--midnight-text);
+  --resize-icon-color: var(--midnight-muted);
+  --resize-background-color: var(--midnight-surface);
+  --resize-hover-icon-color: var(--midnight-bg);
+  --resize-hover-background-color: var(--midnight-cyan);
+  --count-background-color: rgba(106, 169, 255, 0.18);
+  --heading-border-color: var(--midnight-border);
+  --blockquote-color: var(--midnight-muted);
+  --ir-heading-color: var(--midnight-purple);
+  --ir-title-color: var(--midnight-muted);
+  --ir-bi-color: var(--midnight-pink);
+  --ir-link-color: var(--midnight-green);
+  --ir-bracket-color: var(--midnight-blue);
+  --ir-paren-color: var(--midnight-cyan);
+
+  border: 0;
+  border-radius: 0;
+  background: var(--midnight-bg);
+  color: var(--midnight-text);
+  font-family: var(--midnight-font);
+}
+
+/* ── Editor and split preview surfaces ─────────────────────────────────── */
+#app .vditor-content,
+#app .vditor-ir,
+#app .vditor-wysiwyg,
+#app .vditor-sv,
+#app .vditor-preview,
+#app .vditor-reset {
+  background: var(--midnight-bg);
+  color: var(--midnight-text);
+}
+
+#app.vditor .vditor-reset,
+#app.vditor .vditor-sv {
+  font-family: var(--midnight-font);
+  font-size: 16px;
+  line-height: 1.72;
+  caret-color: var(--midnight-cyan);
+}
+
+#app .vditor-preview {
+  border-left-color: var(--midnight-border);
+}
+
+#app .vditor-ir pre.vditor-reset:focus,
+#app .vditor-wysiwyg pre.vditor-reset:focus,
+#app .vditor-sv:focus {
+  background: var(--midnight-bg);
+}
+
+#app.vditor *::selection {
+  background: var(--midnight-selection);
+  color: #f5fbff;
+}
+
+/* ── Toolbar and floating UI ───────────────────────────────────────────── */
+#app.vditor .vditor-toolbar {
+  background: var(--midnight-surface);
+  border-bottom: 1px solid var(--midnight-border);
+  box-shadow: 0 1px 0 rgba(77, 232, 232, 0.04),
+    0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+#app.vditor .vditor-toolbar__divider {
+  border-left-color: #31415f;
+}
+
+#app.vditor .vditor-toolbar__item .vditor-tooltipped {
+  color: var(--midnight-muted);
+  border-radius: 5px;
+}
+
+#app.vditor .vditor-toolbar__item .vditor-tooltipped:hover,
+#app.vditor .vditor-toolbar__item .vditor-tooltipped:focus,
+#app.vditor .vditor-menu--current {
+  color: var(--midnight-cyan) !important;
+  background: rgba(77, 232, 232, 0.08);
+}
+
+#app.vditor .vditor-tooltipped::after {
+  color: var(--midnight-text);
+  background: #1c2942;
+  border: 1px solid #334667;
+  box-shadow: var(--midnight-shadow);
+}
+
+#app.vditor .vditor-tooltipped__s::before,
+#app.vditor .vditor-tooltipped__se::before,
+#app.vditor .vditor-tooltipped__sw::before {
+  border-bottom-color: #334667;
+}
+
+#app.vditor .vditor-panel,
+#app.vditor .vditor-hint,
+#app.vditor .vditor-tip,
+#app.vditor .vditor-upload,
+#app.vditor .vditor-devtools {
+  color: var(--midnight-text);
+  background: var(--midnight-surface-2);
+  border-color: var(--midnight-border);
+  box-shadow: var(--midnight-shadow);
+}
+
+#app.vditor .vditor-panel::after {
+  color: var(--midnight-muted);
+  background: var(--midnight-surface-2);
+}
+
+#app.vditor .vditor-hint button,
+#app.vditor .vditor-panel button {
+  color: var(--midnight-text);
+  background: transparent;
+}
+
+#app.vditor .vditor-hint button:hover,
+#app.vditor .vditor-panel button:hover,
+#app.vditor .vditor-hint--current {
+  color: var(--midnight-cyan);
+  background: var(--midnight-surface-3);
+}
+
+/* ── Outline ───────────────────────────────────────────────────────────── */
+#app.vditor .vditor-outline {
+  color: var(--midnight-muted);
+  background: var(--midnight-surface);
+  border-color: var(--midnight-border);
+}
+
+#app.vditor .vditor-outline__title {
+  color: var(--midnight-cyan);
+  border-bottom-color: var(--midnight-border);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+#app.vditor .vditor-outline li > span {
+  border-radius: 5px;
+}
+
+#app.vditor .vditor-outline li > span:hover {
+  color: var(--midnight-text);
+  background: rgba(106, 169, 255, 0.1);
+}
+
+/* ── Headings and text ─────────────────────────────────────────────────── */
+#app.vditor .vditor-reset h1,
+#app.vditor .vditor-reset h2,
+#app.vditor .vditor-reset h3,
+#app.vditor .vditor-reset h4,
+#app.vditor .vditor-reset h5,
+#app.vditor .vditor-reset h6 {
+  color: var(--midnight-text);
+  font-family: var(--midnight-font);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+#app.vditor .vditor-reset h1 {
+  color: #f1f6ff;
+  font-size: 2em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid #2a3b59;
+}
+
+#app.vditor .vditor-reset h2 {
+  color: var(--midnight-blue);
+  font-size: 1.58em;
+  padding-bottom: 0.24em;
+  border-bottom: 1px solid var(--midnight-border);
+}
+
+#app.vditor .vditor-reset h3 {
+  color: var(--midnight-cyan);
+  font-size: 1.3em;
+}
+
+#app.vditor .vditor-reset h4 {
+  color: var(--midnight-purple);
+}
+
+#app.vditor .vditor-reset h5 {
+  color: var(--midnight-pink);
+}
+
+#app.vditor .vditor-reset h6 {
+  color: var(--midnight-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+#app.vditor .vditor-reset p,
+#app.vditor .vditor-reset li {
+  color: var(--midnight-text);
+}
+
+#app.vditor .vditor-reset a {
+  color: var(--midnight-blue);
+  text-decoration-color: rgba(106, 169, 255, 0.48);
+  text-underline-offset: 0.18em;
+}
+
+#app.vditor .vditor-reset a:hover {
+  color: var(--midnight-cyan);
+  text-decoration-color: var(--midnight-cyan);
+}
+
+#app.vditor .vditor-reset strong {
+  color: #f3f7ff;
+  font-weight: 750;
+}
+
+#app.vditor .vditor-reset em {
+  color: #c8b8ff;
+}
+
+#app.vditor .vditor-reset del {
+  color: var(--midnight-faint);
+}
+
+#app.vditor .vditor-reset mark {
+  color: #fff3c4;
+  background: rgba(255, 213, 128, 0.2);
+  border-bottom: 1px solid rgba(255, 213, 128, 0.7);
+  border-radius: 3px;
+  padding: 0 0.18em;
+}
+
+#app.vditor .vditor-reset blockquote {
+  color: #aebbd2;
+  background: linear-gradient(90deg, rgba(77, 232, 232, 0.09), transparent 75%);
+  border-left: 3px solid var(--midnight-cyan);
+  border-radius: 0 7px 7px 0;
+  padding: 0.75em 1em;
+}
+
+#app.vditor .vditor-reset hr {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #334769, transparent);
+  border: 0;
+}
+
+#app.vditor .vditor-reset ul > li::marker,
+#app.vditor .vditor-reset ol > li::marker {
+  color: var(--midnight-cyan);
+  font-weight: 700;
+}
+
+/* ── Code and syntax highlighting ──────────────────────────────────────── */
+#app.vditor .vditor-reset code:not(.hljs):not(.highlight-chroma) {
+  color: #a9e8ff;
+  background: rgba(106, 169, 255, 0.11) !important;
+  border: 1px solid rgba(106, 169, 255, 0.18);
+  border-radius: 4px;
+  padding: 0.12em 0.36em;
+  font-family: var(--midnight-mono);
+  font-size: 0.9em;
+}
+
+#app.vditor .vditor-reset pre {
+  color: #d8e5ff;
+  background: var(--midnight-code);
+  border: 1px solid #263653;
+  border-radius: 9px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025),
+    0 10px 26px rgba(0, 0, 0, 0.2);
+}
+
+#app.vditor .vditor-reset pre > code,
+#app.vditor .vditor-reset pre code.hljs {
+  color: #d8e5ff;
+  background: transparent !important;
+  border: 0;
+  font-family: var(--midnight-mono);
+}
+
+#app.vditor .hljs-comment,
+#app.vditor .hljs-quote {
+  color: #657694;
+  font-style: italic;
+}
+
+#app.vditor .hljs-keyword,
+#app.vditor .hljs-selector-tag,
+#app.vditor .hljs-literal {
+  color: var(--midnight-purple);
+}
+
+#app.vditor .hljs-string,
+#app.vditor .hljs-regexp,
+#app.vditor .hljs-addition {
+  color: var(--midnight-green);
+}
+
+#app.vditor .hljs-number,
+#app.vditor .hljs-meta,
+#app.vditor .hljs-built_in {
+  color: var(--midnight-yellow);
+}
+
+#app.vditor .hljs-title,
+#app.vditor .hljs-section,
+#app.vditor .hljs-function {
+  color: var(--midnight-blue);
+}
+
+#app.vditor .hljs-variable,
+#app.vditor .hljs-attr,
+#app.vditor .hljs-attribute {
+  color: var(--midnight-cyan);
+}
+
+#app.vditor .hljs-deletion,
+#app.vditor .hljs-error {
+  color: var(--midnight-red);
+}
+
+/* ── Diagrams, tables, media and controls ─────────────────────────────── */
+#app.vditor .vditor-reset .language-math,
+#app.vditor .vditor-reset .language-mermaid,
+#app.vditor .vditor-reset .language-echarts,
+#app.vditor .vditor-reset .language-graphviz,
+#app.vditor .vditor-reset .language-flowchart,
+#app.vditor .vditor-reset .language-mindmap,
+#app.vditor .vditor-reset .language-markmap,
+#app.vditor .vditor-reset .language-plantuml {
+  background: var(--midnight-surface);
+  border: 1px solid var(--midnight-border);
+  border-radius: 9px;
+  padding: 0.85em;
+  overflow: auto;
+}
+
+#app.vditor .vditor-reset table {
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid var(--midnight-border);
+  border-radius: 8px;
+}
+
+#app.vditor .vditor-reset table tr,
+#app.vditor .vditor-reset table tr:nth-child(2n) {
+  background: var(--midnight-bg);
+  border-top-color: var(--midnight-border);
+}
+
+#app.vditor .vditor-reset table tr:nth-child(2n) {
+  background: rgba(18, 28, 48, 0.7);
+}
+
+#app.vditor .vditor-reset table th {
+  color: var(--midnight-cyan);
+  background: var(--midnight-surface-2);
+  font-weight: 700;
+}
+
+#app.vditor .vditor-reset table td,
+#app.vditor .vditor-reset table th {
+  border-color: var(--midnight-border);
+}
+
+#app.vditor .vditor-reset img {
+  border: 1px solid var(--midnight-border);
+  border-radius: 9px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.34);
+}
+
+#app.vditor .vditor-reset kbd {
+  color: var(--midnight-text);
+  background: var(--midnight-surface-3);
+  border: 1px solid #3b4d6c;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  box-shadow: none;
+  font-family: var(--midnight-mono);
+}
+
+#app.vditor input[type='checkbox'] {
+  accent-color: var(--midnight-cyan);
+}
+
+/* ── Source/IR markers and line numbers ────────────────────────────────── */
+#app.vditor .vditor-ir__marker,
+#app.vditor .vditor-sv__marker {
+  color: var(--midnight-faint);
+  font-family: var(--midnight-mono);
+}
+
+#app.vditor .vditor-sv {
+  font-family: var(--midnight-mono);
+  color: #cdd9f2;
+}
+
+#vmd-line-number-gutter {
+  background: rgba(8, 13, 24, 0.92);
+  border-right-color: var(--midnight-border);
+}
+
+#vmd-line-number-gutter .vmd-line-number {
+  color: #536886;
+  font-family: var(--midnight-mono);
+}
+
+/* ── Search widget ─────────────────────────────────────────────────────── */
+#vmd-search-bar {
+  color: var(--midnight-text);
+  background: #111b2e;
+  border-color: #30415f;
+  box-shadow: var(--midnight-shadow);
+}
+
+#vmd-search-input {
+  color: var(--midnight-text);
+  background: #09111f;
+  border-color: #30415f;
+  caret-color: var(--midnight-cyan);
+}
+
+#vmd-search-input:focus {
+  border-color: var(--midnight-cyan);
+  box-shadow: 0 0 0 2px rgba(77, 232, 232, 0.12);
+}
+
+#vmd-search-count {
+  color: var(--midnight-muted);
+}
+
+#vmd-search-bar button:hover,
+#vmd-search-case-label:hover {
+  color: var(--midnight-cyan);
+  background: rgba(77, 232, 232, 0.08);
+  border-color: rgba(77, 232, 232, 0.28);
+}
+
+/* ── Scrollbars ────────────────────────────────────────────────────────── */
+#app.vditor *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+#app.vditor *::-webkit-scrollbar-track {
+  background: var(--midnight-bg);
+}
+
+#app.vditor *::-webkit-scrollbar-thumb {
+  background: #2b3a56;
+  border: 2px solid var(--midnight-bg);
+  border-radius: 999px;
+}
+
+#app.vditor *::-webkit-scrollbar-thumb:hover {
+  background: #3c5277;
+}

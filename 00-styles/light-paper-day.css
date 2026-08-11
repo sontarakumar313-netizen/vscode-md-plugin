@@ -1,0 +1,523 @@
+/*
+ * Paper Day — 暖纸白昼亮色主题
+ *
+ * 使用：复制本文件为项目根目录 `.vscode/markdown-interactor.css`，然后在编辑器
+ * “更多”菜单中执行“刷新加载工作区 CSS”。
+ *
+ * 设计目标：暖白纸张、清晰墨色、蓝绿色强调，兼顾长文阅读与源码编辑。
+ */
+
+:root {
+  --paper-bg: #f7f3e9;
+  --paper-sheet: #fffdf7;
+  --paper-surface: #f1ecdf;
+  --paper-surface-2: #e9e2d3;
+  --paper-text: #2b2926;
+  --paper-muted: #756f66;
+  --paper-faint: #aaa294;
+  --paper-border: #d9d1c2;
+  --paper-blue: #2f6f9f;
+  --paper-blue-soft: rgba(47, 111, 159, 0.09);
+  --paper-teal: #267b74;
+  --paper-green: #4f7a4f;
+  --paper-orange: #b86b32;
+  --paper-red: #b84e4a;
+  --paper-purple: #76558f;
+  --paper-yellow: #9a751e;
+  --paper-code: #eee9df;
+  --paper-shadow: 0 14px 36px rgba(72, 61, 43, 0.16);
+  --paper-font: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'Microsoft YaHei UI', sans-serif;
+  --paper-heading: Charter, 'Iowan Old Style', 'Palatino Linotype', Georgia,
+    'Noto Serif CJK SC', serif;
+  --paper-mono: 'JetBrains Mono', 'Cascadia Code', 'SFMono-Regular', Consolas,
+    monospace;
+}
+
+html,
+body {
+  background: var(--paper-bg);
+}
+
+#app.vditor {
+  color-scheme: light;
+  --border-color: var(--paper-border);
+  --second-color: rgba(117, 111, 102, 0.36);
+  --panel-background-color: var(--paper-sheet);
+  --panel-shadow: var(--paper-shadow);
+  --toolbar-background-color: var(--paper-surface);
+  --toolbar-icon-color: var(--paper-muted);
+  --toolbar-icon-hover-color: var(--paper-blue);
+  --textarea-background-color: var(--paper-sheet);
+  --textarea-text-color: var(--paper-text);
+  --resize-icon-color: var(--paper-muted);
+  --resize-background-color: var(--paper-surface);
+  --resize-hover-icon-color: #ffffff;
+  --resize-hover-background-color: var(--paper-blue);
+  --count-background-color: rgba(47, 111, 159, 0.1);
+  --heading-border-color: var(--paper-border);
+  --blockquote-color: var(--paper-muted);
+  --ir-heading-color: var(--paper-purple);
+  --ir-title-color: var(--paper-muted);
+  --ir-bi-color: var(--paper-orange);
+  --ir-link-color: var(--paper-green);
+  --ir-bracket-color: var(--paper-blue);
+  --ir-paren-color: var(--paper-teal);
+
+  color: var(--paper-text);
+  background: var(--paper-sheet);
+  border: 0;
+  border-radius: 0;
+  font-family: var(--paper-font);
+}
+
+/* ── Editor and split preview ──────────────────────────────────────────── */
+#app .vditor-content,
+#app .vditor-ir,
+#app .vditor-wysiwyg,
+#app .vditor-sv,
+#app .vditor-preview,
+#app .vditor-reset {
+  color: var(--paper-text);
+  background: var(--paper-sheet);
+}
+
+#app.vditor .vditor-reset,
+#app.vditor .vditor-sv {
+  color: var(--paper-text);
+  font-family: var(--paper-font);
+  font-size: 16px;
+  line-height: 1.72;
+  caret-color: var(--paper-blue);
+}
+
+#app .vditor-preview {
+  border-left-color: var(--paper-border);
+  background: var(--paper-bg);
+}
+
+#app .vditor-preview > .vditor-reset {
+  background: var(--paper-bg);
+}
+
+#app .vditor-ir pre.vditor-reset:focus,
+#app .vditor-wysiwyg pre.vditor-reset:focus,
+#app .vditor-sv:focus {
+  background: var(--paper-sheet);
+}
+
+#app.vditor *::selection {
+  color: #172a38;
+  background: rgba(74, 151, 203, 0.24);
+}
+
+/* ── Toolbar and floating UI ───────────────────────────────────────────── */
+#app.vditor .vditor-toolbar {
+  background: rgba(247, 243, 233, 0.98);
+  border-bottom: 1px solid var(--paper-border);
+  box-shadow: 0 3px 14px rgba(72, 61, 43, 0.08);
+}
+
+#app.vditor .vditor-toolbar__divider {
+  border-left-color: #c9c0b0;
+}
+
+#app.vditor .vditor-toolbar__item .vditor-tooltipped {
+  color: var(--paper-muted);
+  border-radius: 5px;
+}
+
+#app.vditor .vditor-toolbar__item .vditor-tooltipped:hover,
+#app.vditor .vditor-toolbar__item .vditor-tooltipped:focus,
+#app.vditor .vditor-menu--current {
+  color: var(--paper-blue) !important;
+  background: var(--paper-blue-soft);
+}
+
+#app.vditor .vditor-tooltipped::after {
+  color: #fffdf7;
+  background: #3c4246;
+  border: 1px solid #292e31;
+  box-shadow: 0 8px 22px rgba(32, 35, 37, 0.24);
+}
+
+#app.vditor .vditor-tooltipped__s::before,
+#app.vditor .vditor-tooltipped__se::before,
+#app.vditor .vditor-tooltipped__sw::before {
+  border-bottom-color: #292e31;
+}
+
+#app.vditor .vditor-panel,
+#app.vditor .vditor-hint,
+#app.vditor .vditor-tip,
+#app.vditor .vditor-upload,
+#app.vditor .vditor-devtools {
+  color: var(--paper-text);
+  background: var(--paper-sheet);
+  border-color: var(--paper-border);
+  box-shadow: var(--paper-shadow);
+}
+
+#app.vditor .vditor-panel::after {
+  color: var(--paper-muted);
+  background: var(--paper-sheet);
+}
+
+#app.vditor .vditor-hint button,
+#app.vditor .vditor-panel button {
+  color: var(--paper-text);
+  background: transparent;
+}
+
+#app.vditor .vditor-hint button:hover,
+#app.vditor .vditor-panel button:hover,
+#app.vditor .vditor-hint--current {
+  color: var(--paper-blue);
+  background: var(--paper-blue-soft);
+}
+
+/* ── Outline ───────────────────────────────────────────────────────────── */
+#app.vditor .vditor-outline {
+  color: var(--paper-muted);
+  background: var(--paper-surface);
+  border-color: var(--paper-border);
+}
+
+#app.vditor .vditor-outline__title {
+  color: var(--paper-blue);
+  border-bottom-color: var(--paper-border);
+  font-family: var(--paper-heading);
+  font-size: 1.02em;
+  font-weight: 700;
+}
+
+#app.vditor .vditor-outline li > span {
+  border-radius: 5px;
+}
+
+#app.vditor .vditor-outline li > span:hover {
+  color: #244d69;
+  background: rgba(47, 111, 159, 0.1);
+}
+
+/* ── Editorial typography ──────────────────────────────────────────────── */
+#app.vditor .vditor-reset h1,
+#app.vditor .vditor-reset h2,
+#app.vditor .vditor-reset h3,
+#app.vditor .vditor-reset h4,
+#app.vditor .vditor-reset h5,
+#app.vditor .vditor-reset h6 {
+  color: var(--paper-text);
+  font-family: var(--paper-heading);
+  font-weight: 700;
+  letter-spacing: -0.012em;
+}
+
+#app.vditor .vditor-reset h1 {
+  color: #24221f;
+  font-size: 2.05em;
+  padding-bottom: 0.28em;
+  border-bottom: 2px solid #c9bda8;
+}
+
+#app.vditor .vditor-reset h2 {
+  color: #285f87;
+  font-size: 1.62em;
+  padding-bottom: 0.2em;
+  border-bottom: 1px solid var(--paper-border);
+}
+
+#app.vditor .vditor-reset h3 {
+  color: var(--paper-teal);
+  font-size: 1.32em;
+}
+
+#app.vditor .vditor-reset h4 {
+  color: var(--paper-orange);
+}
+
+#app.vditor .vditor-reset h5 {
+  color: var(--paper-purple);
+}
+
+#app.vditor .vditor-reset h6 {
+  color: var(--paper-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+#app.vditor .vditor-reset p,
+#app.vditor .vditor-reset li {
+  color: var(--paper-text);
+}
+
+#app.vditor .vditor-reset a {
+  color: var(--paper-blue);
+  text-decoration-color: rgba(47, 111, 159, 0.38);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+#app.vditor .vditor-reset a:hover {
+  color: #1e577f;
+  text-decoration-color: #1e577f;
+}
+
+#app.vditor .vditor-reset strong {
+  color: #24211d;
+  font-weight: 750;
+}
+
+#app.vditor .vditor-reset em {
+  color: #73533b;
+}
+
+#app.vditor .vditor-reset del {
+  color: var(--paper-faint);
+}
+
+#app.vditor .vditor-reset mark {
+  color: #4d3b0b;
+  background: rgba(235, 197, 83, 0.28);
+  border-bottom: 1px solid rgba(154, 117, 30, 0.58);
+  border-radius: 2px;
+  padding: 0 0.18em;
+}
+
+#app.vditor .vditor-reset blockquote {
+  color: #615c55;
+  background: #f2eee4;
+  border-left: 3px solid var(--paper-teal);
+  border-radius: 0 6px 6px 0;
+  padding: 0.72em 1em;
+}
+
+#app.vditor .vditor-reset hr {
+  height: 1px;
+  border: 0;
+  background: linear-gradient(90deg, transparent, #c9bda8, transparent);
+}
+
+#app.vditor .vditor-reset ul > li::marker {
+  color: var(--paper-teal);
+}
+
+#app.vditor .vditor-reset ol > li::marker {
+  color: var(--paper-blue);
+  font-weight: 700;
+}
+
+/* ── Code and syntax highlighting ──────────────────────────────────────── */
+#app.vditor .vditor-reset code:not(.hljs):not(.highlight-chroma) {
+  color: #8c4628;
+  background: #eee8dd !important;
+  border: 1px solid #ddd2c2;
+  border-radius: 4px;
+  padding: 0.12em 0.34em;
+  font-family: var(--paper-mono);
+  font-size: 0.9em;
+}
+
+#app.vditor .vditor-reset pre {
+  color: #343434;
+  background: var(--paper-code);
+  border: 1px solid #d6cdbf;
+  border-radius: 7px;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.7),
+    0 8px 20px rgba(77, 64, 45, 0.09);
+}
+
+#app.vditor .vditor-reset pre > code,
+#app.vditor .vditor-reset pre code.hljs {
+  color: #343434;
+  background: transparent !important;
+  border: 0;
+  font-family: var(--paper-mono);
+}
+
+#app.vditor .hljs-comment,
+#app.vditor .hljs-quote {
+  color: #8c877f;
+  font-style: italic;
+}
+
+#app.vditor .hljs-keyword,
+#app.vditor .hljs-selector-tag,
+#app.vditor .hljs-literal {
+  color: var(--paper-purple);
+}
+
+#app.vditor .hljs-string,
+#app.vditor .hljs-regexp,
+#app.vditor .hljs-addition {
+  color: var(--paper-green);
+}
+
+#app.vditor .hljs-number,
+#app.vditor .hljs-meta,
+#app.vditor .hljs-built_in {
+  color: var(--paper-orange);
+}
+
+#app.vditor .hljs-title,
+#app.vditor .hljs-section,
+#app.vditor .hljs-function {
+  color: var(--paper-blue);
+}
+
+#app.vditor .hljs-variable,
+#app.vditor .hljs-attr,
+#app.vditor .hljs-attribute {
+  color: var(--paper-teal);
+}
+
+#app.vditor .hljs-deletion,
+#app.vditor .hljs-error {
+  color: var(--paper-red);
+}
+
+/* ── Diagrams, tables, media and controls ─────────────────────────────── */
+#app.vditor .vditor-reset .language-math,
+#app.vditor .vditor-reset .language-mermaid,
+#app.vditor .vditor-reset .language-echarts,
+#app.vditor .vditor-reset .language-graphviz,
+#app.vditor .vditor-reset .language-flowchart,
+#app.vditor .vditor-reset .language-mindmap,
+#app.vditor .vditor-reset .language-markmap,
+#app.vditor .vditor-reset .language-plantuml {
+  background: var(--paper-bg);
+  border: 1px solid var(--paper-border);
+  border-radius: 7px;
+  padding: 0.85em;
+  overflow: auto;
+}
+
+#app.vditor .vditor-reset table {
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border: 1px solid var(--paper-border);
+  border-radius: 7px;
+  box-shadow: 0 5px 14px rgba(72, 61, 43, 0.06);
+}
+
+#app.vditor .vditor-reset table tr {
+  border-top-color: var(--paper-border);
+}
+
+/* Apply fills to cells rather than rows: Vditor/content themes can set a cell
+   background that otherwise hides the light row color. */
+#app.vditor .vditor-reset table tr > td {
+  color: var(--paper-text);
+  background-color: var(--paper-sheet) !important;
+}
+
+#app.vditor .vditor-reset table tbody tr:nth-child(2n) > td {
+  background-color: #f5f0e6 !important;
+}
+
+#app.vditor .vditor-reset table tr > th {
+  color: #285f87;
+  background-color: #e9e2d3 !important;
+  font-weight: 700;
+}
+
+#app.vditor .vditor-reset table td,
+#app.vditor .vditor-reset table th {
+  border-color: var(--paper-border) !important;
+}
+
+#app.vditor .vditor-reset img {
+  background: var(--paper-sheet);
+  border: 1px solid var(--paper-border);
+  border-radius: 6px;
+  box-shadow: 0 12px 30px rgba(72, 61, 43, 0.14);
+}
+
+#app.vditor .vditor-reset kbd {
+  color: var(--paper-text);
+  background: #eee8dc;
+  border: 1px solid #cfc4b3;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  box-shadow: none;
+  font-family: var(--paper-mono);
+}
+
+#app.vditor input[type='checkbox'] {
+  accent-color: var(--paper-blue);
+}
+
+/* ── Source markers and line numbers ───────────────────────────────────── */
+#app.vditor .vditor-ir__marker,
+#app.vditor .vditor-sv__marker {
+  color: var(--paper-faint);
+  font-family: var(--paper-mono);
+}
+
+#app.vditor .vditor-sv {
+  color: #3b3834;
+  background: #fbf8f1;
+  font-family: var(--paper-mono);
+}
+
+#vmd-line-number-gutter {
+  background: rgba(255, 253, 247, 0.94);
+  border-right-color: var(--paper-border);
+}
+
+#vmd-line-number-gutter .vmd-line-number {
+  color: #a39a8c;
+  font-family: var(--paper-mono);
+}
+
+/* ── Search ────────────────────────────────────────────────────────────── */
+#vmd-search-bar {
+  color: var(--paper-text);
+  background: var(--paper-sheet);
+  border-color: #cfc5b5;
+  box-shadow: var(--paper-shadow);
+}
+
+#vmd-search-input {
+  color: var(--paper-text);
+  background: #fbf8f1;
+  border-color: #cfc5b5;
+  caret-color: var(--paper-blue);
+}
+
+#vmd-search-input:focus {
+  border-color: var(--paper-blue);
+  box-shadow: 0 0 0 2px rgba(47, 111, 159, 0.1);
+}
+
+#vmd-search-count {
+  color: var(--paper-muted);
+}
+
+#vmd-search-bar button:hover,
+#vmd-search-case-label:hover {
+  color: var(--paper-blue);
+  background: var(--paper-blue-soft);
+  border-color: rgba(47, 111, 159, 0.25);
+}
+
+/* ── Scrollbars ────────────────────────────────────────────────────────── */
+#app.vditor *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+#app.vditor *::-webkit-scrollbar-track {
+  background: var(--paper-sheet);
+}
+
+#app.vditor *::-webkit-scrollbar-thumb {
+  background: #cfc6b8;
+  border: 2px solid var(--paper-sheet);
+  border-radius: 999px;
+}
+
+#app.vditor *::-webkit-scrollbar-thumb:hover {
+  background: #afa596;
+}

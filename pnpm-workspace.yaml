@@ -1,0 +1,6 @@
+onlyBuiltDependencies:
+  - esbuild
+ignoredBuiltDependencies:
+  - core-js-pure
+packages:
+  - "./media-src"

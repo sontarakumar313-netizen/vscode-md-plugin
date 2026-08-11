@@ -1,0 +1,18 @@
+{
+  "name": "media-src",
+  "version": "0.0.0",
+  "private": true,
+  "browserslist": "> 0%",
+  "devDependencies": {
+    "@types/node": "^14.14.41",
+    "typescript": "^4.2.3"
+  },
+  "dependencies": {
+    "@babel/runtime-corejs3": "^7.13.17",
+    "date-fns": "^2.21.1",
+    "jquery": "^3.6.0",
+    "jquery-confirm": "^3.3.4",
+    "lodash": "^4.17.21",
+    "vditor": "3.11.2"
+  }
+}

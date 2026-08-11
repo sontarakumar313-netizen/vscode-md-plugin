@@ -1,0 +1,129 @@
+name: Build and publish extension
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    name: Build VSIX and publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build extension
+        run: pnpm build
+
+      - name: Prepare release files
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="$(node -p "require('./package.json').version")"
+          mkdir -p release
+
+          npx --yes @vscode/vsce@3.9.2 package \
+            --no-dependencies \
+            --out "release/markdown-interactor-${VERSION}.vsix"
+
+          git archive \
+            --format=zip \
+            --prefix="markdown-interactor-${VERSION}/" \
+            --output="release/markdown-interactor-${VERSION}-source.zip" \
+            "${GITHUB_SHA}"
+
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            RELEASE_TAG="${GITHUB_REF_NAME}"
+            RELEASE_NAME="Markdown Interactor ${GITHUB_REF_NAME}"
+            PRERELEASE="false"
+          else
+            RELEASE_TAG="continuous"
+            RELEASE_NAME="Markdown Interactor v${VERSION} (continuous)"
+            PRERELEASE="true"
+          fi
+
+          {
+            echo "version=${VERSION}"
+            echo "tag=${RELEASE_TAG}"
+            echo "name=${RELEASE_NAME}"
+            echo "prerelease=${PRERELEASE}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Update continuous-build tag
+        if: steps.release.outputs.prerelease == 'true'
+        shell: bash
+        run: |
+          git tag --force continuous "${GITHUB_SHA}"
+          git push --force origin refs/tags/continuous
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_NAME: ${{ steps.release.outputs.name }}
+          PRERELEASE: ${{ steps.release.outputs.prerelease }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            if [[ "${PRERELEASE}" == "true" ]]; then
+              gh release edit "${RELEASE_TAG}" \
+                --title "${RELEASE_NAME}" \
+                --notes "Automated build from commit ${GITHUB_SHA}."
+            fi
+          elif [[ "${PRERELEASE}" == "true" ]]; then
+            gh release create "${RELEASE_TAG}" \
+              --verify-tag \
+              --prerelease \
+              --title "${RELEASE_NAME}" \
+              --notes "Automated build from commit ${GITHUB_SHA}."
+          else
+            gh release create "${RELEASE_TAG}" \
+              --verify-tag \
+              --latest \
+              --title "${RELEASE_NAME}" \
+              --generate-notes
+          fi
+
+          gh release upload "${RELEASE_TAG}" \
+            release/*.vsix \
+            release/*-source.zip \
+            --clobber
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: markdown-interactor-${{ steps.release.outputs.version }}
+          path: release/*
+          if-no-files-found: error

@@ -1,0 +1,58 @@
+# Dependencies and package-manager state
+node_modules/
+.pnpm-store/
+.npm/
+
+# Build, package, and test output
+out/
+dist/
+lib/
+build/
+coverage/
+.nyc_output/
+.vscode-test/
+*.tsbuildinfo
+*.vsix
+*.tgz
+
+# Logs and runtime files
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.pid
+*.pid.lock
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Tool caches
+.cache/
+.parcel-cache/
+.eslintcache
+
+# Python artifacts (scripts/generate-logo.py)
+__pycache__/
+*.py[cod]
+
+# Editors and operating-system metadata
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Repository-local working material (never commit)
+/.pi-subagents/
+/00-docs/
+/test/
+/.obsidian/
+/.claude/
+/.AGENTS.md
+/TODO.md
+/nul
