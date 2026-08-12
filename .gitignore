@@ -56,5 +56,8 @@ Thumbs.db
 /.claude/
 /.AGENTS.md
 /TODO.md
-/nul
 /00-refs
+scripts/*.mjs
+scripts/*.py
+/out/
+/scripts/

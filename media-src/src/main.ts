@@ -622,7 +622,6 @@ document.addEventListener(
 )
 
 function initVditor(msg) {
-  console.log('msg', msg)
   const initializationGeneration = editorGeneration
   const content = msg.content
   // Hide the editor for the duration of its initial or explicitly requested rebuild.
@@ -834,7 +833,6 @@ function initVditor(msg) {
     upload: {
       url: '/fuzzy', // 没有 url 参数粘贴图片无法上传 see: https://github.com/Vanessa219/vditor/blob/d7628a0a7cfe5d28b055469bf06fb0ba5cfaa1b2/src/ts/util/fixBrowserBehavior.ts#L1409
       async handler(files) {
-        // console.log('files', files)
         const fileInfos = await Promise.all(
           files.map(async (f, index) => {
             const safeName = (f.name || 'file')
@@ -946,12 +944,10 @@ function initializeFromMessage(msg) {
       options: { mode: fixedMode },
     })
   }
-  console.log('initVditor')
 }
 
 window.addEventListener('message', (e) => {
   const msg = e.data
-  // console.log('msg from vscode', msg)
   switch (msg.command) {
     case 'update': {
       if (msg.type === 'init') {

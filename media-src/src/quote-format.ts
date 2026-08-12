@@ -145,13 +145,12 @@ function removeOneQuotePrefix(line: string): string {
   return line.replace(QUOTE_PREFIX, '')
 }
 
-function unwrapQuoteBlock(source: string, block: QuoteBlock): string {
+function unwrapQuoteBlock(block: QuoteBlock): string {
   const bodyLines = block.type === null ? block.lines : block.lines.slice(1)
   return bodyLines.map((line) => removeOneQuotePrefix(line.text)).join('\n')
 }
 
 function retypeQuoteBlock(
-  source: string,
   block: QuoteBlock,
   type: QuoteType
 ): string {
@@ -185,8 +184,8 @@ export function toggleQuoteAt(
   if (block) {
     const replacement =
       block.type === type
-        ? unwrapQuoteBlock(source, block)
-        : retypeQuoteBlock(source, block, type)
+        ? unwrapQuoteBlock(block)
+        : retypeQuoteBlock(block, type)
     const targetInReplacement = findTargetOffset(replacement, targetText, 0)
     return {
       content: replaceSourceRange(source, block.start, block.end, replacement),

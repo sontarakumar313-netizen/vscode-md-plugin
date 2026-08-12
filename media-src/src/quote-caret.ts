@@ -194,7 +194,6 @@ function occurrenceBeforeLine(
 }
 
 function resolveQuoteLine(
-  source: string,
   context: EditorSelectionContext,
   block: QuoteBlock,
   rendered: RenderedLine
@@ -366,7 +365,7 @@ export function resolveCaretLine(
   if (!rendered) return null
   const quoteBlock = sourceQuoteBlock(source, context)
   const line = quoteBlock
-    ? resolveQuoteLine(source, context, quoteBlock, rendered)
+    ? resolveQuoteLine(context, quoteBlock, rendered)
     : resolvePlainLine(source, context, rendered)
   if (!line) return null
   return {
