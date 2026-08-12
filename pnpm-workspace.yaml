@@ -4,3 +4,8 @@ ignoredBuiltDependencies:
   - core-js-pure
 packages:
   - "./media-src"
+patchedDependencies:
+  vditor@3.11.2: patches/vditor@3.11.2.patch
+allowBuilds:
+  core-js-pure: false
+  esbuild: true

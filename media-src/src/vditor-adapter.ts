@@ -11,7 +11,7 @@ import {
 import { setSelectionFocus } from 'vditor/src/ts/util/selection'
 import { afterRenderEvent as commitWysiwygAfterRender } from 'vditor/src/ts/wysiwyg/afterRenderEvent'
 
-export type VditorMode = 'ir' | 'wysiwyg' | 'sv'
+export type VditorMode = 'wysiwyg' | 'sv'
 
 /**
  * Vditor exposes most of the extension points used by this webview through an
@@ -25,7 +25,7 @@ export function getVditorInternals(editor: any = window.vditor): any | null {
 
 export function getVditorMode(editor: any = window.vditor): VditorMode | null {
   const mode = getVditorInternals(editor)?.currentMode || editor?.getCurrentMode?.()
-  return mode === 'ir' || mode === 'wysiwyg' || mode === 'sv' ? mode : null
+  return mode === 'wysiwyg' || mode === 'sv' ? mode : null
 }
 
 export function getVditorEditorElement(

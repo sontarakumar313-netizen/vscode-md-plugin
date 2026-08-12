@@ -1,0 +1,2815 @@
+diff --git a/lute.go b/lute.go
+index c258ce6..14ce28e 100644
+--- a/lute.go
++++ b/lute.go
+@@ -34,12 +34,10 @@ type Lute struct {
+ 
+ 	HTML2MdRendererFuncs          map[ast.NodeType]render.ExtRendererFunc // 用户自定义的 HTML2Md 渲染器函数
+ 	HTML2VditorDOMRendererFuncs   map[ast.NodeType]render.ExtRendererFunc // 用户自定义的 HTML2VditorDOM 渲染器函数
+-	HTML2VditorIRDOMRendererFuncs map[ast.NodeType]render.ExtRendererFunc // 用户自定义的 HTML2VditorIRDOM 渲染器函数
+ 	HTML2BlockDOMRendererFuncs    map[ast.NodeType]render.ExtRendererFunc // 用户自定义的 HTML2BlockDOM 渲染器函数
+ 	HTML2VditorSVDOMRendererFuncs map[ast.NodeType]render.ExtRendererFunc // 用户自定义的 HTML2VditorSVDOM 渲染器函数
+ 	Md2HTMLRendererFuncs          map[ast.NodeType]render.ExtRendererFunc // 用户自定义的 Md2HTML 渲染器函数
+ 	Md2VditorDOMRendererFuncs     map[ast.NodeType]render.ExtRendererFunc // 用户自定义的 Md2VditorDOM 渲染器函数
+-	Md2VditorIRDOMRendererFuncs   map[ast.NodeType]render.ExtRendererFunc // 用户自定义的 Md2VditorIRDOM 渲染器函数
+ 	Md2BlockDOMRendererFuncs      map[ast.NodeType]render.ExtRendererFunc // 用户自定义的 Md2BlockDOM 渲染器函数
+ 	Md2VditorSVDOMRendererFuncs   map[ast.NodeType]render.ExtRendererFunc // 用户自定义的 Md2VditorSVDOM 渲染器函数
+ }
+@@ -67,12 +65,10 @@ func New(opts ...ParseOption) (ret *Lute) {
+ 
+ 	ret.HTML2MdRendererFuncs = map[ast.NodeType]render.ExtRendererFunc{}
+ 	ret.HTML2VditorDOMRendererFuncs = map[ast.NodeType]render.ExtRendererFunc{}
+-	ret.HTML2VditorIRDOMRendererFuncs = map[ast.NodeType]render.ExtRendererFunc{}
+ 	ret.HTML2BlockDOMRendererFuncs = map[ast.NodeType]render.ExtRendererFunc{}
+ 	ret.HTML2VditorSVDOMRendererFuncs = map[ast.NodeType]render.ExtRendererFunc{}
+ 	ret.Md2HTMLRendererFuncs = map[ast.NodeType]render.ExtRendererFunc{}
+ 	ret.Md2VditorDOMRendererFuncs = map[ast.NodeType]render.ExtRendererFunc{}
+-	ret.Md2VditorIRDOMRendererFuncs = map[ast.NodeType]render.ExtRendererFunc{}
+ 	ret.Md2BlockDOMRendererFuncs = map[ast.NodeType]render.ExtRendererFunc{}
+ 	ret.Md2VditorSVDOMRendererFuncs = map[ast.NodeType]render.ExtRendererFunc{}
+ 	return ret
+@@ -399,11 +395,6 @@ func (lute *Lute) SetProtyleWYSIWYG(b bool) {
+ 	lute.RenderOptions.ProtyleWYSIWYG = b
+ }
+ 
+-func (lute *Lute) SetVditorIR(b bool) {
+-	lute.ParseOptions.VditorIR = b
+-	lute.RenderOptions.VditorIR = b
+-}
+-
+ func (lute *Lute) SetVditorSV(b bool) {
+ 	lute.ParseOptions.VditorSV = b
+ 	lute.RenderOptions.VditorSV = b
+@@ -572,8 +563,6 @@ func (lute *Lute) SetJSRenderers(options map[string]map[string]*js.Object) {
+ 			rendererFuncs = lute.HTML2MdRendererFuncs
+ 		} else if "HTML2VditorDOM" == rendererType {
+ 			rendererFuncs = lute.HTML2VditorDOMRendererFuncs
+-		} else if "HTML2VditorIRDOM" == rendererType {
+-			rendererFuncs = lute.HTML2VditorIRDOMRendererFuncs
+ 		} else if "HTML2BlockDOM" == rendererType {
+ 			rendererFuncs = lute.HTML2BlockDOMRendererFuncs
+ 		} else if "HTML2VditorSVDOM" == rendererType {
+@@ -582,8 +571,6 @@ func (lute *Lute) SetJSRenderers(options map[string]map[string]*js.Object) {
+ 			rendererFuncs = lute.Md2HTMLRendererFuncs
+ 		} else if "Md2VditorDOM" == rendererType {
+ 			rendererFuncs = lute.Md2VditorDOMRendererFuncs
+-		} else if "Md2VditorIRDOM" == rendererType {
+-			rendererFuncs = lute.Md2VditorIRDOMRendererFuncs
+ 		} else if "Md2BlockDOM" == rendererType {
+ 			rendererFuncs = lute.Md2BlockDOMRendererFuncs
+ 		} else if "Md2VditorSVDOM" == rendererType {
+diff --git a/parse/blocks.go b/parse/blocks.go
+index a792ef0..400fd33 100644
+--- a/parse/blocks.go
++++ b/parse/blocks.go
+@@ -24,7 +24,7 @@ func (t *Tree) parseBlocks() {
+ 	t.Context.Tip = t.Root
+ 	lines := 0
+ 	for line := t.lexer.NextLine(); nil != line; line = t.lexer.NextLine() {
+-		if t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorIR || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG {
++		if t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG {
+ 			if !bytes.Equal(line, editor.CaretNewlineTokens) && t.Context.Tip.ParentIs(ast.NodeListItem) && bytes.HasPrefix(line, editor.CaretTokens) {
+ 				// 插入符在开头的话移动到上一行结尾，处理 https://github.com/Vanessa219/vditor/issues/633 中的一些情况
+ 				if ast.NodeListItem == t.Context.Tip.Type {
+diff --git a/parse/code_block.go b/parse/code_block.go
+index 896b2cc..557fd00 100644
+--- a/parse/code_block.go
++++ b/parse/code_block.go
+@@ -161,7 +161,7 @@ func (context *Context) isFencedCodeClose(tokens []byte, openMarker byte, num in
+ 	}
+ 	tokens = lex.TrimWhitespace(tokens)
+ 	endCaret := bytes.HasSuffix(tokens, editor.CaretTokens)
+-	if context.ParseOption.VditorWYSIWYG || context.ParseOption.VditorIR || context.ParseOption.VditorSV || context.ParseOption.ProtyleWYSIWYG {
++	if context.ParseOption.VditorWYSIWYG || context.ParseOption.VditorSV || context.ParseOption.ProtyleWYSIWYG {
+ 		tokens = bytes.ReplaceAll(tokens, editor.CaretTokens, nil)
+ 		if endCaret {
+ 			context.Tip.Tokens = bytes.TrimSuffix(context.Tip.Tokens, []byte("\n"))
+diff --git a/parse/custom_block.go b/parse/custom_block.go
+index 07c0202..c74abc6 100644
+--- a/parse/custom_block.go
++++ b/parse/custom_block.go
+@@ -123,7 +123,7 @@ func (context *Context) isCustomBlockClose(tokens []byte) (ok bool) {
+ 	}
+ 	tokens = lex.TrimWhitespace(tokens)
+ 	endCaret := bytes.HasSuffix(tokens, editor.CaretTokens)
+-	if context.ParseOption.VditorWYSIWYG || context.ParseOption.VditorIR || context.ParseOption.VditorSV || context.ParseOption.ProtyleWYSIWYG {
++	if context.ParseOption.VditorWYSIWYG || context.ParseOption.VditorSV || context.ParseOption.ProtyleWYSIWYG {
+ 		tokens = bytes.ReplaceAll(tokens, editor.CaretTokens, nil)
+ 		if endCaret {
+ 			context.Tip.Tokens = bytes.TrimSuffix(context.Tip.Tokens, []byte("\n"))
+diff --git a/parse/delimiter.go b/parse/delimiter.go
+index c378c8d..fd467b0 100644
+--- a/parse/delimiter.go
++++ b/parse/delimiter.go
+@@ -309,7 +309,7 @@ func (t *Tree) scanDelims(ctx *InlineContext) *delimiter {
+ 			tokenBefore = rune(c)
+ 		}
+ 
+-		if (t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorIR || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG) && editor.Caret == string(tokenBefore) {
++		if (t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG) && editor.Caret == string(tokenBefore) {
+ 			// 跳过插入符位置向前看
+ 			caretLen := len(editor.Caret)
+ 			if 0 < startPos-caretLen {
+diff --git a/parse/footnotes.go b/parse/footnotes.go
+index b660003..03b08b2 100644
+--- a/parse/footnotes.go
++++ b/parse/footnotes.go
+@@ -81,7 +81,7 @@ func FootnotesContinue(footnotesDef *ast.Node, context *Context) int {
+ 
+ func (t *Tree) FindFootnotesDef(label []byte) (pos int, def *ast.Node) {
+ 	pos = 0
+-	if t.Context.ParseOption.VditorIR || t.Context.ParseOption.VditorSV || t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.ProtyleWYSIWYG {
++	if t.Context.ParseOption.VditorSV || t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.ProtyleWYSIWYG {
+ 		label = bytes.ReplaceAll(label, editor.CaretTokens, nil)
+ 	}
+ 	ast.Walk(t.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
+diff --git a/parse/heading.go b/parse/heading.go
+index da08776..2171d72 100644
+--- a/parse/heading.go
++++ b/parse/heading.go
+@@ -100,7 +100,7 @@ func SetextHeadingStart(t *Tree, container *ast.Node) int {
+ func (t *Tree) parseATXHeading() (ok bool, markers, content []byte, level int) {
+ 	tokens := t.Context.currentLine[t.Context.nextNonspace:]
+ 	var startCaret bool
+-	if (t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorIR || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG) && bytes.HasPrefix(tokens, editor.CaretTokens) {
++	if (t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG) && bytes.HasPrefix(tokens, editor.CaretTokens) {
+ 		tokens = bytes.ReplaceAll(tokens, editor.CaretTokens, nil)
+ 		startCaret = true
+ 	}
+@@ -111,7 +111,7 @@ func (t *Tree) parseATXHeading() (ok bool, markers, content []byte, level int) {
+ 	}
+ 
+ 	var inCaret bool
+-	if (t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorIR || t.Context.ParseOption.VditorSV) && bytes.Contains(tokens, []byte("#"+editor.Caret+"#")) {
++	if (t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorSV) && bytes.Contains(tokens, []byte("#"+editor.Caret+"#")) {
+ 		tokens = bytes.ReplaceAll(tokens, editor.CaretTokens, nil)
+ 		inCaret = true
+ 	}
+@@ -122,7 +122,7 @@ func (t *Tree) parseATXHeading() (ok bool, markers, content []byte, level int) {
+ 	}
+ 
+ 	var endCaret bool
+-	if (t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorIR || t.Context.ParseOption.VditorSV) && bytes.HasPrefix(tokens[level:], []byte(" "+editor.Caret)) {
++	if (t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorSV) && bytes.HasPrefix(tokens[level:], []byte(" "+editor.Caret)) {
+ 		tokens = bytes.ReplaceAll(tokens, editor.CaretTokens, nil)
+ 		endCaret = true
+ 	}
+@@ -163,7 +163,7 @@ func (t *Tree) parseATXHeading() (ok bool, markers, content []byte, level int) {
+ 		_, content = lex.TrimRight(content)
+ 	}
+ 
+-	if t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorIR || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG {
++	if t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG {
+ 		if startCaret || inCaret || endCaret {
+ 			content = append(editor.CaretTokens, content...)
+ 		}
+@@ -176,7 +176,7 @@ func (t *Tree) parseATXHeading() (ok bool, markers, content []byte, level int) {
+ func (t *Tree) parseSetextHeading() (level int) {
+ 	ln := lex.TrimWhitespace(t.Context.currentLine)
+ 	var caretInLn bool
+-	if t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorIR || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG {
++	if t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG {
+ 		if bytes.Contains(ln, editor.CaretTokens) {
+ 			caretInLn = true
+ 			ln = bytes.ReplaceAll(ln, editor.CaretTokens, nil)
+@@ -213,7 +213,7 @@ func (t *Tree) parseSetextHeading() (level int) {
+ 		level = 2
+ 	}
+ 
+-	if (t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorIR || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG) && caretInLn {
++	if (t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG) && caretInLn {
+ 		t.Context.oldtip.Tokens = lex.TrimWhitespace(t.Context.oldtip.Tokens)
+ 		t.Context.oldtip.AppendTokens(editor.CaretTokens)
+ 	}
+diff --git a/parse/inline.go b/parse/inline.go
+index 57c17c9..c17fceb 100644
+--- a/parse/inline.go
++++ b/parse/inline.go
+@@ -172,7 +172,7 @@ func (t *Tree) parseCloseBracket(ctx *InlineContext) *ast.Node {
+ 			if passed, remains, dest = t.Context.parseInlineLinkDest(remains); nil == passed {
+ 				break
+ 			}
+-			if t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorIR || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG {
++			if t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG {
+ 				if !isImage && nil == opener.node.Next {
+ 					break
+ 				}
+@@ -209,7 +209,7 @@ func (t *Tree) parseCloseBracket(ctx *InlineContext) *ast.Node {
+ 			ctx.pos += len(passed)
+ 			matched = isLink && 0 < len(remains)
+ 			if matched {
+-				if t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorIR || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG {
++				if t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG {
+ 					if bytes.HasPrefix(remains, []byte(editor.Caret+")")) {
+ 						if 0 < len(title) {
+ 							// 将 ‸) 换位为 )‸
+diff --git a/parse/inline_html.go b/parse/inline_html.go
+index 2253200..86611ad 100644
+--- a/parse/inline_html.go
++++ b/parse/inline_html.go
+@@ -26,7 +26,7 @@ func (t *Tree) parseInlineHTML(ctx *InlineContext) (ret *ast.Node) {
+ 	tokens := ctx.tokens
+ 	caretInTag := false
+ 	caretLeftSpace := false
+-	if t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorIR || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG {
++	if t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG {
+ 		caretIndex := bytes.Index(tokens, editor.CaretTokens)
+ 		caretInTag = caretIndex > ctx.pos
+ 		if caretInTag {
+@@ -113,7 +113,7 @@ func (t *Tree) parseInlineHTML(ctx *InlineContext) (ret *ast.Node) {
+ 		if lex.ItemSlash == tokens[0] {
+ 			tags = append(tags, tokens[1])
+ 		}
+-		if (t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorIR || t.Context.ParseOption.VditorSV) && caretInTag || t.Context.ParseOption.ProtyleWYSIWYG {
++		if (t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorSV) && caretInTag || t.Context.ParseOption.ProtyleWYSIWYG {
+ 			if !bytes.Contains(tags, []byte(editor.CaretReplacement+" ")) && !caretLeftSpace {
+ 				tags = bytes.ReplaceAll(tags, []byte("\" "+editor.CaretReplacement), []byte("\""+editor.CaretReplacement))
+ 			}
+diff --git a/parse/inline_link.go b/parse/inline_link.go
+index 315b191..57e19f6 100644
+--- a/parse/inline_link.go
++++ b/parse/inline_link.go
+@@ -151,7 +151,7 @@ func (context *Context) parseInlineLinkDest(tokens []byte) (passed, remains, des
+ 	}
+ 
+ 	if nil != passed {
+-		if (!context.ParseOption.VditorWYSIWYG && !context.ParseOption.VditorIR && !context.ParseOption.VditorSV && !context.ParseOption.ProtyleWYSIWYG) &&
++		if (!context.ParseOption.VditorWYSIWYG && !context.ParseOption.VditorSV && !context.ParseOption.ProtyleWYSIWYG) &&
+ 			!context.ParseOption.ImgPathAllowSpace {
+ 			destination = html.EncodeDestination(html.UnescapeBytes(destination))
+ 		}
+diff --git a/parse/inlines.go b/parse/inlines.go
+index d98a2bd..db9636d 100644
+--- a/parse/inlines.go
++++ b/parse/inlines.go
+@@ -46,7 +46,7 @@ func (t *Tree) walkParseInline(node *ast.Node) {
+ 		tokens := node.Tokens
+ 		if ast.NodeParagraph == typ {
+ 			if nil == tokens {
+-				if ast.NodeListItem != node.Parent.Type || t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorIR || t.Context.ParseOption.VditorSV {
++				if ast.NodeListItem != node.Parent.Type || t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorSV {
+ 					// 解析 GFM 表节点后段落内容 Tokens 可能会被置换为空，具体可参看函数 Paragraph.Finalize()
+ 					// 在这里从语法树上移除空段落节点
+ 					next := node.Next
+@@ -85,7 +85,7 @@ func (t *Tree) walkParseInline(node *ast.Node) {
+ 		// 2. 方便后续功能方面的处理，比如 GFM 自动链接解析
+ 		t.mergeText(node)
+ 
+-		if t.Context.ParseOption.GFMAutoLink && !t.Context.ParseOption.VditorWYSIWYG && !t.Context.ParseOption.VditorIR && !t.Context.ParseOption.VditorSV && !t.Context.ParseOption.ProtyleWYSIWYG {
++		if t.Context.ParseOption.GFMAutoLink && !t.Context.ParseOption.VditorWYSIWYG && !t.Context.ParseOption.VditorSV && !t.Context.ParseOption.ProtyleWYSIWYG {
+ 			t.parseGFMAutoEmailLink(node)
+ 			t.parseGFMAutoLink(node)
+ 		}
+diff --git a/parse/link.go b/parse/link.go
+index 7f7b9ad..c165324 100644
+--- a/parse/link.go
++++ b/parse/link.go
+@@ -111,7 +111,7 @@ func (context *Context) parseLinkTitle(tokens []byte) (validTitle bool, passed,
+ 		}
+ 	}
+ 	if nil != title {
+-		if !context.ParseOption.VditorWYSIWYG && !context.ParseOption.VditorIR && !context.ParseOption.VditorSV && !context.ParseOption.ProtyleWYSIWYG {
++		if !context.ParseOption.VditorWYSIWYG && !context.ParseOption.VditorSV && !context.ParseOption.ProtyleWYSIWYG {
+ 			title = html.UnescapeBytes(title)
+ 		}
+ 	}
+@@ -133,7 +133,7 @@ func (context *Context) parseBlockRefText(tokens []byte) (validTitle bool, passe
+ 		subtype = "d"
+ 	}
+ 	if nil != title {
+-		if !context.ParseOption.VditorWYSIWYG && !context.ParseOption.VditorIR && !context.ParseOption.VditorSV && !context.ParseOption.ProtyleWYSIWYG {
++		if !context.ParseOption.VditorWYSIWYG && !context.ParseOption.VditorSV && !context.ParseOption.ProtyleWYSIWYG {
+ 			title = html.UnescapeBytes(title)
+ 		}
+ 	}
+@@ -188,7 +188,7 @@ func (context *Context) parseLinkDest(tokens []byte) (ret, remains, destination
+ 		ret, remains, destination = context.parseLinkDest2(tokens) // [label](/url)
+ 	}
+ 	if nil != ret {
+-		if !context.ParseOption.VditorWYSIWYG && !context.ParseOption.VditorIR && !context.ParseOption.VditorSV && !context.ParseOption.ProtyleWYSIWYG {
++		if !context.ParseOption.VditorWYSIWYG && !context.ParseOption.VditorSV && !context.ParseOption.ProtyleWYSIWYG {
+ 			destination = html.EncodeDestination(html.UnescapeBytes(destination))
+ 		}
+ 	}
+@@ -339,7 +339,7 @@ func (context *Context) parseLinkLabel(tokens []byte) (n int, remains, label []b
+ 	}
+ 
+ 	label = lex.TrimWhitespace(label)
+-	if !context.ParseOption.VditorWYSIWYG && !context.ParseOption.VditorIR && !context.ParseOption.VditorSV && !context.ParseOption.ProtyleWYSIWYG {
++	if !context.ParseOption.VditorWYSIWYG && !context.ParseOption.VditorSV && !context.ParseOption.ProtyleWYSIWYG {
+ 		label = lex.ReplaceAll(label, lex.ItemNewline, lex.ItemSpace)
+ 		length := len(label)
+ 		var token byte
+diff --git a/parse/linkrefdef_case_fold.go b/parse/linkrefdef_case_fold.go
+index 0689db9..a99bb12 100644
+--- a/parse/linkrefdef_case_fold.go
++++ b/parse/linkrefdef_case_fold.go
+@@ -26,7 +26,7 @@ func (t *Tree) FindLinkRefDefLink(label []byte) (link *ast.Node) {
+ 		return
+ 	}
+ 
+-	if t.Context.ParseOption.VditorIR || t.Context.ParseOption.VditorSV || t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.ProtyleWYSIWYG {
++	if t.Context.ParseOption.VditorSV || t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.ProtyleWYSIWYG {
+ 		label = bytes.ReplaceAll(label, editor.CaretTokens, nil)
+ 	}
+ 	ast.Walk(t.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
+diff --git a/parse/linkrefdef_case_foldjs.go b/parse/linkrefdef_case_foldjs.go
+index 456b5b3..8d74664 100644
+--- a/parse/linkrefdef_case_foldjs.go
++++ b/parse/linkrefdef_case_foldjs.go
+@@ -25,7 +25,7 @@ func (t *Tree) FindLinkRefDefLink(label []byte) (link *ast.Node) {
+ 		return
+ 	}
+ 
+-	if t.Context.ParseOption.VditorIR || t.Context.ParseOption.VditorSV || t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.ProtyleWYSIWYG {
++	if t.Context.ParseOption.VditorSV || t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.ProtyleWYSIWYG {
+ 		label = bytes.ReplaceAll(label, editor.CaretTokens, nil)
+ 	}
+ 	ast.Walk(t.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
+diff --git a/parse/list.go b/parse/list.go
+index fb24273..c95071d 100644
+--- a/parse/list.go
++++ b/parse/list.go
+@@ -231,7 +231,7 @@ func (t *Tree) parseListMarker(container *ast.Node) (data *ast.ListData, ial [][
+ 			}
+ 		}
+ 
+-		if t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorIR || t.Context.ParseOption.VditorSV {
++		if t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorSV {
+ 			tokens = bytes.ReplaceAll(tokens, editor.CaretTokens, nil)
+ 		}
+ 
+diff --git a/parse/math_block.go b/parse/math_block.go
+index 9c7caee..9c4844d 100644
+--- a/parse/math_block.go
++++ b/parse/math_block.go
+@@ -79,7 +79,7 @@ func (context *Context) mathBlockFinalize(mathBlock *ast.Node) {
+ 	}
+ 	tokens := mathBlock.Tokens[2:] // 剔除开头的 $$
+ 	tokens = lex.TrimWhitespace(tokens)
+-	if context.ParseOption.VditorWYSIWYG || context.ParseOption.VditorIR || context.ParseOption.VditorSV || context.ParseOption.ProtyleWYSIWYG {
++	if context.ParseOption.VditorWYSIWYG || context.ParseOption.VditorSV || context.ParseOption.ProtyleWYSIWYG {
+ 		if bytes.HasSuffix(tokens, MathBlockMarkerCaret) {
+ 			// 剔除结尾的 $$‸
+ 			tokens = bytes.TrimSuffix(tokens, MathBlockMarkerCaret)
+diff --git a/parse/paragraph.go b/parse/paragraph.go
+index 6877746..f6b2f85 100644
+--- a/parse/paragraph.go
++++ b/parse/paragraph.go
+@@ -63,7 +63,7 @@ func paragraphFinalize(p *ast.Node, context *Context) (insertTable bool) {
+ 		// 尝试解析任务列表项
+ 		if listItem := p.Parent; nil != listItem && ast.NodeListItem == listItem.Type && listItem.FirstChild == p {
+ 			if 3 == listItem.ListData.Typ {
+-				isEditor := context.ParseOption.VditorWYSIWYG || context.ParseOption.VditorIR || context.ParseOption.VditorSV || context.ParseOption.ProtyleWYSIWYG
++				isEditor := context.ParseOption.VditorWYSIWYG || context.ParseOption.VditorSV || context.ParseOption.ProtyleWYSIWYG
+ 				isTaskListItem := 3 < len(p.Tokens)
+ 				if context.ParseOption.ProtyleWYSIWYG {
+ 					isTaskListItem = 3 <= len(p.Tokens)
+@@ -82,7 +82,7 @@ func paragraphFinalize(p *ast.Node, context *Context) (insertTable bool) {
+ 					if (3 == len(tokens) && (bytes.EqualFold(tokens, []byte("[x]")) || bytes.Equal(tokens, []byte("[ ]")))) ||
+ 						(3 < len(tokens) && (lex.IsWhitespace(tokens[3]) || editor.CaretTokens[0] == tokens[3] || editor.CaretTokens[0] == tokens[2])) {
+ 						var caretStartText, caretAfterCloseBracket, caretInBracket bool
+-						if context.ParseOption.VditorWYSIWYG || context.ParseOption.VditorIR || context.ParseOption.VditorSV || context.ParseOption.ProtyleWYSIWYG {
++						if context.ParseOption.VditorWYSIWYG || context.ParseOption.VditorSV || context.ParseOption.ProtyleWYSIWYG {
+ 							closeBracket := bytes.IndexByte(tokens, lex.ItemCloseBracket)
+ 							if bytes.HasPrefix(tokens, editor.CaretTokens) {
+ 								tokens = bytes.ReplaceAll(tokens, editor.CaretTokens, nil)
+diff --git a/parse/parse.go b/parse/parse.go
+index 236abb5..ca986ac 100644
+--- a/parse/parse.go
++++ b/parse/parse.go
+@@ -353,7 +353,6 @@ type Options struct {
+ 	// Vditor 所见即所得支持。
+ 	VditorWYSIWYG bool
+ 	// Vditor 即时渲染支持。
+-	VditorIR bool
+ 	// Vditor 分屏预览支持。
+ 	VditorSV bool
+ 	// Protyle 所见即所得支持。
+diff --git a/parse/text.go b/parse/text.go
+index 4c9a9c3..578ce02 100644
+--- a/parse/text.go
++++ b/parse/text.go
+@@ -71,7 +71,7 @@ func (t *Tree) parseBackslash(block *ast.Node, ctx *InlineContext) *ast.Node {
+ 		n.AppendChild(&ast.Node{Type: ast.NodeBackslashContent, Tokens: []byte{token}})
+ 		return nil
+ 	}
+-	if t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorIR || t.Context.ParseOption.ProtyleWYSIWYG {
++	if t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.ProtyleWYSIWYG {
+ 		// 处理 \‸x 情况，插入符后的字符才是待转义的
+ 		tokens := ctx.tokens[ctx.pos:]
+ 		caret := editor.CaretTokens
+diff --git a/parse/thematic_break.go b/parse/thematic_break.go
+index bf269e3..231e4b9 100644
+--- a/parse/thematic_break.go
++++ b/parse/thematic_break.go
+@@ -58,7 +58,7 @@ func (t *Tree) parseThematicBreak() (ok bool, caretTokens []byte) {
+ 		markerCnt++
+ 	}
+ 
+-	if (t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorIR || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG) && caretInLn {
++	if (t.Context.ParseOption.VditorWYSIWYG || t.Context.ParseOption.VditorSV || t.Context.ParseOption.ProtyleWYSIWYG) && caretInLn {
+ 		caretTokens = editor.CaretTokens
+ 	}
+ 	return 3 <= markerCnt, caretTokens
+diff --git a/parse/toc.go b/parse/toc.go
+index 43cdf09..018e8aa 100644
+--- a/parse/toc.go
++++ b/parse/toc.go
+@@ -25,7 +25,7 @@ func (context *Context) parseToC(paragraph *ast.Node) *ast.Node {
+ 	}
+ 
+ 	content := bytes.TrimSpace(lines[0])
+-	if context.ParseOption.VditorWYSIWYG || context.ParseOption.VditorIR || context.ParseOption.VditorSV {
++	if context.ParseOption.VditorWYSIWYG || context.ParseOption.VditorSV {
+ 		content = bytes.ReplaceAll(content, editor.CaretTokens, nil)
+ 	}
+ 	if !bytes.EqualFold(content, []byte("[toc]")) {
+diff --git a/parse/yaml_front_matter.go b/parse/yaml_front_matter.go
+index 7f89285..d504885 100644
+--- a/parse/yaml_front_matter.go
++++ b/parse/yaml_front_matter.go
+@@ -50,7 +50,7 @@ var YamlFrontMatterMarkerCaretNewline = util.StrToBytes("---" + editor.Caret + "
+ func (context *Context) yamlFrontMatterFinalize(node *ast.Node) {
+ 	tokens := node.Tokens[3:] // 剔除开头的 ---\n
+ 	tokens = lex.TrimWhitespace(tokens)
+-	if context.ParseOption.VditorWYSIWYG || context.ParseOption.VditorIR || context.ParseOption.VditorSV {
++	if context.ParseOption.VditorWYSIWYG || context.ParseOption.VditorSV {
+ 		if bytes.HasSuffix(tokens, YamlFrontMatterMarkerCaret) {
+ 			// 剔除结尾的 ---‸
+ 			tokens = bytes.TrimSuffix(tokens, YamlFrontMatterMarkerCaret)
+diff --git a/render/renderer.go b/render/renderer.go
+index c7072bd..41e207e 100644
+--- a/render/renderer.go
++++ b/render/renderer.go
+@@ -60,7 +60,6 @@ type Options struct {
+ 	// Vditor 所见即所得支持。
+ 	VditorWYSIWYG bool
+ 	// Vditor 即时渲染支持。
+-	VditorIR bool
+ 	// Vditor 分屏预览支持。
+ 	VditorSV bool
+ 	// Protyle 所见即所得支持。
+@@ -131,7 +130,6 @@ func NewOptions() *Options {
+ 		CodeSyntaxHighlightLineNum:     false,
+ 		CodeSyntaxHighlightStyleName:   "github",
+ 		VditorWYSIWYG:                  false,
+-		VditorIR:                       false,
+ 		VditorSV:                       false,
+ 		ProtyleWYSIWYG:                 false,
+ 		KramdownBlockIAL:               false,
+@@ -472,8 +470,6 @@ func (r *BaseRenderer) headings() (ret []*Heading) {
+ 		id := HeadingID(heading)
+ 		if r.Options.VditorWYSIWYG {
+ 			id = "wysiwyg-" + id
+-		} else if r.Options.VditorIR {
+-			id = "ir-" + id
+ 		}
+ 
+ 		if r.Options.KramdownBlockIAL {
+diff --git a/render/vditor_ir_renderer.go b/render/vditor_ir_renderer.go
+deleted file mode 100644
+index 04b8fb5..0000000
+--- a/render/vditor_ir_renderer.go
++++ /dev/null
+@@ -1,1529 +0,0 @@
+-// Lute - 一款结构化的 Markdown 引擎，支持 Go 和 JavaScript
+-// Copyright (c) 2019-present, b3log.org
+-//
+-// Lute is licensed under Mulan PSL v2.
+-// You can use this software according to the terms and conditions of the Mulan PSL v2.
+-// You may obtain a copy of Mulan PSL v2 at:
+-//         http://license.coscl.org.cn/MulanPSL2
+-// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+-// See the Mulan PSL v2 for more details.
+-
+-package render
+-
+-import (
+-	"bytes"
+-	"strconv"
+-	"strings"
+-
+-	"github.com/88250/lute/editor"
+-	"github.com/88250/lute/html"
+-
+-	"github.com/88250/lute/ast"
+-	"github.com/88250/lute/lex"
+-	"github.com/88250/lute/parse"
+-	"github.com/88250/lute/util"
+-)
+-
+-// VditorIRRenderer 描述了 Vditor Instant-Rendering DOM 渲染器。
+-type VditorIRRenderer struct {
+-	*BaseRenderer
+-}
+-
+-// NewVditorIRRenderer 创建一个 Vditor Instant-Rendering DOM 渲染器。
+-func NewVditorIRRenderer(tree *parse.Tree, options *Options) *VditorIRRenderer {
+-	ret := &VditorIRRenderer{BaseRenderer: NewBaseRenderer(tree, options)}
+-	ret.RendererFuncs[ast.NodeDocument] = ret.renderDocument
+-	ret.RendererFuncs[ast.NodeParagraph] = ret.renderParagraph
+-	ret.RendererFuncs[ast.NodeText] = ret.renderText
+-	ret.RendererFuncs[ast.NodeCodeSpan] = ret.renderCodeSpan
+-	ret.RendererFuncs[ast.NodeCodeSpanOpenMarker] = ret.renderCodeSpanOpenMarker
+-	ret.RendererFuncs[ast.NodeCodeSpanContent] = ret.renderCodeSpanContent
+-	ret.RendererFuncs[ast.NodeCodeSpanCloseMarker] = ret.renderCodeSpanCloseMarker
+-	ret.RendererFuncs[ast.NodeCodeBlock] = ret.renderCodeBlock
+-	ret.RendererFuncs[ast.NodeCodeBlockFenceOpenMarker] = ret.renderCodeBlockOpenMarker
+-	ret.RendererFuncs[ast.NodeCodeBlockFenceInfoMarker] = ret.renderCodeBlockInfoMarker
+-	ret.RendererFuncs[ast.NodeCodeBlockCode] = ret.renderCodeBlockCode
+-	ret.RendererFuncs[ast.NodeCodeBlockFenceCloseMarker] = ret.renderCodeBlockCloseMarker
+-	ret.RendererFuncs[ast.NodeMathBlock] = ret.renderMathBlock
+-	ret.RendererFuncs[ast.NodeMathBlockOpenMarker] = ret.renderMathBlockOpenMarker
+-	ret.RendererFuncs[ast.NodeMathBlockContent] = ret.renderMathBlockContent
+-	ret.RendererFuncs[ast.NodeMathBlockCloseMarker] = ret.renderMathBlockCloseMarker
+-	ret.RendererFuncs[ast.NodeInlineMath] = ret.renderInlineMath
+-	ret.RendererFuncs[ast.NodeInlineMathOpenMarker] = ret.renderInlineMathOpenMarker
+-	ret.RendererFuncs[ast.NodeInlineMathContent] = ret.renderInlineMathContent
+-	ret.RendererFuncs[ast.NodeInlineMathCloseMarker] = ret.renderInlineMathCloseMarker
+-	ret.RendererFuncs[ast.NodeEmphasis] = ret.renderEmphasis
+-	ret.RendererFuncs[ast.NodeEmA6kOpenMarker] = ret.renderEmAsteriskOpenMarker
+-	ret.RendererFuncs[ast.NodeEmA6kCloseMarker] = ret.renderEmAsteriskCloseMarker
+-	ret.RendererFuncs[ast.NodeEmU8eOpenMarker] = ret.renderEmUnderscoreOpenMarker
+-	ret.RendererFuncs[ast.NodeEmU8eCloseMarker] = ret.renderEmUnderscoreCloseMarker
+-	ret.RendererFuncs[ast.NodeStrong] = ret.renderStrong
+-	ret.RendererFuncs[ast.NodeStrongA6kOpenMarker] = ret.renderStrongA6kOpenMarker
+-	ret.RendererFuncs[ast.NodeStrongA6kCloseMarker] = ret.renderStrongA6kCloseMarker
+-	ret.RendererFuncs[ast.NodeStrongU8eOpenMarker] = ret.renderStrongU8eOpenMarker
+-	ret.RendererFuncs[ast.NodeStrongU8eCloseMarker] = ret.renderStrongU8eCloseMarker
+-	ret.RendererFuncs[ast.NodeBlockquote] = ret.renderBlockquote
+-	ret.RendererFuncs[ast.NodeBlockquoteMarker] = ret.renderBlockquoteMarker
+-	ret.RendererFuncs[ast.NodeHeading] = ret.renderHeading
+-	ret.RendererFuncs[ast.NodeHeadingC8hMarker] = ret.renderHeadingC8hMarker
+-	ret.RendererFuncs[ast.NodeHeadingID] = ret.renderHeadingID
+-	ret.RendererFuncs[ast.NodeList] = ret.renderList
+-	ret.RendererFuncs[ast.NodeListItem] = ret.renderListItem
+-	ret.RendererFuncs[ast.NodeThematicBreak] = ret.renderThematicBreak
+-	ret.RendererFuncs[ast.NodeHardBreak] = ret.renderHardBreak
+-	ret.RendererFuncs[ast.NodeSoftBreak] = ret.renderSoftBreak
+-	ret.RendererFuncs[ast.NodeHTMLBlock] = ret.renderHTML
+-	ret.RendererFuncs[ast.NodeInlineHTML] = ret.renderInlineHTML
+-	ret.RendererFuncs[ast.NodeLink] = ret.renderLink
+-	ret.RendererFuncs[ast.NodeImage] = ret.renderImage
+-	ret.RendererFuncs[ast.NodeBang] = ret.renderBang
+-	ret.RendererFuncs[ast.NodeOpenBracket] = ret.renderOpenBracket
+-	ret.RendererFuncs[ast.NodeCloseBracket] = ret.renderCloseBracket
+-	ret.RendererFuncs[ast.NodeOpenParen] = ret.renderOpenParen
+-	ret.RendererFuncs[ast.NodeCloseParen] = ret.renderCloseParen
+-	ret.RendererFuncs[ast.NodeOpenBrace] = ret.renderOpenBrace
+-	ret.RendererFuncs[ast.NodeCloseBrace] = ret.renderCloseBrace
+-	ret.RendererFuncs[ast.NodeLinkText] = ret.renderLinkText
+-	ret.RendererFuncs[ast.NodeLinkSpace] = ret.renderLinkSpace
+-	ret.RendererFuncs[ast.NodeLinkDest] = ret.renderLinkDest
+-	ret.RendererFuncs[ast.NodeLinkTitle] = ret.renderLinkTitle
+-	ret.RendererFuncs[ast.NodeStrikethrough] = ret.renderStrikethrough
+-	ret.RendererFuncs[ast.NodeStrikethrough1OpenMarker] = ret.renderStrikethrough1OpenMarker
+-	ret.RendererFuncs[ast.NodeStrikethrough1CloseMarker] = ret.renderStrikethrough1CloseMarker
+-	ret.RendererFuncs[ast.NodeStrikethrough2OpenMarker] = ret.renderStrikethrough2OpenMarker
+-	ret.RendererFuncs[ast.NodeStrikethrough2CloseMarker] = ret.renderStrikethrough2CloseMarker
+-	ret.RendererFuncs[ast.NodeTaskListItemMarker] = ret.renderTaskListItemMarker
+-	ret.RendererFuncs[ast.NodeTable] = ret.renderTable
+-	ret.RendererFuncs[ast.NodeTableHead] = ret.renderTableHead
+-	ret.RendererFuncs[ast.NodeTableRow] = ret.renderTableRow
+-	ret.RendererFuncs[ast.NodeTableCell] = ret.renderTableCell
+-	ret.RendererFuncs[ast.NodeEmoji] = ret.renderEmoji
+-	ret.RendererFuncs[ast.NodeEmojiUnicode] = ret.renderEmojiUnicode
+-	ret.RendererFuncs[ast.NodeEmojiImg] = ret.renderEmojiImg
+-	ret.RendererFuncs[ast.NodeEmojiAlias] = ret.renderEmojiAlias
+-	ret.RendererFuncs[ast.NodeFootnotesDefBlock] = ret.renderFootnotesDefBlock
+-	ret.RendererFuncs[ast.NodeFootnotesDef] = ret.renderFootnotesDef
+-	ret.RendererFuncs[ast.NodeFootnotesRef] = ret.renderFootnotesRef
+-	ret.RendererFuncs[ast.NodeToC] = ret.renderToC
+-	ret.RendererFuncs[ast.NodeBackslash] = ret.renderBackslash
+-	ret.RendererFuncs[ast.NodeBackslashContent] = ret.renderBackslashContent
+-	ret.RendererFuncs[ast.NodeHTMLEntity] = ret.renderHtmlEntity
+-	ret.RendererFuncs[ast.NodeYamlFrontMatter] = ret.renderYamlFrontMatter
+-	ret.RendererFuncs[ast.NodeYamlFrontMatterOpenMarker] = ret.renderYamlFrontMatterOpenMarker
+-	ret.RendererFuncs[ast.NodeYamlFrontMatterContent] = ret.renderYamlFrontMatterContent
+-	ret.RendererFuncs[ast.NodeYamlFrontMatterCloseMarker] = ret.renderYamlFrontMatterCloseMarker
+-	ret.RendererFuncs[ast.NodeMark] = ret.renderMark
+-	ret.RendererFuncs[ast.NodeMark1OpenMarker] = ret.renderMark1OpenMarker
+-	ret.RendererFuncs[ast.NodeMark1CloseMarker] = ret.renderMark1CloseMarker
+-	ret.RendererFuncs[ast.NodeSup] = ret.renderSup
+-	ret.RendererFuncs[ast.NodeSupOpenMarker] = ret.renderSupOpenMarker
+-	ret.RendererFuncs[ast.NodeSupCloseMarker] = ret.renderSupCloseMarker
+-	ret.RendererFuncs[ast.NodeSub] = ret.renderSub
+-	ret.RendererFuncs[ast.NodeSubOpenMarker] = ret.renderSubOpenMarker
+-	ret.RendererFuncs[ast.NodeSubCloseMarker] = ret.renderSubCloseMarker
+-	ret.RendererFuncs[ast.NodeMark2OpenMarker] = ret.renderMark2OpenMarker
+-	ret.RendererFuncs[ast.NodeMark2CloseMarker] = ret.renderMark2CloseMarker
+-	ret.RendererFuncs[ast.NodeKramdownBlockIAL] = ret.renderKramdownBlockIAL
+-	ret.RendererFuncs[ast.NodeLinkRefDefBlock] = ret.renderLinkRefDefBlock
+-	ret.RendererFuncs[ast.NodeLinkRefDef] = ret.renderLinkRefDef
+-	return ret
+-}
+-
+-func (r *VditorIRRenderer) renderLinkRefDefBlock(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.WriteString("<div data-block=\"0\" data-type=\"link-ref-defs-block\">")
+-	} else {
+-		r.WriteString("</div>")
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderLinkRefDef(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		dest := node.FirstChild.ChildByType(ast.NodeLinkDest).Tokens
+-		destStr := util.BytesToStr(dest)
+-		r.WriteString("[" + util.BytesToStr(node.Tokens) + "]:")
+-		if editor.Caret != destStr {
+-			r.WriteString(" ")
+-		}
+-		r.WriteString(destStr + "\n")
+-	}
+-	return ast.WalkSkipChildren
+-}
+-
+-func (r *VditorIRRenderer) renderKramdownBlockIAL(node *ast.Node, entering bool) ast.WalkStatus {
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderMark(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.renderSpanNode(node)
+-	} else {
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderMark1OpenMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.WriteString("=")
+-		r.Tag("/span", nil, false)
+-		r.Tag("mark", [][]string{{"data-newline", "1"}}, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderMark1CloseMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("/mark", nil, false)
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.WriteString("=")
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderMark2OpenMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.WriteString("==")
+-		r.Tag("/span", nil, false)
+-		r.Tag("mark", [][]string{{"data-newline", "1"}}, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderMark2CloseMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("/mark", nil, false)
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.WriteString("==")
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderSup(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.renderSpanNode(node)
+-	} else {
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderSupOpenMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.WriteString("^")
+-		r.Tag("/span", nil, false)
+-		r.Tag("sup", [][]string{{"data-newline", "1"}}, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderSupCloseMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("/sup", nil, false)
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.WriteString("^")
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderSub(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.renderSpanNode(node)
+-	} else {
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderSubOpenMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.WriteString("~")
+-		r.Tag("/span", nil, false)
+-		r.Tag("sub", [][]string{{"data-newline", "1"}}, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderSubCloseMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("/sub", nil, false)
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.WriteString("~")
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderYamlFrontMatterCloseMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"data-type", "yaml-front-matter-close-marker"}}, false)
+-		r.Write(parse.YamlFrontMatterMarker)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderYamlFrontMatterContent(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		node.Tokens = bytes.TrimSpace(node.Tokens)
+-		codeLen := len(node.Tokens)
+-		codeIsEmpty := 1 > codeLen || (len(editor.Caret) == codeLen && editor.Caret == string(node.Tokens))
+-		r.Tag("pre", [][]string{{"class", "vditor-ir__marker--pre"}}, false)
+-		r.Tag("code", [][]string{{"data-type", "yaml-front-matter"}, {"class", "language-yaml"}}, false)
+-		if codeIsEmpty {
+-			r.WriteString(editor.FrontEndCaret + "\n")
+-		} else {
+-			r.Write(html.EscapeHTML(node.Tokens))
+-		}
+-		r.WriteString("</code></pre>")
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderYamlFrontMatterOpenMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"data-type", "yaml-front-matter-open-marker"}}, false)
+-		r.Write(parse.YamlFrontMatterMarker)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderYamlFrontMatter(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.renderDivNode(node)
+-	} else {
+-		r.WriteString("</div>")
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderHtmlEntity(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.renderSpanNode(node)
+-		r.Tag("code", [][]string{{"data-newline", "1"}, {"class", "vditor-ir__marker vditor-ir__marker--pre"}, {"data-type", "html-entity"}}, false)
+-		r.Write(html.EscapeHTML(node.HtmlEntityTokens))
+-		r.Tag("/code", nil, false)
+-		r.Tag("span", [][]string{{"class", "vditor-ir__preview"}, {"data-render", "2"}}, false)
+-		r.Tag("code", nil, false)
+-		r.Write(node.HtmlEntityTokens)
+-		r.Tag("/code", nil, false)
+-		r.Tag("/span", nil, false)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderBackslashContent(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Write(html.EscapeHTML(node.Tokens))
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderBackslash(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.renderSpanNode(node)
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--bi"}}, false)
+-		r.WriteByte(lex.ItemBackslash)
+-		r.WriteString("</span>")
+-	} else {
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderToC(node *ast.Node, entering bool) ast.WalkStatus {
+-	return r.BaseRenderer.renderToC(node, entering)
+-}
+-
+-func (r *VditorIRRenderer) renderFootnotesDefBlock(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.WriteString("<div data-block=\"0\" data-type=\"footnotes-block\">")
+-	} else {
+-		r.WriteString("</div>")
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderFootnotesDef(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		if r.RenderingFootnotes {
+-			return ast.WalkContinue
+-		}
+-
+-		r.WriteString("<div data-type=\"footnotes-def\">")
+-		r.WriteString("[" + string(node.Tokens) + "]: ")
+-		for c := node.FirstChild; nil != c; c = c.Next {
+-			ast.Walk(c, func(n *ast.Node, entering bool) ast.WalkStatus {
+-				return r.RendererFuncs[n.Type](n, entering)
+-			})
+-		}
+-		r.WriteString("</div>")
+-		return ast.WalkSkipChildren
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderFootnotesRef(node *ast.Node, entering bool) ast.WalkStatus {
+-	if !entering {
+-		return ast.WalkContinue
+-	}
+-
+-	previousNodeText := node.PreviousNodeText()
+-	previousNodeText = strings.ReplaceAll(previousNodeText, editor.Caret, "")
+-	if "" == previousNodeText {
+-		r.WriteString(editor.Zwsp)
+-	}
+-	idx, def := r.Tree.FindFootnotesDef(node.Tokens)
+-	idxStr := strconv.Itoa(idx)
+-	label := def.Text()
+-	attrs := [][]string{{"data-type", "footnotes-ref"}}
+-	text := node.Text()
+-	expand := strings.Contains(text, editor.Caret)
+-	if expand {
+-		attrs = append(attrs, []string{"class", "vditor-ir__node vditor-ir__node--expand vditor-tooltipped vditor-tooltipped__s"})
+-	} else {
+-		attrs = append(attrs, []string{"class", "vditor-ir__node vditor-tooltipped vditor-tooltipped__s"})
+-	}
+-	attrs = append(attrs, []string{"aria-label", SubStr(html.EscapeString(label), 24)})
+-	attrs = append(attrs, []string{"data-footnotes-label", string(node.FootnotesRefLabel)})
+-	r.Tag("sup", attrs, false)
+-	r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--bracket"}}, false)
+-	r.WriteByte(lex.ItemOpenBracket)
+-	r.Tag("/span", nil, false)
+-	r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--link"}}, false)
+-	r.Write(node.Tokens)
+-	r.Tag("/span", nil, false)
+-	r.Tag("span", [][]string{{"class", "vditor-ir__marker--hide"}, {"data-render", "1"}}, false)
+-	r.WriteString(idxStr)
+-	r.Tag("/span", nil, false)
+-	r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--bracket"}}, false)
+-	r.WriteByte(lex.ItemCloseBracket)
+-	r.Tag("/span", nil, false)
+-	r.WriteString("</sup>" + editor.Zwsp)
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderCodeBlockCloseMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"data-type", "code-block-close-marker"}}, false)
+-		r.Write(node.Tokens)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderCodeBlockInfoMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--info"}, {"data-type", "code-block-info"}}, false)
+-		r.WriteString(editor.Zwsp)
+-		r.Write(node.CodeBlockInfo)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderCodeBlockOpenMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"data-type", "code-block-open-marker"}}, false)
+-		r.Write(node.Tokens)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderCodeBlock(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.renderDivNode(node)
+-	} else {
+-		r.WriteString("</div>")
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderCodeBlockCode(node *ast.Node, entering bool) ast.WalkStatus {
+-	if !entering {
+-		return ast.WalkContinue
+-	}
+-
+-	codeLen := len(node.Tokens)
+-	codeIsEmpty := 1 > codeLen || (len(editor.Caret) == codeLen && editor.Caret == string(node.Tokens))
+-	isFenced := node.Parent.IsFencedCodeBlock
+-	caretInInfo := false
+-	var language string
+-	if isFenced {
+-		caretInInfo = bytes.Contains(node.Previous.CodeBlockInfo, editor.CaretTokens)
+-		node.Previous.CodeBlockInfo = bytes.ReplaceAll(node.Previous.CodeBlockInfo, editor.CaretTokens, nil)
+-	}
+-	var attrs [][]string
+-	if isFenced && 0 < len(node.Previous.CodeBlockInfo) {
+-		infoWords := lex.Split(node.Previous.CodeBlockInfo, lex.ItemSpace)
+-		language = string(infoWords[0])
+-		attrs = append(attrs, []string{"class", "language-" + language})
+-		if "mindmap" == language {
+-			dataCode := EChartsMindmap(node.Tokens)
+-			attrs = append(attrs, []string{"data-code", string(dataCode)})
+-		}
+-	}
+-
+-	class := "vditor-ir__marker--pre"
+-	if r.Options.VditorCodeBlockPreview {
+-		class += " vditor-ir__marker"
+-	}
+-	r.Tag("pre", [][]string{{"class", class}}, false)
+-	r.Tag("code", attrs, false)
+-	if codeIsEmpty {
+-		if !caretInInfo {
+-			r.WriteString(editor.FrontEndCaret)
+-		}
+-		r.WriteByte(lex.ItemNewline)
+-	} else {
+-		r.Write(html.EscapeHTML(node.Tokens))
+-		r.Newline()
+-	}
+-	r.WriteString("</code></pre>")
+-
+-	if r.Options.VditorCodeBlockPreview {
+-		r.Tag("pre", [][]string{{"class", "vditor-ir__preview"}, {"data-render", "2"}}, false)
+-		preDiv := NoHighlight(language)
+-		if preDiv {
+-			r.Tag("div", attrs, false)
+-		} else {
+-			r.Tag("code", attrs, false)
+-		}
+-		tokens := node.Tokens
+-		tokens = bytes.ReplaceAll(tokens, editor.CaretTokens, nil)
+-		r.Write(html.EscapeHTML(tokens))
+-		if preDiv {
+-			r.WriteString("</div></pre>")
+-		} else {
+-			r.WriteString("</code></pre>")
+-		}
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderEmojiAlias(node *ast.Node, entering bool) ast.WalkStatus {
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderEmojiImg(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.WriteString("<span data-render=\"2\">")
+-		r.Write(node.Tokens)
+-		r.WriteString("</span>")
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.Write(node.FirstChild.Tokens)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderEmojiUnicode(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.WriteString("<span data-render=\"2\">")
+-		r.Write(node.Tokens)
+-		r.WriteString("</span>")
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.Write(node.FirstChild.Tokens)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderEmoji(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		previousNodeText := node.PreviousNodeText()
+-		previousNodeText = strings.ReplaceAll(previousNodeText, editor.Caret, "")
+-		if "" == previousNodeText {
+-			r.WriteString(editor.Zwsp)
+-		}
+-		r.renderSpanNode(node)
+-	} else {
+-		r.WriteString("</span>")
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderInlineMathCloseMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.WriteByte(lex.ItemDollar)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderInlineMathContent(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		tokens := node.Tokens
+-		tokens = html.EscapeHTML(tokens)
+-		r.Write(tokens)
+-		r.Tag("/code", nil, false)
+-		r.Tag("span", [][]string{{"class", "vditor-ir__preview"}, {"data-render", "2"}}, false)
+-		r.Tag("span", [][]string{{"class", "language-math"}}, false)
+-		tokens = bytes.ReplaceAll(tokens, editor.CaretTokens, nil)
+-		if node.ParentIs(ast.NodeTableCell) {
+-			// Improve the `|` render in the inline math in the table https://github.com/Vanessa219/vditor/issues/1550
+-			tokens = bytes.ReplaceAll(tokens, []byte("\\|"), []byte("|"))
+-		}
+-		r.Write(tokens)
+-		r.Tag("/span", nil, false)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderInlineMathOpenMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.WriteByte(lex.ItemDollar)
+-		r.Tag("/span", nil, false)
+-		r.Tag("code", [][]string{{"data-newline", "1"}, {"class", "vditor-ir__marker vditor-ir__marker--pre"}, {"data-type", "math-inline"}}, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderInlineMath(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.renderSpanNode(node)
+-	} else {
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderMathBlockCloseMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"data-type", "math-block-close-marker"}}, false)
+-		r.Write(parse.MathBlockMarker)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderMathBlockContent(node *ast.Node, entering bool) ast.WalkStatus {
+-	if !entering {
+-		return ast.WalkContinue
+-	}
+-
+-	node.Tokens = bytes.TrimSpace(node.Tokens)
+-	codeLen := len(node.Tokens)
+-	codeIsEmpty := 1 > codeLen || (len(editor.Caret) == codeLen && editor.Caret == string(node.Tokens))
+-	class := "vditor-ir__marker--pre"
+-	if r.Options.VditorMathBlockPreview {
+-		class += " vditor-ir__marker"
+-	}
+-	r.Tag("pre", [][]string{{"class", class}}, false)
+-	r.Tag("code", [][]string{{"data-type", "math-block"}, {"class", "language-math"}}, false)
+-	if codeIsEmpty {
+-		r.WriteString(editor.FrontEndCaret + "\n")
+-	} else {
+-		r.Write(html.EscapeHTML(node.Tokens))
+-	}
+-	r.WriteString("</code></pre>")
+-
+-	if r.Options.VditorMathBlockPreview {
+-		r.Tag("pre", [][]string{{"class", "vditor-ir__preview"}, {"data-render", "2"}}, false)
+-		r.Tag("div", [][]string{{"data-type", "math-block"}, {"class", "language-math"}}, false)
+-		tokens := node.Tokens
+-		tokens = bytes.ReplaceAll(tokens, editor.CaretTokens, nil)
+-		r.Write(html.EscapeHTML(tokens))
+-		r.WriteString("</div></pre>")
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderMathBlockOpenMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"data-type", "math-block-open-marker"}}, false)
+-		r.Write(parse.MathBlockMarker)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderMathBlock(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.renderDivNode(node)
+-	} else {
+-		r.WriteString("</div>")
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderTableCell(node *ast.Node, entering bool) ast.WalkStatus {
+-	tag := "td"
+-	if ast.NodeTableHead == node.Parent.Parent.Type {
+-		tag = "th"
+-	}
+-	if entering {
+-		var attrs [][]string
+-		switch node.TableCellAlign {
+-		case 1:
+-			attrs = append(attrs, []string{"align", "left"})
+-		case 2:
+-			attrs = append(attrs, []string{"align", "center"})
+-		case 3:
+-			attrs = append(attrs, []string{"align", "right"})
+-		}
+-		r.Tag(tag, attrs, false)
+-		if nil == node.FirstChild {
+-			node.AppendChild(&ast.Node{Type: ast.NodeText, Tokens: []byte(" ")})
+-		} else if bytes.Equal(node.FirstChild.Tokens, editor.CaretTokens) {
+-			node.FirstChild.Tokens = []byte(editor.Caret + " ")
+-		} else {
+-			node.FirstChild.Tokens = bytes.TrimSpace(node.FirstChild.Tokens)
+-		}
+-	} else {
+-		r.Tag("/"+tag, nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderTableRow(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("tr", nil, false)
+-	} else {
+-		r.Tag("/tr", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderTableHead(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("thead", nil, false)
+-	} else {
+-		r.Tag("/thead", nil, false)
+-		if nil != node.Next {
+-			r.Tag("tbody", nil, false)
+-		}
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderTable(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("table", [][]string{{"data-block", "0"}, {"data-type", "table"}}, false)
+-	} else {
+-		if nil != node.FirstChild.Next {
+-			r.Tag("/tbody", nil, false)
+-		}
+-		r.Tag("/table", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderStrikethrough(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.renderSpanNode(node)
+-	} else {
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderStrikethrough1OpenMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.WriteString("~")
+-		r.Tag("/span", nil, false)
+-		r.Tag("s", [][]string{{"data-newline", "1"}}, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderStrikethrough1CloseMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("/s", nil, false)
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.WriteString("~")
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderStrikethrough2OpenMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.WriteString("~~")
+-		r.Tag("/span", nil, false)
+-		r.Tag("s", [][]string{{"data-newline", "1"}}, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderStrikethrough2CloseMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("/s", nil, false)
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.WriteString("~~")
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderLinkTitle(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		if ast.NodeLink == node.Parent.Type && 3 == node.Parent.LinkType {
+-			return ast.WalkContinue
+-		}
+-
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--title"}}, false)
+-		r.WriteByte(lex.ItemDoublequote)
+-		r.Write(node.Tokens)
+-		r.WriteByte(lex.ItemDoublequote)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderLinkDest(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		if ast.NodeLink == node.Parent.Type && 3 == node.Parent.LinkType {
+-			return ast.WalkContinue
+-		}
+-
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--link"}}, false)
+-		dest := node.Tokens
+-		if r.Options.Sanitize {
+-			tokens := bytes.TrimSpace(dest)
+-			tokens = bytes.ToLower(tokens)
+-			if bytes.HasPrefix(tokens, []byte("javascript:")) {
+-				dest = nil
+-			}
+-		}
+-		dest = html.EscapeHTML(dest)
+-		r.Write(dest)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderLinkSpace(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		if ast.NodeLink == node.Parent.Type && 3 == node.Parent.LinkType {
+-			return ast.WalkContinue
+-		}
+-
+-		r.WriteByte(lex.ItemSpace)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderLinkText(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		if ast.NodeImage == node.Parent.Type {
+-			r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--bracket"}}, false)
+-		} else {
+-			if 3 == node.Parent.LinkType {
+-				r.Tag("span", nil, false)
+-			} else {
+-				r.Tag("span", [][]string{{"class", "vditor-ir__link"}}, false)
+-			}
+-		}
+-		r.Write(node.Tokens)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderCloseParen(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		if ast.NodeLink == node.Parent.Type && 3 == node.Parent.LinkType {
+-			return ast.WalkContinue
+-		}
+-
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--paren"}}, false)
+-		r.WriteByte(lex.ItemCloseParen)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderOpenParen(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		if ast.NodeLink == node.Parent.Type && 3 == node.Parent.LinkType {
+-			return ast.WalkContinue
+-		}
+-
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--paren"}}, false)
+-		r.WriteByte(lex.ItemOpenParen)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderCloseBrace(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--brace"}}, false)
+-		r.WriteByte(lex.ItemCloseBrace)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderOpenBrace(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--brace"}}, false)
+-		r.WriteByte(lex.ItemOpenBrace)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderCloseBracket(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--bracket"}}, false)
+-		r.WriteByte(lex.ItemCloseBracket)
+-		r.Tag("/span", nil, false)
+-
+-		if 3 == node.Parent.LinkType {
+-			linkText := node.Parent.ChildByType(ast.NodeLinkText)
+-			if nil == linkText || !bytes.EqualFold(node.Parent.LinkRefLabel, linkText.Tokens) {
+-				r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--link"}}, false)
+-				r.WriteByte(lex.ItemOpenBracket)
+-				r.Write(node.Parent.LinkRefLabel)
+-				r.WriteByte(lex.ItemCloseBracket)
+-				r.Tag("/span", nil, false)
+-			}
+-		}
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderOpenBracket(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--bracket"}}, false)
+-		r.WriteByte(lex.ItemOpenBracket)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderBang(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.WriteByte(lex.ItemBang)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderImage(node *ast.Node, entering bool) ast.WalkStatus {
+-	needResetCaret := nil != node.Next && ast.NodeText == node.Next.Type && bytes.HasPrefix(node.Next.Tokens, editor.CaretTokens)
+-
+-	if entering {
+-		if 3 == node.LinkType {
+-			node.ChildByType(ast.NodeOpenParen).Unlink()
+-			node.ChildByType(ast.NodeLinkDest).Unlink()
+-			if linkSpace := node.ChildByType(ast.NodeLinkSpace); nil != linkSpace {
+-				linkSpace.Unlink()
+-				node.ChildByType(ast.NodeLinkTitle).Unlink()
+-			}
+-			node.ChildByType(ast.NodeCloseParen).Unlink()
+-		}
+-
+-		text := r.Text(node)
+-		class := "vditor-ir__node"
+-		if strings.Contains(text, editor.Caret) || needResetCaret {
+-			class += " vditor-ir__node--expand"
+-		}
+-		r.Tag("span", [][]string{{"class", class}, {"data-type", "img"}}, false)
+-	} else {
+-		if needResetCaret {
+-			r.WriteString(editor.Caret)
+-			node.Next.Tokens = bytes.ReplaceAll(node.Next.Tokens, editor.CaretTokens, nil)
+-		}
+-
+-		link := node
+-		if 3 == node.LinkType {
+-			link = r.Tree.FindLinkRefDefLink(node.LinkRefLabel)
+-		}
+-		destTokens := link.ChildByType(ast.NodeLinkDest).Tokens
+-		destTokens = r.LinkPath(destTokens)
+-		destTokens = bytes.ReplaceAll(destTokens, editor.CaretTokens, nil)
+-		attrs := [][]string{{"src", string(destTokens)}}
+-		alt := node.ChildByType(ast.NodeLinkText)
+-		if nil != alt && 0 < len(alt.Tokens) {
+-			altTokens := bytes.ReplaceAll(alt.Tokens, editor.CaretTokens, nil)
+-			attrs = append(attrs, []string{"alt", string(altTokens)})
+-		}
+-		r.Tag("img", attrs, true)
+-
+-		// XSS 过滤
+-		buf := r.Writer.Bytes()
+-		idx := bytes.LastIndex(buf, []byte("<img src="))
+-		imgBuf := buf[idx:]
+-		if r.Options.Sanitize {
+-			imgBuf = sanitize(imgBuf)
+-		}
+-		r.Writer.Truncate(idx)
+-		r.Writer.Write(imgBuf)
+-
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderLink(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.renderSpanNode(node)
+-	} else {
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderHTML(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.renderDivNode(node)
+-		tokens := bytes.TrimSpace(node.Tokens)
+-		r.WriteString("<pre class=\"vditor-ir__marker--pre vditor-ir__marker\">")
+-		r.Tag("code", [][]string{{"data-type", "html-block"}}, false)
+-		r.Write(html.EscapeHTML(tokens))
+-		r.WriteString("</code></pre>")
+-
+-		r.Tag("pre", [][]string{{"class", "vditor-ir__preview"}, {"data-render", "2"}}, false)
+-		tokens = bytes.ReplaceAll(tokens, editor.CaretTokens, nil)
+-		if r.Options.Sanitize {
+-			tokens = sanitize(tokens)
+-		}
+-		r.Write(tokens)
+-		r.WriteString("</pre></div>")
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderInlineHTML(node *ast.Node, entering bool) ast.WalkStatus {
+-	if !entering {
+-		return ast.WalkContinue
+-	}
+-
+-	openKbd := bytes.Equal(node.Tokens, []byte("<kbd>"))
+-	closeKbd := bytes.Equal(node.Tokens, []byte("</kbd>"))
+-	if openKbd || closeKbd {
+-		if openKbd {
+-			if r.tagMatchClose("kbd", node) {
+-				r.renderSpanNode(node)
+-				r.Tag("code", [][]string{{"class", "vditor-ir__marker"}}, false)
+-				r.Write(html.EscapeHTML(node.Tokens))
+-				r.Tag("/code", nil, false)
+-				r.Tag("/span", nil, false)
+-				r.Tag("kbd", nil, false)
+-			} else {
+-				r.renderSpanNode(node)
+-				r.Tag("code", [][]string{{"class", "vditor-ir__marker"}}, false)
+-				r.Write(html.EscapeHTML(node.Tokens))
+-				r.Tag("/code", nil, false)
+-				r.Tag("/span", nil, false)
+-			}
+-		} else {
+-			if r.tagMatchOpen("kbd", node) {
+-				r.Tag("/kbd", nil, false)
+-				r.renderSpanNode(node)
+-				r.Tag("code", [][]string{{"class", "vditor-ir__marker"}}, false)
+-				r.Write(html.EscapeHTML(node.Tokens))
+-				r.Tag("/code", nil, false)
+-				r.Tag("/span", nil, false)
+-			} else {
+-				r.renderSpanNode(node)
+-				r.Tag("code", [][]string{{"class", "vditor-ir__marker"}}, false)
+-				r.Write(html.EscapeHTML(node.Tokens))
+-				r.Tag("/code", nil, false)
+-				r.Tag("/span", nil, false)
+-			}
+-		}
+-	} else {
+-		r.renderSpanNode(node)
+-		r.Tag("code", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.Write(html.EscapeHTML(node.Tokens))
+-		r.Tag("/code", nil, false)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) tagMatchClose(tag string, node *ast.Node) bool {
+-	for n := node.Next; nil != n; n = n.Next {
+-		if ast.NodeInlineHTML == n.Type && "</"+tag+">" == n.TokensStr() {
+-			return true
+-		}
+-	}
+-	return false
+-}
+-
+-func (r *VditorIRRenderer) tagMatchOpen(tag string, node *ast.Node) bool {
+-	for n := node.Previous; nil != n; n = n.Previous {
+-		if ast.NodeInlineHTML == n.Type && "<"+tag+">" == n.TokensStr() {
+-			return true
+-		}
+-	}
+-	return false
+-}
+-
+-func (r *VditorIRRenderer) renderDocument(node *ast.Node, entering bool) ast.WalkStatus {
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderParagraph(node *ast.Node, entering bool) ast.WalkStatus {
+-	if grandparent := node.Parent.Parent; nil != grandparent && ast.NodeList == grandparent.Type && grandparent.ListData.Tight { // List.ListItem.Paragraph
+-		return ast.WalkContinue
+-	}
+-
+-	if entering {
+-		r.Tag("p", [][]string{{"data-block", "0"}}, false)
+-	} else {
+-		r.Tag("/p", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderText(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		tokens := node.Tokens
+-		if r.Options.FixTermTypo {
+-			tokens = r.FixTermTypo(tokens)
+-		}
+-
+-		// 有的场景需要零宽空格撑起，但如果有其他文本内容的话需要把零宽空格删掉
+-		if !bytes.EqualFold(tokens, []byte(editor.Caret+editor.Zwsp)) {
+-			tokens = bytes.ReplaceAll(tokens, []byte(editor.Zwsp), nil)
+-		}
+-		r.Write(html.EscapeHTML(tokens))
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderCodeSpan(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.renderSpanNode(node)
+-	} else {
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderCodeSpanOpenMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		r.WriteString(strings.Repeat("`", node.Parent.CodeMarkerLen))
+-		if bytes.HasPrefix(node.Next.Tokens, []byte("`")) {
+-			r.WriteByte(lex.ItemSpace)
+-		}
+-		r.Tag("/span", nil, false)
+-		r.Tag("code", [][]string{{"data-newline", "1"}}, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderCodeSpanContent(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Write(html.EscapeHTML(node.Tokens))
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderCodeSpanCloseMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("/code", nil, false)
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker"}}, false)
+-		if bytes.HasSuffix(node.Previous.Tokens, []byte("`")) {
+-			r.WriteByte(lex.ItemSpace)
+-		}
+-		r.WriteString(strings.Repeat("`", node.Parent.CodeMarkerLen))
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderEmphasis(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.renderSpanNode(node)
+-	} else {
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderEmAsteriskOpenMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--bi"}}, false)
+-		r.WriteByte(lex.ItemAsterisk)
+-		r.Tag("/span", nil, false)
+-		r.Tag("em", [][]string{{"data-newline", "1"}}, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderEmAsteriskCloseMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("/em", nil, false)
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--bi"}}, false)
+-		r.WriteByte(lex.ItemAsterisk)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderEmUnderscoreOpenMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--bi"}}, false)
+-		r.WriteByte(lex.ItemUnderscore)
+-		r.Tag("/span", nil, false)
+-		r.Tag("em", [][]string{{"data-newline", "1"}}, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderEmUnderscoreCloseMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("/em", nil, false)
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--bi"}}, false)
+-		r.WriteByte(lex.ItemUnderscore)
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderStrong(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.renderSpanNode(node)
+-	} else {
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderStrongA6kOpenMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--bi"}}, false)
+-		r.WriteString("**")
+-		r.Tag("/span", nil, false)
+-		r.Tag("strong", [][]string{{"data-newline", "1"}}, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderStrongA6kCloseMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("/strong", nil, false)
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--bi"}}, false)
+-		r.WriteString("**")
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderStrongU8eOpenMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--bi"}}, false)
+-		r.WriteString("__")
+-		r.Tag("/span", nil, false)
+-		r.Tag("strong", [][]string{{"data-newline", "1"}}, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderStrongU8eCloseMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("/strong", nil, false)
+-		r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--bi"}}, false)
+-		r.WriteString("__")
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderBlockquote(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.WriteString(`<blockquote data-block="0">`)
+-	} else {
+-		r.WriteString("</blockquote>")
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderBlockquoteMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderHeading(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		text := r.Text(node)
+-		headingID := node.ChildByType(ast.NodeHeadingID)
+-		if strings.Contains(text, editor.Caret) || (nil != headingID && bytes.Contains(headingID.Tokens, editor.CaretTokens)) {
+-			r.WriteString("<h" + headingLevel[node.HeadingLevel:node.HeadingLevel+1] + " data-block=\"0\" class=\"vditor-ir__node vditor-ir__node--expand\"")
+-		} else {
+-			r.WriteString("<h" + headingLevel[node.HeadingLevel:node.HeadingLevel+1] + " data-block=\"0\" class=\"vditor-ir__node\"")
+-		}
+-
+-		var id string
+-		if nil != headingID {
+-			id = string(headingID.Tokens)
+-		}
+-		if "" == id {
+-			id = HeadingID(node)
+-		}
+-		r.WriteString(" id=\"ir-" + id + "\"")
+-		if !node.HeadingSetext {
+-			r.WriteString(" data-marker=\"#\">")
+-		} else {
+-			if 1 == node.HeadingLevel {
+-				r.WriteString(" data-marker=\"=\">")
+-			} else {
+-				r.WriteString(" data-marker=\"-\">")
+-			}
+-		}
+-		if r.Options.HeadingAnchor {
+-			id := HeadingID(node)
+-			r.Tag("a", [][]string{{"id", "vditorAnchor-" + id}, {"class", "vditor-anchor"}, {"href", "#" + id}}, false)
+-			r.WriteString(`<svg viewBox="0 0 16 16" version="1.1" width="16" height="16"><path fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg>`)
+-			r.Tag("/a", nil, false)
+-		}
+-
+-		if !node.HeadingSetext {
+-			r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--heading"}, {"data-type", "heading-marker"}}, false)
+-			r.WriteString(strings.Repeat("#", node.HeadingLevel) + " ")
+-			r.Tag("/span", nil, false)
+-		}
+-	} else {
+-		if node.HeadingSetext {
+-			r.Tag("span", [][]string{{"class", "vditor-ir__marker vditor-ir__marker--heading"}, {"data-type", "heading-marker"}, {"data-render", "2"}}, false)
+-			r.Newline()
+-			contentLen := r.setextHeadingLen(node)
+-			if 1 == node.HeadingLevel {
+-				r.WriteString(strings.Repeat("=", contentLen))
+-			} else {
+-				r.WriteString(strings.Repeat("-", contentLen))
+-			}
+-			r.Tag("/span", nil, false)
+-		}
+-		r.WriteString("</h" + headingLevel[node.HeadingLevel:node.HeadingLevel+1] + ">")
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderHeadingC8hMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderHeadingID(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("span", [][]string{{"data-type", "heading-id"}, {"class", "vditor-ir__marker"}}, false)
+-		r.WriteString(" {" + string(node.Tokens) + "}")
+-		r.Tag("/span", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderList(node *ast.Node, entering bool) ast.WalkStatus {
+-	tag := "ul"
+-	if 1 == node.ListData.Typ || (3 == node.ListData.Typ && 0 == node.ListData.BulletChar) {
+-		tag = "ol"
+-	}
+-	if entering {
+-		var attrs [][]string
+-		if node.ListData.Tight {
+-			attrs = append(attrs, []string{"data-tight", "true"})
+-		}
+-		if 0 == node.ListData.BulletChar {
+-			if 1 != node.ListData.Start {
+-				attrs = append(attrs, []string{"start", strconv.Itoa(node.ListData.Start)})
+-			}
+-		}
+-		switch node.ListData.Typ {
+-		case 0:
+-			attrs = append(attrs, []string{"data-marker", string(node.ListData.Marker)})
+-		case 1:
+-			attrs = append(attrs, []string{"data-marker", strconv.Itoa(node.ListData.Num) + string(node.ListData.Delimiter)})
+-		case 3:
+-			if 0 == node.ListData.BulletChar {
+-				attrs = append(attrs, []string{"data-marker", strconv.Itoa(node.ListData.Num) + string(node.ListData.Delimiter)})
+-			} else {
+-				attrs = append(attrs, []string{"data-marker", string(node.ListData.Marker)})
+-			}
+-		}
+-		attrs = append(attrs, []string{"data-block", "0"})
+-		r.renderListStyle(node, &attrs)
+-		r.Tag(tag, attrs, false)
+-	} else {
+-		r.Tag("/"+tag, nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderListItem(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		var attrs [][]string
+-		switch node.ListData.Typ {
+-		case 0:
+-			attrs = append(attrs, []string{"data-marker", string(node.ListData.Marker)})
+-		case 1:
+-			attrs = append(attrs, []string{"data-marker", strconv.Itoa(node.ListData.Num) + string(node.ListData.Delimiter)})
+-		case 3:
+-			if 0 == node.ListData.BulletChar {
+-				attrs = append(attrs, []string{"data-marker", strconv.Itoa(node.ListData.Num) + string(node.ListData.Delimiter)})
+-			} else {
+-				attrs = append(attrs, []string{"data-marker", string(node.ListData.Marker)})
+-			}
+-			if nil != node.FirstChild && nil != node.FirstChild.FirstChild && ast.NodeTaskListItemMarker == node.FirstChild.FirstChild.Type { // li.p.task
+-				attrs = append(attrs, []string{"class", r.Options.GFMTaskListItemClass})
+-			}
+-		}
+-		r.Tag("li", attrs, false)
+-	} else {
+-		r.Tag("/li", nil, false)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderTaskListItemMarker(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		var attrs [][]string
+-		if node.TaskListItemChecked {
+-			attrs = append(attrs, []string{"checked", ""})
+-		}
+-		attrs = append(attrs, []string{"type", "checkbox"})
+-		r.Tag("input", attrs, true)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderThematicBreak(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("hr", [][]string{{"data-block", "0"}}, true)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderHardBreak(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.Tag("br", nil, true)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderSoftBreak(node *ast.Node, entering bool) ast.WalkStatus {
+-	if entering {
+-		r.WriteByte(lex.ItemNewline)
+-	}
+-	return ast.WalkContinue
+-}
+-
+-func (r *VditorIRRenderer) renderSpanNode(node *ast.Node) {
+-	text := r.Text(node)
+-	var attrs [][]string
+-
+-	switch node.Type {
+-	case ast.NodeEmphasis:
+-		attrs = append(attrs, []string{"data-type", "em"})
+-	case ast.NodeStrong:
+-		attrs = append(attrs, []string{"data-type", "strong"})
+-	case ast.NodeStrikethrough:
+-		attrs = append(attrs, []string{"data-type", "s"})
+-	case ast.NodeMark:
+-		attrs = append(attrs, []string{"data-type", "mark"})
+-	case ast.NodeSup:
+-		attrs = append(attrs, []string{"data-type", "sup"})
+-	case ast.NodeSub:
+-		attrs = append(attrs, []string{"data-type", "sub"})
+-	case ast.NodeLink:
+-		if 3 != node.LinkType {
+-			attrs = append(attrs, []string{"data-type", "a"})
+-		} else {
+-			attrs = append(attrs, []string{"data-type", "link-ref"})
+-		}
+-	case ast.NodeImage:
+-		attrs = append(attrs, []string{"data-type", "img"})
+-	case ast.NodeCodeSpan:
+-		attrs = append(attrs, []string{"data-type", "code"})
+-	case ast.NodeEmoji:
+-		attrs = append(attrs, []string{"data-type", "emoji"})
+-	case ast.NodeInlineHTML:
+-		attrs = append(attrs, []string{"data-type", "html-inline"})
+-	case ast.NodeHTMLEntity:
+-		attrs = append(attrs, []string{"data-type", "html-entity"})
+-	case ast.NodeBackslash:
+-		attrs = append(attrs, []string{"data-type", "backslash"})
+-	default:
+-		attrs = append(attrs, []string{"data-type", "inline-node"})
+-	}
+-
+-	if strings.Contains(text, editor.Caret) {
+-		attrs = append(attrs, []string{"class", "vditor-ir__node vditor-ir__node--expand"})
+-		r.Tag("span", attrs, false)
+-		return
+-	}
+-
+-	preText := node.PreviousNodeText()
+-	if strings.HasSuffix(preText, editor.Caret) {
+-		attrs = append(attrs, []string{"class", "vditor-ir__node vditor-ir__node--expand"})
+-		r.Tag("span", attrs, false)
+-		return
+-	}
+-
+-	nexText := node.NextNodeText()
+-	if strings.HasPrefix(nexText, editor.Caret) {
+-		attrs = append(attrs, []string{"class", "vditor-ir__node vditor-ir__node--expand"})
+-		r.Tag("span", attrs, false)
+-		return
+-	}
+-
+-	attrs = append(attrs, []string{"class", "vditor-ir__node"})
+-	r.Tag("span", attrs, false)
+-	return
+-}
+-
+-func (r *VditorIRRenderer) renderDivNode(node *ast.Node) {
+-	text := r.Text(node)
+-	attrs := [][]string{{"data-block", "0"}}
+-	switch node.Type {
+-	case ast.NodeCodeBlock:
+-		attrs = append(attrs, []string{"data-type", "code-block"})
+-	case ast.NodeHTMLBlock:
+-		attrs = append(attrs, []string{"data-type", "html-block"})
+-	case ast.NodeMathBlock:
+-		attrs = append(attrs, []string{"data-type", "math-block"})
+-	case ast.NodeYamlFrontMatter:
+-		attrs = append(attrs, []string{"data-type", "yaml-front-matter"})
+-	}
+-
+-	if strings.Contains(text, editor.Caret) {
+-		attrs = append(attrs, []string{"class", "vditor-ir__node vditor-ir__node--expand"})
+-		r.Tag("div", attrs, false)
+-		return
+-	}
+-
+-	attrs = append(attrs, []string{"class", "vditor-ir__node"})
+-	r.Tag("div", attrs, false)
+-	return
+-}
+-
+-func (r *VditorIRRenderer) Text(node *ast.Node) (ret string) {
+-	ast.Walk(node, func(n *ast.Node, entering bool) ast.WalkStatus {
+-		if entering {
+-			switch n.Type {
+-			case ast.NodeText, ast.NodeLinkText, ast.NodeLinkDest, ast.NodeLinkTitle, ast.NodeCodeBlockCode, ast.NodeCodeSpanContent, ast.NodeInlineMathContent, ast.NodeMathBlockContent, ast.NodeYamlFrontMatterContent, ast.NodeHTMLBlock, ast.NodeInlineHTML, ast.NodeEmojiAlias:
+-				ret += string(n.Tokens)
+-			case ast.NodeCodeBlockFenceInfoMarker:
+-				ret += string(n.CodeBlockInfo)
+-			case ast.NodeLink:
+-				if 3 == n.LinkType {
+-					ret += string(n.LinkRefLabel)
+-				}
+-			}
+-		}
+-		return ast.WalkContinue
+-	})
+-	return
+-}
+diff --git a/vditor_ir.go b/vditor_ir.go
+deleted file mode 100644
+index 6e5359f..0000000
+--- a/vditor_ir.go
++++ /dev/null
+@@ -1,805 +0,0 @@
+-// Lute - 一款结构化的 Markdown 引擎，支持 Go 和 JavaScript
+-// Copyright (c) 2019-present, b3log.org
+-//
+-// Lute is licensed under Mulan PSL v2.
+-// You can use this software according to the terms and conditions of the Mulan PSL v2.
+-// You may obtain a copy of Mulan PSL v2 at:
+-//         http://license.coscl.org.cn/MulanPSL2
+-// THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+-// See the Mulan PSL v2 for more details.
+-
+-package lute
+-
+-import (
+-	"bytes"
+-	"strconv"
+-	"strings"
+-
+-	"github.com/88250/lute/ast"
+-	"github.com/88250/lute/editor"
+-	"github.com/88250/lute/html"
+-	"github.com/88250/lute/html/atom"
+-	"github.com/88250/lute/parse"
+-	"github.com/88250/lute/render"
+-	"github.com/88250/lute/util"
+-)
+-
+-// SpinVditorIRDOM 自旋 Vditor Instant-Rendering DOM，用于即时渲染模式下的编辑。
+-func (lute *Lute) SpinVditorIRDOM(ivHTML string) (ovHTML string) {
+-	// 替换插入符
+-	ivHTML = strings.ReplaceAll(ivHTML, "<wbr>", editor.Caret)
+-	markdown := lute.vditorIRDOM2Md(ivHTML)
+-	tree := parse.Parse("", []byte(markdown), lute.ParseOptions)
+-	renderer := render.NewVditorIRRenderer(tree, lute.RenderOptions)
+-	output := renderer.Render()
+-	// 替换插入符
+-	ovHTML = strings.ReplaceAll(string(output), editor.Caret, "<wbr>")
+-	return
+-}
+-
+-// HTML2VditorIRDOM 将 HTML 转换为 Vditor Instant-Rendering DOM，用于即时渲染模式下粘贴。
+-func (lute *Lute) HTML2VditorIRDOM(sHTML string) (vHTML string) {
+-	markdown, err := lute.HTML2Markdown(sHTML)
+-	if nil != err {
+-		vHTML = err.Error()
+-		return
+-	}
+-
+-	tree := parse.Parse("", []byte(markdown), lute.ParseOptions)
+-	renderer := render.NewVditorIRRenderer(tree, lute.RenderOptions)
+-	for nodeType, rendererFunc := range lute.HTML2VditorIRDOMRendererFuncs {
+-		renderer.ExtRendererFuncs[nodeType] = rendererFunc
+-	}
+-	output := renderer.Render()
+-	vHTML = string(output)
+-	return
+-}
+-
+-// VditorIRDOM2HTML 将 Vditor Instant-Rendering DOM 转换为 HTML，用于 Vditor.getHTML() 接口。
+-func (lute *Lute) VditorIRDOM2HTML(vhtml string) (sHTML string) {
+-	markdown := lute.vditorIRDOM2Md(vhtml)
+-	sHTML = lute.Md2HTML(markdown)
+-	return
+-}
+-
+-// Md2VditorIRDOM 将 markdown 转换为 Vditor Instant-Rendering DOM，用于从源码模式切换至即时渲染模式。
+-func (lute *Lute) Md2VditorIRDOM(markdown string) (vHTML string) {
+-	tree := parse.Parse("", []byte(markdown), lute.ParseOptions)
+-	renderer := render.NewVditorIRRenderer(tree, lute.RenderOptions)
+-	for nodeType, rendererFunc := range lute.Md2VditorIRDOMRendererFuncs {
+-		renderer.ExtRendererFuncs[nodeType] = rendererFunc
+-	}
+-	output := renderer.Render()
+-	vHTML = string(output)
+-	return
+-}
+-
+-// VditorIRDOM2Md 将 Vditor Instant-Rendering DOM 转换为 markdown，用于从即时渲染模式切换至源码模式。
+-func (lute *Lute) VditorIRDOM2Md(htmlStr string) (markdown string) {
+-	htmlStr = strings.ReplaceAll(htmlStr, editor.Zwsp, "")
+-	markdown = lute.vditorIRDOM2Md(htmlStr)
+-	markdown = strings.ReplaceAll(markdown, editor.Zwsp, "")
+-	return
+-}
+-
+-func (lute *Lute) vditorIRDOM2Md(htmlStr string) (markdown string) {
+-	// 删掉插入符
+-	htmlStr = strings.ReplaceAll(htmlStr, "<wbr>", "")
+-
+-	// 替换结尾空白，否则 HTML 解析会产生冗余节点导致生成空的代码块
+-	htmlStr = strings.ReplaceAll(htmlStr, "\t\n", "\n")
+-	htmlStr = strings.ReplaceAll(htmlStr, "    \n", "  \n")
+-
+-	// 将字符串解析为 DOM 树
+-	htmlRoot := lute.parseHTML(htmlStr)
+-	if nil == htmlRoot {
+-		return
+-	}
+-
+-	// 调整 DOM 结构
+-	lute.adjustVditorDOM(htmlRoot)
+-
+-	// 将 HTML 树转换为 Markdown AST
+-	tree := &parse.Tree{Name: "", Root: &ast.Node{Type: ast.NodeDocument}, Context: &parse.Context{ParseOption: lute.ParseOptions}}
+-	tree.Context.Tip = tree.Root
+-	for c := htmlRoot.FirstChild; nil != c; c = c.NextSibling {
+-		lute.genASTByVditorIRDOM(c, tree)
+-	}
+-
+-	// 调整树结构
+-	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
+-		if entering {
+-			switch n.Type {
+-			case ast.NodeInlineHTML, ast.NodeCodeSpan, ast.NodeInlineMath, ast.NodeHTMLBlock, ast.NodeCodeBlockCode, ast.NodeMathBlockContent:
+-				n.Tokens = html.UnescapeHTML(n.Tokens)
+-				if nil != n.Next && ast.NodeCodeSpan == n.Next.Type && n.CodeMarkerLen == n.Next.CodeMarkerLen {
+-					// 合并代码节点 https://github.com/Vanessa219/vditor/issues/167
+-					n.FirstChild.Next.Tokens = append(n.FirstChild.Next.Tokens, n.Next.FirstChild.Next.Tokens...)
+-					n.Next.Unlink()
+-				}
+-			case ast.NodeList:
+-				// 浏览器生成的子列表是 ul.ul 形式，需要将其调整为 ul.li.ul
+-				if nil != n.Parent && ast.NodeList == n.Parent.Type {
+-					if previousLi := n.Previous; nil != previousLi {
+-						previousLi.AppendChild(n)
+-					}
+-				}
+-			}
+-		}
+-		return ast.WalkContinue
+-	})
+-
+-	// 将 AST 进行 Markdown 格式化渲染
+-	options := render.NewOptions()
+-	options.AutoSpace = false
+-	options.FixTermTypo = false
+-	renderer := render.NewFormatRenderer(tree, options)
+-	formatted := renderer.Render()
+-	markdown = string(formatted)
+-	return
+-}
+-
+-// genASTByVditorIRDOM 根据指定的 Vditor IR DOM 节点 n 进行深度优先遍历并逐步生成 Markdown 语法树 tree。
+-func (lute *Lute) genASTByVditorIRDOM(n *html.Node, tree *parse.Tree) {
+-	dataRender := util.DomAttrValue(n, "data-render")
+-	if "1" == dataRender || "2" == dataRender { // 1：浮动工具栏，2：preview 代码块、数学公式块或者不解析的节点
+-		return
+-	}
+-
+-	dataType := util.DomAttrValue(n, "data-type")
+-
+-	if atom.Div == n.DataAtom {
+-		if "code-block" == dataType || "html-block" == dataType || "math-block" == dataType || "yaml-front-matter" == dataType {
+-			if ("code-block" == dataType || "math-block" == dataType) &&
+-				!strings.Contains(util.DomAttrValue(n.FirstChild, "data-type"), "-block-open-marker") {
+-				// 处理在结尾 ``` 或者 $$ 后换行的情况
+-				// TODO: 插入符现在已经不可能出现在该位置，确认后移除该段代码
+-				p := &ast.Node{Type: ast.NodeParagraph}
+-				text := &ast.Node{Type: ast.NodeText, Tokens: []byte(util.DomText(n.FirstChild))}
+-				p.AppendChild(text)
+-				tree.Context.Tip.AppendChild(p)
+-				tree.Context.Tip = p
+-				return
+-			}
+-
+-			for c := n.FirstChild; c != nil; c = c.NextSibling {
+-				lute.genASTByVditorIRDOM(c, tree)
+-			}
+-		} else if "link-ref-defs-block" == dataType {
+-			text := util.DomText(n)
+-			node := &ast.Node{Type: ast.NodeText, Tokens: []byte(text)}
+-			tree.Context.Tip.AppendChild(node)
+-		} else if "footnotes-def" == dataType {
+-			for c := n.FirstChild; c != nil; c = c.NextSibling {
+-				lute.genASTByVditorIRDOM(c, tree)
+-			}
+-		} else if "footnotes-block" == dataType {
+-			for def := n.FirstChild; nil != def; def = def.NextSibling {
+-				originalHTML := &bytes.Buffer{}
+-				if err := html.Render(originalHTML, def); nil == err {
+-					md := lute.vditorIRDOM2Md(originalHTML.String())
+-					lines := strings.Split(md, "\n")
+-					md = ""
+-					for i, line := range lines {
+-						if 0 < i {
+-							md += "    " + line
+-						} else {
+-							md = line
+-						}
+-						md += "\n"
+-					}
+-					node := &ast.Node{Type: ast.NodeText, Tokens: []byte(md)}
+-					tree.Context.Tip.AppendChild(node)
+-				}
+-			}
+-		} else if "toc-block" == dataType {
+-			node := &ast.Node{Type: ast.NodeToC}
+-			tree.Context.Tip.AppendChild(node)
+-		} else {
+-			text := util.DomText(n)
+-			if editor.Caret+"\n" == text { // 处理 FireFox 某些情况下产生的分段
+-				tree.Context.Tip.AppendChild(&ast.Node{Type: ast.NodeText, Tokens: []byte(editor.Caret + "\n")})
+-			}
+-		}
+-		return
+-	}
+-
+-	class := util.DomAttrValue(n, "class")
+-	content := strings.ReplaceAll(n.Data, editor.Zwsp, "")
+-	node := &ast.Node{Type: ast.NodeText, Tokens: []byte(content)}
+-	switch n.DataAtom {
+-	case 0:
+-		if "" == content {
+-			return
+-		}
+-
+-		checkIndentCodeBlock := strings.ReplaceAll(content, editor.Caret, "")
+-		checkIndentCodeBlock = strings.ReplaceAll(checkIndentCodeBlock, "\t", "    ")
+-		if (!lute.isInline(n.PrevSibling)) && strings.HasPrefix(checkIndentCodeBlock, "    ") {
+-			node.Type = ast.NodeCodeBlock
+-			node.IsFencedCodeBlock = true
+-			node.AppendChild(&ast.Node{Type: ast.NodeCodeBlockFenceOpenMarker, Tokens: []byte("```"), CodeBlockFenceLen: 3})
+-			node.AppendChild(&ast.Node{Type: ast.NodeCodeBlockFenceInfoMarker})
+-			startCaret := strings.HasPrefix(content, editor.Caret)
+-			if startCaret {
+-				content = strings.ReplaceAll(content, editor.Caret, "")
+-			}
+-			content = strings.TrimSpace(content)
+-			if startCaret {
+-				content = editor.Caret + content
+-			}
+-			content := &ast.Node{Type: ast.NodeCodeBlockCode, Tokens: []byte(content)}
+-			node.AppendChild(content)
+-			node.AppendChild(&ast.Node{Type: ast.NodeCodeBlockFenceCloseMarker, Tokens: []byte("```"), CodeBlockFenceLen: 3})
+-			tree.Context.Tip.AppendChild(node)
+-			return
+-		}
+-		if nil != n.Parent && atom.A == n.Parent.DataAtom {
+-			node.Type = ast.NodeLinkText
+-		}
+-		tree.Context.Tip.AppendChild(node)
+-	case atom.P, atom.Div:
+-		node.Type = ast.NodeParagraph
+-		text := util.DomText(n)
+-		if "\n" == text && ast.NodeBlockquote == tree.Context.Tip.Type && nil == tree.Context.Tip.FirstChild.Next {
+-			// 不允许在 bq 第一个节点前换行
+-			return
+-		} else {
+-			tree.Context.Tip.AppendChild(node)
+-			tree.Context.Tip = node
+-			defer tree.Context.ParentTip()
+-		}
+-	case atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6:
+-		text := util.DomText(n)
+-		if "" == strings.TrimSpace(text) {
+-			return
+-		}
+-		node.Type = ast.NodeHeading
+-		marker := util.DomAttrValue(n, "data-marker")
+-		node.HeadingSetext = "=" == marker || "-" == marker
+-		if !node.HeadingSetext {
+-			marker := util.DomText(n.FirstChild)
+-			node.HeadingLevel = bytes.Count([]byte(marker), []byte("#"))
+-		} else {
+-			if "" == strings.TrimSpace(strings.ReplaceAll(util.DomText(n.LastChild), editor.Caret, "")) {
+-				node.Type = ast.NodeText
+-				node.Tokens = []byte(text)
+-				tree.Context.Tip.AppendChild(node)
+-				tree.Context.Tip = node
+-				break
+-			}
+-
+-			if "=" == marker {
+-				node.HeadingLevel = 1
+-			} else {
+-				node.HeadingLevel = 2
+-			}
+-			if nil != n.LastChild.PrevSibling {
+-				n.LastChild.PrevSibling.Data = strings.TrimSuffix(n.LastChild.PrevSibling.Data, "\n")
+-			}
+-		}
+-		tree.Context.Tip.AppendChild(node)
+-		tree.Context.Tip = node
+-		defer tree.Context.ParentTip()
+-	case atom.Hr:
+-		node.Type = ast.NodeThematicBreak
+-		tree.Context.Tip.AppendChild(node)
+-	case atom.Blockquote:
+-		content := strings.TrimSpace(util.DomText(n))
+-		if "" == content || "&gt;" == content {
+-			return
+-		}
+-		if editor.Caret == content {
+-			node.Type = ast.NodeText
+-			node.Tokens = []byte(content)
+-			tree.Context.Tip.AppendChild(node)
+-		}
+-
+-		node.Type = ast.NodeBlockquote
+-		node.AppendChild(&ast.Node{Type: ast.NodeBlockquoteMarker, Tokens: []byte(">")})
+-		tree.Context.Tip.AppendChild(node)
+-		tree.Context.Tip = node
+-		defer tree.Context.ParentTip()
+-	case atom.Ol, atom.Ul:
+-		if nil == n.FirstChild {
+-			return
+-		}
+-
+-		node.Type = ast.NodeList
+-		node.ListData = &ast.ListData{}
+-		if atom.Ol == n.DataAtom {
+-			node.ListData.Typ = 1
+-		}
+-		tight := util.DomAttrValue(n, "data-tight")
+-		if "true" == tight || "" == tight {
+-			node.ListData.Tight = true
+-		}
+-		tree.Context.Tip.AppendChild(node)
+-		tree.Context.Tip = node
+-		defer tree.Context.ParentTip()
+-	case atom.Li:
+-		if p := n.FirstChild; nil != p && atom.P == p.DataAtom && nil != p.NextSibling && atom.P == p.NextSibling.DataAtom {
+-			tree.Context.Tip.ListData.Tight = false
+-		}
+-
+-		node.Type = ast.NodeListItem
+-		marker := util.DomAttrValue(n, "data-marker")
+-		var bullet byte
+-		if "" == marker {
+-			if nil != n.Parent && atom.Ol == n.Parent.DataAtom {
+-				firstLiMarker := util.DomAttrValue(n.Parent.FirstChild, "data-marker")
+-				if startAttr := util.DomAttrValue(n.Parent, "start"); "" == startAttr {
+-					marker = "1"
+-				} else {
+-					marker = startAttr
+-				}
+-				if "" != firstLiMarker {
+-					marker += firstLiMarker[len(firstLiMarker)-1:]
+-				} else {
+-					marker += "."
+-				}
+-			} else {
+-				marker = util.DomAttrValue(n.Parent, "data-marker")
+-				if "" == marker {
+-					marker = "*"
+-				}
+-				bullet = marker[0]
+-			}
+-		} else {
+-			if nil != n.Parent {
+-				if atom.Ol == n.Parent.DataAtom {
+-					if "*" == marker || "-" == marker || "+" == marker {
+-						marker = "1."
+-					}
+-					if "1." != marker && "1)" != marker && nil != n.PrevSibling && atom.Li != n.PrevSibling.DataAtom &&
+-						nil != n.Parent.Parent && (atom.Ol == n.Parent.Parent.DataAtom || atom.Ul == n.Parent.Parent.DataAtom) {
+-						// 子有序列表第一项必须从 1 开始
+-						marker = "1."
+-					}
+-					if "1." != marker && "1)" != marker && atom.Ol == n.Parent.DataAtom && n.Parent.FirstChild == n && "" == util.DomAttrValue(n.Parent, "start") {
+-						marker = "1."
+-					}
+-				} else {
+-					if "*" != marker && "-" != marker && "+" != marker {
+-						marker = "*"
+-					}
+-					bullet = marker[0]
+-				}
+-			} else {
+-				marker = util.DomAttrValue(n, "data-marker")
+-				if "" == marker {
+-					marker = "*"
+-				}
+-				bullet = marker[0]
+-			}
+-		}
+-		node.ListData = &ast.ListData{Marker: []byte(marker), BulletChar: bullet}
+-		if 0 == bullet {
+-			node.ListData.Num, _ = strconv.Atoi(marker[:len(marker)-1])
+-			node.ListData.Delimiter = marker[len(marker)-1]
+-		}
+-
+-		tree.Context.Tip.AppendChild(node)
+-		tree.Context.Tip = node
+-		defer tree.Context.ParentTip()
+-	case atom.Pre:
+-		if atom.Code == n.FirstChild.DataAtom {
+-			var codeTokens []byte
+-			if nil != n.FirstChild.FirstChild {
+-				codeTokens = []byte(n.FirstChild.FirstChild.Data)
+-			}
+-
+-			divDataType := util.DomAttrValue(n.Parent, "data-type")
+-			switch divDataType {
+-			case "math-block":
+-				node.Type = ast.NodeMathBlockContent
+-				node.Tokens = codeTokens
+-				tree.Context.Tip.AppendChild(node)
+-			case "html-block":
+-				node.Type = ast.NodeHTMLBlock
+-				node.Tokens = codeTokens
+-				tree.Context.Tip.AppendChild(node)
+-			case "yaml-front-matter":
+-				node.Type = ast.NodeYamlFrontMatter
+-				node.AppendChild(&ast.Node{Type: ast.NodeYamlFrontMatterContent, Tokens: codeTokens})
+-				tree.Context.Tip.AppendChild(node)
+-			default:
+-				node.Type = ast.NodeCodeBlockCode
+-				node.Tokens = codeTokens
+-				tree.Context.Tip.AppendChild(node)
+-			}
+-		}
+-		return
+-	case atom.Em, atom.I:
+-		if nil == n.FirstChild || atom.Br == n.FirstChild.DataAtom {
+-			return
+-		}
+-		if lute.startsWithNewline(n.FirstChild) {
+-			n.FirstChild.Data = strings.TrimLeft(n.FirstChild.Data, editor.Zwsp+"\n")
+-			tree.Context.Tip.AppendChild(&ast.Node{Type: ast.NodeText, Tokens: []byte(editor.Zwsp + "\n")})
+-		}
+-		text := strings.TrimSpace(util.DomText(n))
+-		if lute.isEmptyText(n) {
+-			return
+-		}
+-		if editor.Caret == text {
+-			node.Tokens = editor.CaretTokens
+-			tree.Context.Tip.AppendChild(node)
+-			return
+-		}
+-
+-		node.Type = ast.NodeEmphasis
+-		tree.Context.Tip.AppendChild(node)
+-		tree.Context.Tip = node
+-		defer tree.Context.ParentTip()
+-	case atom.Strong, atom.B:
+-		if nil == n.FirstChild || atom.Br == n.FirstChild.DataAtom {
+-			return
+-		}
+-		if lute.startsWithNewline(n.FirstChild) {
+-			n.FirstChild.Data = strings.TrimLeft(n.FirstChild.Data, editor.Zwsp+"\n")
+-			tree.Context.Tip.AppendChild(&ast.Node{Type: ast.NodeText, Tokens: []byte(editor.Zwsp + "\n")})
+-		}
+-		text := strings.TrimSpace(util.DomText(n))
+-		if lute.isEmptyText(n) {
+-			return
+-		}
+-		if editor.Caret == text {
+-			node.Tokens = editor.CaretTokens
+-			tree.Context.Tip.AppendChild(node)
+-			return
+-		}
+-
+-		node.Type = ast.NodeStrong
+-		tree.Context.Tip.AppendChild(node)
+-		tree.Context.Tip = node
+-		defer tree.Context.ParentTip()
+-	case atom.Del, atom.S, atom.Strike:
+-		if nil == n.FirstChild || atom.Br == n.FirstChild.DataAtom {
+-			return
+-		}
+-		if lute.startsWithNewline(n.FirstChild) {
+-			n.FirstChild.Data = strings.TrimLeft(n.FirstChild.Data, editor.Zwsp+"\n")
+-			tree.Context.Tip.AppendChild(&ast.Node{Type: ast.NodeText, Tokens: []byte(editor.Zwsp + "\n")})
+-		}
+-		text := strings.TrimSpace(util.DomText(n))
+-		if lute.isEmptyText(n) {
+-			return
+-		}
+-		if editor.Caret == text {
+-			node.Tokens = editor.CaretTokens
+-			tree.Context.Tip.AppendChild(node)
+-			return
+-		}
+-
+-		node.Type = ast.NodeStrikethrough
+-		tree.Context.Tip.AppendChild(node)
+-		tree.Context.Tip = node
+-		defer tree.Context.ParentTip()
+-	case atom.Mark:
+-		if nil == n.FirstChild || atom.Br == n.FirstChild.DataAtom {
+-			return
+-		}
+-		if lute.startsWithNewline(n.FirstChild) {
+-			n.FirstChild.Data = strings.TrimLeft(n.FirstChild.Data, editor.Zwsp+"\n")
+-			tree.Context.Tip.AppendChild(&ast.Node{Type: ast.NodeText, Tokens: []byte(editor.Zwsp + "\n")})
+-		}
+-		text := strings.TrimSpace(util.DomText(n))
+-		if lute.isEmptyText(n) {
+-			return
+-		}
+-		if editor.Caret == text {
+-			node.Tokens = editor.CaretTokens
+-			tree.Context.Tip.AppendChild(node)
+-			return
+-		}
+-
+-		node.Type = ast.NodeMark
+-		tree.Context.Tip.AppendChild(node)
+-		tree.Context.Tip = node
+-		defer tree.Context.ParentTip()
+-	case atom.Code:
+-		if nil == n.FirstChild {
+-			return
+-		}
+-		contentStr := strings.ReplaceAll(n.FirstChild.Data, editor.Zwsp, "")
+-		if editor.Caret == contentStr {
+-			node.Tokens = editor.CaretTokens
+-			tree.Context.Tip.AppendChild(node)
+-			return
+-		}
+-		if "" == contentStr {
+-			return
+-		}
+-		codeTokens := []byte(contentStr)
+-		content := &ast.Node{Type: ast.NodeCodeSpanContent, Tokens: codeTokens}
+-		node.Type = ast.NodeCodeSpan
+-		node.AppendChild(content)
+-		tree.Context.Tip.AppendChild(node)
+-		return
+-	case atom.Br:
+-		if nil != n.Parent {
+-			if lute.parentIs(n, atom.Td, atom.Th) {
+-				if (nil == n.PrevSibling || editor.Caret == n.PrevSibling.Data) && (nil == n.NextSibling || editor.Caret == n.NextSibling.Data) {
+-					return
+-				}
+-				if nil == n.NextSibling {
+-					return // 删掉表格中结尾的 br
+-				}
+-
+-				node.Type = ast.NodeInlineHTML
+-				node.Tokens = []byte("<br />")
+-				tree.Context.Tip.AppendChild(node)
+-				return
+-			}
+-			if atom.P == n.Parent.DataAtom {
+-				if nil != n.Parent.NextSibling && (atom.Ul == n.Parent.NextSibling.DataAtom || atom.Ol == n.Parent.NextSibling.DataAtom || atom.Blockquote == n.Parent.NextSibling.DataAtom) {
+-					tree.Context.Tip.AppendChild(&ast.Node{Type: ast.NodeText, Tokens: []byte(editor.Zwsp)})
+-					return
+-				}
+-			}
+-		}
+-
+-		node.Type = ast.NodeHardBreak
+-		tree.Context.Tip.AppendChild(node)
+-		tree.Context.Tip = node
+-		defer tree.Context.ParentTip()
+-	case atom.A:
+-		node.Type = ast.NodeLink
+-		node.AppendChild(&ast.Node{Type: ast.NodeOpenBracket})
+-		tree.Context.Tip.AppendChild(node)
+-		tree.Context.Tip = node
+-		defer tree.Context.ParentTip()
+-	case atom.Img:
+-		imgClass := class
+-		imgAlt := util.DomAttrValue(n, "alt")
+-		if "emoji" == imgClass {
+-			node.Type = ast.NodeEmoji
+-			emojiImg := &ast.Node{Type: ast.NodeEmojiImg, Tokens: tree.EmojiImgTokens(imgAlt, util.DomAttrValue(n, "src"))}
+-			emojiImg.AppendChild(&ast.Node{Type: ast.NodeEmojiAlias, Tokens: []byte(":" + imgAlt + ":")})
+-			node.AppendChild(emojiImg)
+-			tree.Context.Tip.AppendChild(node)
+-			tree.Context.Tip = node
+-			defer tree.Context.ParentTip()
+-		} else {
+-			return
+-		}
+-	case atom.Input:
+-		if nil == n.Parent || nil == n.Parent.Parent || (atom.P != n.Parent.DataAtom && atom.Li != n.Parent.DataAtom) {
+-			// 仅允许 input 出现在任务列表中
+-			return
+-		}
+-		if nil != n.NextSibling && atom.Span == n.NextSibling.DataAtom {
+-			// 在任务列表前退格
+-			n.NextSibling.FirstChild.Data = strings.TrimSpace(n.NextSibling.FirstChild.Data)
+-			break
+-		}
+-		node.Type = ast.NodeTaskListItemMarker
+-		node.TaskListItemChecked = lute.hasAttr(n, "checked")
+-		tree.Context.Tip.AppendChild(node)
+-		if nil != node.Parent.Parent.Parent && nil != node.Parent.Parent.Parent.ListData { // ul.li.p.input
+-			node.Parent.Parent.Parent.ListData.Typ = 3
+-		}
+-	case atom.Table:
+-		node.Type = ast.NodeTable
+-		var tableAligns []int
+-		if nil == n.FirstChild || nil == n.FirstChild.FirstChild || nil == n.FirstChild.FirstChild.FirstChild {
+-			return
+-		}
+-
+-		for th := n.FirstChild.FirstChild.FirstChild; nil != th; th = th.NextSibling {
+-			align := util.DomAttrValue(th, "align")
+-			switch align {
+-			case "left":
+-				tableAligns = append(tableAligns, 1)
+-			case "center":
+-				tableAligns = append(tableAligns, 2)
+-			case "right":
+-				tableAligns = append(tableAligns, 3)
+-			default:
+-				tableAligns = append(tableAligns, 0)
+-			}
+-		}
+-		node.TableAligns = tableAligns
+-		node.Tokens = nil
+-		tree.Context.Tip.AppendChild(&ast.Node{Type: ast.NodeParagraph}) // 表格开头输入会导致解析问题，所以插入一个空段落进行分隔
+-		tree.Context.Tip.AppendChild(node)
+-		tree.Context.Tip = node
+-		defer tree.Context.ParentTip()
+-	case atom.Thead:
+-		node.Type = ast.NodeTableHead
+-		tree.Context.Tip.AppendChild(node)
+-		tree.Context.Tip = node
+-		defer tree.Context.ParentTip()
+-	case atom.Tbody:
+-	case atom.Tr:
+-		node.Type = ast.NodeTableRow
+-		tree.Context.Tip.AppendChild(node)
+-		tree.Context.Tip = node
+-		defer tree.Context.ParentTip()
+-	case atom.Th, atom.Td:
+-		node.Type = ast.NodeTableCell
+-		align := util.DomAttrValue(n, "align")
+-		var tableAlign int
+-		switch align {
+-		case "left":
+-			tableAlign = 1
+-		case "center":
+-			tableAlign = 2
+-		case "right":
+-			tableAlign = 3
+-		default:
+-			tableAlign = 0
+-		}
+-		node.TableCellAlign = tableAlign
+-		node.Tokens = nil
+-		tree.Context.Tip.AppendChild(node)
+-		tree.Context.Tip = node
+-		defer tree.Context.ParentTip()
+-	case atom.Sup:
+-		if nil == n.FirstChild {
+-			break
+-		}
+-		if "footnotes-ref" == dataType {
+-			node.Type = ast.NodeText
+-			node.Tokens = []byte(util.DomText(n))
+-			tree.Context.Tip.AppendChild(node)
+-		}
+-		return
+-	case atom.Span:
+-		switch dataType {
+-		case "inline-node", "em", "strong", "s", "a", "link-ref", "img", "code", "heading-id", "html-inline", "inline-math", "html-entity":
+-			node.Type = ast.NodeText
+-			node.Tokens = []byte(util.DomText(n))
+-			tree.Context.Tip.AppendChild(node)
+-			return
+-		case "math-block-close-marker":
+-			tree.Context.Tip.AppendChild(&ast.Node{Type: ast.NodeMathBlockCloseMarker, Tokens: parse.MathBlockMarker})
+-			defer tree.Context.ParentTip()
+-			return
+-		case "math-block-open-marker":
+-			node.Type = ast.NodeMathBlock
+-			node.AppendChild(&ast.Node{Type: ast.NodeMathBlockOpenMarker, Tokens: parse.MathBlockMarker})
+-			tree.Context.Tip.AppendChild(node)
+-			tree.Context.Tip = node
+-			return
+-		case "yaml-front-matter-close-marker":
+-			tree.Context.Tip.AppendChild(&ast.Node{Type: ast.NodeYamlFrontMatterCloseMarker, Tokens: parse.YamlFrontMatterMarker})
+-			defer tree.Context.ParentTip()
+-			return
+-		case "yaml-front-matter-open-marker":
+-			node.Type = ast.NodeYamlFrontMatter
+-			node.AppendChild(&ast.Node{Type: ast.NodeYamlFrontMatterOpenMarker, Tokens: parse.YamlFrontMatterMarker})
+-			tree.Context.Tip.AppendChild(node)
+-			tree.Context.Tip = node
+-			return
+-		case "code-block-open-marker":
+-			if atom.Pre == n.NextSibling.DataAtom { // DOM 后缺少 info span 节点
+-				n.InsertAfter(&html.Node{DataAtom: atom.Span, Attr: []*html.Attribute{{Key: "data-type", Val: "code-block-info"}}})
+-			}
+-			marker := []byte(util.DomText(n))
+-			lastBacktick := bytes.LastIndex(marker, []byte("`")) + 1
+-			if 0 < lastBacktick {
+-				// 把 ` 后面的字符调整到 info 节点
+-				n.NextSibling.AppendChild(&html.Node{Data: string(marker[lastBacktick:])})
+-				marker = marker[:lastBacktick]
+-			}
+-			node.Type = ast.NodeCodeBlock
+-			node.IsFencedCodeBlock = true
+-			node.AppendChild(&ast.Node{Type: ast.NodeCodeBlockFenceOpenMarker, Tokens: marker, CodeBlockFenceLen: len(marker)})
+-			tree.Context.Tip.AppendChild(node)
+-			tree.Context.Tip = node
+-			return
+-		case "code-block-info":
+-			info := []byte(util.DomText(n))
+-			info = bytes.ReplaceAll(info, []byte(editor.Zwsp), nil)
+-			tree.Context.Tip.AppendChild(&ast.Node{Type: ast.NodeCodeBlockFenceInfoMarker, CodeBlockInfo: info})
+-			return
+-		case "code-block-close-marker":
+-			marker := []byte(util.DomText(n))
+-			lastBacktick := bytes.LastIndex(marker, []byte("`")) + 1
+-			if 0 < lastBacktick {
+-				marker = marker[:lastBacktick]
+-			}
+-			if 0 == len(marker) {
+-				marker = []byte("```")
+-			}
+-			tree.Context.Tip.AppendChild(&ast.Node{Type: ast.NodeCodeBlockFenceCloseMarker, Tokens: marker, CodeBlockFenceLen: len(marker)})
+-			defer tree.Context.ParentTip()
+-			return
+-		case "heading-marker":
+-			text := util.DomText(n)
+-			if caretInMarker := strings.Contains(text, editor.Caret); caretInMarker {
+-				caret := &html.Node{Type: html.TextNode, Data: editor.Caret}
+-				n.InsertAfter(caret)
+-				text = strings.ReplaceAll(text, "#", "")
+-				text = strings.ReplaceAll(text, editor.Caret, "")
+-				text = strings.TrimSpace(text)
+-				if 0 < len(text) {
+-					caret.Data = text + caret.Data
+-				}
+-			}
+-			return
+-		}
+-
+-		if nil == n.FirstChild {
+-			break
+-		}
+-
+-		var codeTokens []byte
+-		if editor.Zwsp == n.FirstChild.Data && "" == util.DomAttrValue(n, "style") && nil != n.FirstChild.NextSibling {
+-			codeTokens = []byte(n.FirstChild.NextSibling.FirstChild.Data)
+-		} else if atom.Code == n.FirstChild.DataAtom {
+-			codeTokens = []byte(n.FirstChild.FirstChild.Data)
+-			if editor.Zwsp == string(codeTokens) {
+-				break
+-			}
+-		} else {
+-			break
+-		}
+-		if "math-inline" == dataType {
+-			node.Type = ast.NodeInlineMath
+-			node.AppendChild(&ast.Node{Type: ast.NodeInlineMathOpenMarker})
+-			node.AppendChild(&ast.Node{Type: ast.NodeInlineMathContent, Tokens: codeTokens})
+-			node.AppendChild(&ast.Node{Type: ast.NodeInlineMathCloseMarker})
+-			tree.Context.Tip.AppendChild(node)
+-		} else if "html-inline" == dataType {
+-			node.Type = ast.NodeInlineHTML
+-			node.Tokens = codeTokens
+-			tree.Context.Tip.AppendChild(node)
+-		} else if "code-inline" == dataType {
+-			node.Tokens = codeTokens
+-			tree.Context.Tip.AppendChild(node)
+-		} else if "html-entity" == dataType {
+-			node.Type = ast.NodeText
+-			node.Tokens = codeTokens
+-			tree.Context.Tip.AppendChild(node)
+-		}
+-		return
+-	case atom.Font:
+-		node.Type = ast.NodeText
+-		node.Tokens = []byte(util.DomText(n))
+-		tree.Context.Tip.AppendChild(node)
+-		return
+-	case atom.Details:
+-		node.Type = ast.NodeHTMLBlock
+-		node.Tokens = util.DomHTML(n)
+-		node.Tokens = bytes.SplitAfter(node.Tokens, []byte("</summary>"))[0]
+-		tree.Context.Tip.AppendChild(node)
+-	case atom.Kbd:
+-		// kbd 标签由 code 标签构成节点
+-	case atom.Summary:
+-		return
+-	default:
+-		node.Type = ast.NodeHTMLBlock
+-		node.Tokens = util.DomHTML(n)
+-		tree.Context.Tip.AppendChild(node)
+-		return
+-	}
+-
+-	for c := n.FirstChild; c != nil; c = c.NextSibling {
+-		lute.genASTByVditorIRDOM(c, tree)
+-	}
+-
+-	switch n.DataAtom {
+-	case atom.A:
+-		node.AppendChild(&ast.Node{Type: ast.NodeCloseBracket})
+-		node.AppendChild(&ast.Node{Type: ast.NodeOpenParen})
+-		href := util.DomAttrValue(n, "href")
+-		if "" != lute.RenderOptions.LinkBase {
+-			href = strings.ReplaceAll(href, lute.RenderOptions.LinkBase, "")
+-		}
+-		if "" != lute.RenderOptions.LinkPrefix {
+-			href = strings.ReplaceAll(href, lute.RenderOptions.LinkPrefix, "")
+-		}
+-		node.AppendChild(&ast.Node{Type: ast.NodeLinkDest, Tokens: []byte(href)})
+-		linkTitle := util.DomAttrValue(n, "title")
+-		if "" != linkTitle {
+-			node.AppendChild(&ast.Node{Type: ast.NodeLinkSpace})
+-			node.AppendChild(&ast.Node{Type: ast.NodeLinkTitle, Tokens: []byte(linkTitle)})
+-		}
+-		node.AppendChild(&ast.Node{Type: ast.NodeCloseParen})
+-	case atom.Details:
+-		tree.Context.Tip.AppendChild(&ast.Node{Type: ast.NodeHTMLBlock, Tokens: []byte("</details>")})
+-	}
+-}

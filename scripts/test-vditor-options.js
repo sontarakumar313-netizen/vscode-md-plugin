@@ -111,13 +111,36 @@ assert.strictEqual(
   'a value left in saved editor state must not override the validated setting'
 )
 
-// Unrelated saved editor options still pass through untouched.
+// Only the two supported editor modes may cross the host boundary.
 configValues = { frontMatterDisplay: 'table' }
+for (const mode of ['wysiwyg', 'sv']) {
+  assert.strictEqual(
+    getVditorOptions(
+      { globalState: { get: () => ({ mode }) } },
+      undefined
+    ).mode,
+    mode,
+    `a supported saved editor mode must survive: ${mode}`
+  )
+}
+const removedMode = ['i', 'r'].join('')
+for (const mode of [removedMode, undefined, null, '', 'legacy-mode', 42, true, {}]) {
+  assert.strictEqual(
+    getVditorOptions(
+      { globalState: { get: () => ({ mode }) } },
+      undefined
+    ).mode,
+    'wysiwyg',
+    `an unsupported saved editor mode must fall back to WYSIWYG: ${JSON.stringify(
+      mode
+    )}`
+  )
+}
+
 const withSaved = getVditorOptions(
   { globalState: { get: () => ({ mode: 'sv', theme: 'dark', preview: {} }) } },
   undefined
 )
-assert.strictEqual(withSaved.mode, 'sv', 'a saved editor mode must survive')
 assert.strictEqual(
   withSaved.theme,
   undefined,

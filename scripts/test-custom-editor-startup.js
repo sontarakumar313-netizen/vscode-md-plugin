@@ -138,10 +138,13 @@ async function testInitialReadyMessage() {
       editorGeneration: 1,
       scrollTop: 0,
       type: 'init',
-      // The stub configuration returns undefined for every key, so
-      // frontMatterDisplay here is the host's fallback for an unset or
-      // hand-edited value, not a setting being read back.
-      options: { useVscodeThemeColor: undefined, frontMatterDisplay: 'table' },
+      // The stub configuration returns undefined for every key, so these are
+      // the host fallbacks for unset or hand-edited values.
+      options: {
+        useVscodeThemeColor: undefined,
+        mode: 'wysiwyg',
+        frontMatterDisplay: 'table',
+      },
       theme: 'light',
       workspaceStyleCss: null,
       workspaceStylePath: null,

@@ -7,7 +7,12 @@ import {
 	preserveEditorSelectionForToolbar,
 } from './caret-anchor'
 import { t } from './lang'
-import { confirm } from './utils'
+import { confirm, saveVditorOptions } from './utils'
+import {
+	getVditorEditorElement,
+	getVditorMode,
+} from './vditor-adapter'
+import type { VditorMode } from './vditor-adapter'
 
 const outlineIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 1v22M4 6h1.2M4 11h1.2M4 16h1.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'
 const lineNumbersIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M9 3h14M9 12h14M9 21h14M1 3h2v6M1 9h3M4 22H1c0-1.2 3-3 3-4.5S2.5 15 1 15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
@@ -17,6 +22,7 @@ const lineNumbersIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/
 const mathBlockIcon = '<svg class="vmd-math-toolbar-icon vmd-math-toolbar-icon--display" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 1.5h22M1 22.5h22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M13 4H5l5 8-5 8h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 6h7M16 12h5M16 18h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
 const mathInlineIcon = '<svg class="vmd-math-toolbar-icon vmd-math-toolbar-icon--inline" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 6h2M1 18h2M21 6h2M21 18h2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13 2H5l5 10-5 10h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 6h7M16 12h5M16 18h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
 const detailsIcon = '<svg class="vmd-details-toolbar-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4 6h10M4 12h10M4 18h10M17 8l5 4-5 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+const editingModeIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 18.5h3.5L18 9l-3-3-9.5 9.5L5 18.5zm8.5-11 3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 
 // insertMD writes raw Markdown, so a `$` inside the selection would close the
 // math delimiter early and turn `a$b` into the broken `$a$b$`. Normalize every
@@ -150,7 +156,7 @@ function insertDetails(editor: any): void {
 				? (context.range.startContainer as Element)
 				: context.range.startContainer.parentElement
 		const blockElement = node?.closest(
-			'p, li, blockquote, h1, h2, h3, h4, h5, h6, pre, [data-block], .vditor-ir__node'
+			'p, li, blockquote, h1, h2, h3, h4, h5, h6, pre, [data-block]'
 		)
 		const blockText = blockElement?.textContent?.trim() || ''
 		if (blockElement && blockText) {
@@ -200,6 +206,112 @@ async function copyToClipboard(content: string, label: string): Promise<void> {
 		vscode.postMessage({ command: 'info', content: `Copy ${label} successfully!` })
 	} catch (error) {
 		vscode.postMessage({ command: 'error', content: `Copy ${label} failed! ${error.message}` })
+	}
+}
+
+const MODE_BUTTONS: Array<{ name: string; mode: VditorMode }> = [
+	{ name: 'vmd-mode-wysiwyg', mode: 'wysiwyg' },
+	{ name: 'vmd-mode-sv', mode: 'sv' },
+]
+
+export function syncEditorModeToolbar(editor: any = window.vditor): void {
+	const current = getVditorMode(editor)
+	for (const { name, mode } of MODE_BUTTONS) {
+		const button = document.querySelector<HTMLElement>(
+			`.vditor-toolbar [data-type="${name}"]`
+		)
+		if (!button) continue
+		const active = current === mode
+		button.classList.toggle('vditor-menu--current', active)
+		button.setAttribute('aria-pressed', String(active))
+	}
+}
+
+function refreshModeDependentFeatures(): void {
+	;(window as any).__vmdDetails?.rebind?.()
+	;(window as any).__vmdFrontMatter?.rebind?.()
+	;(window as any).__vmdSearch?.rebind?.()
+	;(window as any).__vmdLineNumbers?.rebind?.()
+	;(window as any).__vmdSplitScrollSync?.rebind?.(window.vditor)
+}
+
+let forwardingModeShortcut = false
+
+function selectEditorMode(mode: VditorMode): void {
+	const editor = window.vditor
+	if (!editor) return
+	if (getVditorMode(editor) !== mode) {
+		const editorElement = getVditorEditorElement(editor)
+		if (!editorElement) return
+		const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
+		forwardingModeShortcut = true
+		try {
+			// Vditor has no public mode setter. Forward only its two supported
+			// built-in mode shortcuts through the active editor element instead of
+			// importing the private three-mode toolbar implementation.
+			editorElement.dispatchEvent(new KeyboardEvent('keydown', {
+				key: mode === 'wysiwyg' ? '7' : '9',
+				code: mode === 'wysiwyg' ? 'Digit7' : 'Digit9',
+				ctrlKey: !isMac,
+				metaKey: isMac,
+				altKey: true,
+				bubbles: true,
+				cancelable: true,
+			}))
+		} finally {
+			forwardingModeShortcut = false
+		}
+	}
+	syncEditorModeToolbar(editor)
+	queueMicrotask(() => {
+		refreshModeDependentFeatures()
+		saveVditorOptions()
+	})
+}
+
+/** Owns the only supported mode shortcuts and consumes the removed middle one. */
+export function installEditorModeShortcuts(): void {
+	if ((window as any).__vmdEditorModeShortcuts) return
+
+	const onKeydown = (event: KeyboardEvent) => {
+		if (forwardingModeShortcut) return
+		const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
+		const primary = isMac
+			? event.metaKey && !event.ctrlKey
+			: event.ctrlKey && !event.metaKey
+		if (
+			!primary ||
+			!event.altKey ||
+			event.shiftKey ||
+			!/^Digit[7-9]$/.test(event.code)
+		) {
+			return
+		}
+
+		const editorElement = getVditorEditorElement()
+		if (
+			!editorElement ||
+			!(event.target instanceof Node) ||
+			!editorElement.contains(event.target)
+		) {
+			return
+		}
+
+		event.preventDefault()
+		event.stopImmediatePropagation()
+		if (event.code === 'Digit7') {
+			selectEditorMode('wysiwyg')
+		} else if (event.code === 'Digit9') {
+			selectEditorMode('sv')
+		}
+	}
+
+	document.addEventListener('keydown', onKeydown, true)
+	;(window as any).__vmdEditorModeShortcuts = {
+		dispose() {
+			document.removeEventListener('keydown', onKeydown, true)
+			delete (window as any).__vmdEditorModeShortcuts
+		},
 	}
 }
 
@@ -294,7 +406,28 @@ export const toolbar = [
 	'upload',
 	'table',
 	'|',
-	{ name: 'edit-mode', tipPosition: 'e', },
+	{
+		name: 'vmd-edit-mode',
+		tipPosition: 'e',
+		tip: t('editingMode'),
+		icon: editingModeIcon,
+		toolbar: [
+			{
+				name: 'vmd-mode-wysiwyg',
+				icon: t('wysiwygMode'),
+				click() {
+					selectEditorMode('wysiwyg')
+				},
+			},
+			{
+				name: 'vmd-mode-sv',
+				icon: t('splitViewMode'),
+				click() {
+					selectEditorMode('sv')
+				},
+			},
+		],
+	},
 	{
 		name: 'more',
 		tipPosition: 'e',

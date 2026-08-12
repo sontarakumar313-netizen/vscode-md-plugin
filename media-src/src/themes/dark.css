@@ -22,12 +22,12 @@
   --count-background-color: rgba(77, 170, 252, 0.18);
   --heading-border-color: #3c3c3c;
   --blockquote-color: #a0a0a0;
-  --ir-heading-color: #c586c0;
-  --ir-title-color: #a0a0a0;
-  --ir-bi-color: #569cd6;
-  --ir-link-color: #4ec9b0;
-  --ir-bracket-color: #4daafc;
-  --ir-paren-color: #dcdcaa;
+  --sv-heading-color: #c586c0;
+  --sv-title-color: #a0a0a0;
+  --sv-bi-color: #569cd6;
+  --sv-link-color: #4ec9b0;
+  --sv-bracket-color: #4daafc;
+  --sv-paren-color: #dcdcaa;
   --vmd-content-link-color: #4daafc;
   --vmd-content-subtle-background: #252526;
   --vmd-content-code-background: rgba(77, 170, 252, 0.16);
@@ -38,7 +38,6 @@
 
 :where(body[data-vmd-theme='dark']) #app.vditor,
 :where(body[data-vmd-theme='dark']) #app .vditor-content,
-:where(body[data-vmd-theme='dark']) #app .vditor-ir,
 :where(body[data-vmd-theme='dark']) #app .vditor-wysiwyg,
 :where(body[data-vmd-theme='dark']) #app .vditor-sv,
 :where(body[data-vmd-theme='dark']) #app .vditor-preview,
@@ -68,12 +67,12 @@
   --count-background-color: var(--vscode-editor-selectionBackground, rgba(77, 170, 252, 0.18));
   --heading-border-color: var(--vscode-editorWidget-border, #3c3c3c);
   --blockquote-color: var(--vscode-descriptionForeground, #a0a0a0);
-  --ir-heading-color: var(--vscode-symbolIcon-classForeground, #c586c0);
-  --ir-title-color: var(--vscode-descriptionForeground, #a0a0a0);
-  --ir-bi-color: var(--vscode-symbolIcon-keywordForeground, #569cd6);
-  --ir-link-color: var(--vscode-textLink-foreground, #4ec9b0);
-  --ir-bracket-color: var(--vscode-textLink-foreground, #4daafc);
-  --ir-paren-color: var(--vscode-symbolIcon-stringForeground, #dcdcaa);
+  --sv-heading-color: var(--vscode-symbolIcon-classForeground, #c586c0);
+  --sv-title-color: var(--vscode-descriptionForeground, #a0a0a0);
+  --sv-bi-color: var(--vscode-symbolIcon-keywordForeground, #569cd6);
+  --sv-link-color: var(--vscode-textLink-foreground, #4ec9b0);
+  --sv-bracket-color: var(--vscode-textLink-foreground, #4daafc);
+  --sv-paren-color: var(--vscode-symbolIcon-stringForeground, #dcdcaa);
   --vmd-content-link-color: var(--vscode-textLink-foreground, #4daafc);
   --vmd-content-subtle-background: var(--vscode-editorWidget-background, #252526);
   --vmd-content-code-background: var(--vscode-textCodeBlock-background, rgba(77, 170, 252, 0.16));
@@ -82,8 +81,7 @@
   --vmd-content-selection-background: var(--vscode-editor-selectionBackground, rgba(77, 170, 252, 0.28));
 }
 
-:where(body[data-vmd-theme='dark']) #app .vditor-reset a,
-:where(body[data-vmd-theme='dark']) #app .vditor-ir__link {
+:where(body[data-vmd-theme='dark']) #app .vditor-reset a {
   color: var(--vmd-content-link-color);
 }
 
@@ -128,8 +126,7 @@
 :where(body[data-vmd-theme='dark']) #app .vditor-reset pre code,
 :where(body[data-vmd-theme='dark']) #app .vditor-reset code.hljs,
 :where(body[data-vmd-theme='dark']) #app .vditor-reset .highlight-chroma,
-:where(body[data-vmd-theme='dark']) #app .vditor-wysiwyg__pre,
-:where(body[data-vmd-theme='dark']) #app .vditor-ir__marker--pre {
+:where(body[data-vmd-theme='dark']) #app .vditor-wysiwyg__pre {
   color: var(--vmd-code-block-foreground);
   background-color: var(--vmd-code-block-background);
 }

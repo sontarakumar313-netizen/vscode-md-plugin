@@ -53,9 +53,9 @@ export const fileToBase64 = async (file) => {
 // 只保存 Vditor 编辑模式。分屏预览由 SV 编辑模式固定启用，不再持久化
 // preview 配置，避免旧版的预览选项重新生效。
 export function saveVditorOptions() {
-  const vditorOptions = {
-    mode: getVditorMode(),
-  }
+  const mode = getVditorMode()
+  if (!mode) return
+  const vditorOptions = { mode }
   vscode.postMessage({
     command: 'save-options',
     options: vditorOptions,
@@ -84,9 +84,6 @@ export function handleToolbarClick() {
 function slugifyHeading(text: string): string {
   return text
     .trim()
-    // Vditor's IR mode keeps the literal `#`/`##`/... marker as part of the heading's
-    // textContent, unlike the final rendered output, so strip it first.
-    .replace(/^#{1,6}\s*/, '')
     .toLowerCase()
     .replace(/[`*_~]/g, '')
     .replace(/[^\p{L}\p{N}\- ]+/gu, '')
@@ -112,9 +109,7 @@ function scrollToHeadingAnchor(fragment: string): boolean {
   const root =
     mode === 'sv'
       ? document.querySelector('.vditor-preview')
-      : mode === 'wysiwyg'
-        ? document.querySelector('.vditor-wysiwyg .vditor-reset')
-        : document.querySelector('.vditor-ir .vditor-reset')
+      : document.querySelector('.vditor-wysiwyg .vditor-reset')
   if (!root) return false
 
   const headings = root.querySelectorAll('h1, h2, h3, h4, h5, h6')
@@ -139,14 +134,7 @@ export function fixLinkClick() {
     (e) => {
       const target = e.target as HTMLElement
       const link = target.closest('a')
-      // Vditor's IR mode never renders a real `<a href>` for links: it always shows the
-      // raw markdown syntax, with the url held in a `.vditor-ir__marker--link` marker
-      // span inside a `[data-type="a"]` wrapper, instead of a real anchor element.
-      const irLinkMarker = target
-        .closest<HTMLElement>('[data-type="a"]')
-        ?.querySelector('.vditor-ir__marker--link')
-      const href =
-        link?.getAttribute('href') || irLinkMarker?.textContent || undefined
+      const href = link?.getAttribute('href') || undefined
 
       if (!href) return
       e.preventDefault()

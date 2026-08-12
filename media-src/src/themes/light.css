@@ -22,12 +22,12 @@
   --count-background-color: rgba(0, 106, 177, 0.1);
   --heading-border-color: #d4d4d4;
   --blockquote-color: #616161;
-  --ir-heading-color: #7f3f98;
-  --ir-title-color: #616161;
-  --ir-bi-color: #0451a5;
-  --ir-link-color: #008000;
-  --ir-bracket-color: #006ab1;
-  --ir-paren-color: #267f99;
+  --sv-heading-color: #7f3f98;
+  --sv-title-color: #616161;
+  --sv-bi-color: #0451a5;
+  --sv-link-color: #008000;
+  --sv-bracket-color: #006ab1;
+  --sv-paren-color: #267f99;
   --vmd-content-link-color: #006ab1;
   --vmd-content-subtle-background: #fafbfc;
   --vmd-content-code-background: rgba(27, 31, 35, 0.06);
@@ -36,7 +36,6 @@
 
 :where(body[data-vmd-theme='light']) #app.vditor,
 :where(body[data-vmd-theme='light']) #app .vditor-content,
-:where(body[data-vmd-theme='light']) #app .vditor-ir,
 :where(body[data-vmd-theme='light']) #app .vditor-wysiwyg,
 :where(body[data-vmd-theme='light']) #app .vditor-sv,
 :where(body[data-vmd-theme='light']) #app .vditor-preview,
@@ -66,20 +65,19 @@
   --count-background-color: var(--vscode-editor-selectionBackground, rgba(0, 106, 177, 0.1));
   --heading-border-color: var(--vscode-editorWidget-border, #d4d4d4);
   --blockquote-color: var(--vscode-descriptionForeground, #616161);
-  --ir-heading-color: var(--vscode-symbolIcon-classForeground, #7f3f98);
-  --ir-title-color: var(--vscode-descriptionForeground, #616161);
-  --ir-bi-color: var(--vscode-symbolIcon-keywordForeground, #0451a5);
-  --ir-link-color: var(--vscode-textLink-foreground, #008000);
-  --ir-bracket-color: var(--vscode-textLink-foreground, #006ab1);
-  --ir-paren-color: var(--vscode-symbolIcon-stringForeground, #267f99);
+  --sv-heading-color: var(--vscode-symbolIcon-classForeground, #7f3f98);
+  --sv-title-color: var(--vscode-descriptionForeground, #616161);
+  --sv-bi-color: var(--vscode-symbolIcon-keywordForeground, #0451a5);
+  --sv-link-color: var(--vscode-textLink-foreground, #008000);
+  --sv-bracket-color: var(--vscode-textLink-foreground, #006ab1);
+  --sv-paren-color: var(--vscode-symbolIcon-stringForeground, #267f99);
   --vmd-content-link-color: var(--vscode-textLink-foreground, #006ab1);
   --vmd-content-subtle-background: var(--vscode-editorWidget-background, #fafbfc);
   --vmd-content-code-background: var(--vscode-textCodeBlock-background, rgba(27, 31, 35, 0.06));
   --vmd-content-selection-background: var(--vscode-editor-selectionBackground, rgba(0, 106, 177, 0.22));
 }
 
-:where(body[data-vmd-theme='light']) #app .vditor-reset a,
-:where(body[data-vmd-theme='light']) #app .vditor-ir__link {
+:where(body[data-vmd-theme='light']) #app .vditor-reset a {
   color: var(--vmd-content-link-color);
 }
 

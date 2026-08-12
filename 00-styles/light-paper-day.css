@@ -57,12 +57,12 @@ body {
   --count-background-color: rgba(47, 111, 159, 0.1);
   --heading-border-color: var(--paper-border);
   --blockquote-color: var(--paper-muted);
-  --ir-heading-color: var(--paper-purple);
-  --ir-title-color: var(--paper-muted);
-  --ir-bi-color: var(--paper-orange);
-  --ir-link-color: var(--paper-green);
-  --ir-bracket-color: var(--paper-blue);
-  --ir-paren-color: var(--paper-teal);
+  --sv-heading-color: var(--paper-purple);
+  --sv-title-color: var(--paper-muted);
+  --sv-bi-color: var(--paper-orange);
+  --sv-link-color: var(--paper-green);
+  --sv-bracket-color: var(--paper-blue);
+  --sv-paren-color: var(--paper-teal);
 
   color: var(--paper-text);
   background: var(--paper-sheet);
@@ -73,7 +73,6 @@ body {
 
 /* ── Editor and split preview ──────────────────────────────────────────── */
 #app .vditor-content,
-#app .vditor-ir,
 #app .vditor-wysiwyg,
 #app .vditor-sv,
 #app .vditor-preview,
@@ -100,7 +99,6 @@ body {
   background: var(--paper-bg);
 }
 
-#app .vditor-ir pre.vditor-reset:focus,
 #app .vditor-wysiwyg pre.vditor-reset:focus,
 #app .vditor-sv:focus {
   background: var(--paper-sheet);
@@ -449,7 +447,6 @@ body {
 }
 
 /* ── Source markers and line numbers ───────────────────────────────────── */
-#app.vditor .vditor-ir__marker,
 #app.vditor .vditor-sv__marker {
   color: var(--paper-faint);
   font-family: var(--paper-mono);

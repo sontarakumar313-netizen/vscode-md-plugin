@@ -14,7 +14,7 @@ assert.strictEqual(
 )
 const lute = global.Lute.New()
 const round = (markdown) =>
-  lute.VditorIRDOM2Md(lute.Md2VditorIRDOM(markdown))
+  lute.VditorDOM2Md(lute.Md2VditorDOM(markdown))
 
 const fixtures = [
   {
@@ -24,7 +24,6 @@ const fixtures = [
   {
     name: 'task marker case and spacing',
     origin: '* [x] done\n\nsentinel old\n',
-    nonIdempotent: true,
   },
   {
     name: 'consecutive blank lines',
@@ -58,7 +57,6 @@ const fixtures = [
     name: 'reference-link title and spacing',
     origin:
       '[ref]: https://example.com "Title"\n\nUse [ref].\n\nsentinel old\n',
-    nonIdempotent: true,
   },
   {
     name: 'bare URL',

@@ -67,12 +67,12 @@ body {
   --count-background-color: rgba(106, 169, 255, 0.18);
   --heading-border-color: var(--midnight-border);
   --blockquote-color: var(--midnight-muted);
-  --ir-heading-color: var(--midnight-purple);
-  --ir-title-color: var(--midnight-muted);
-  --ir-bi-color: var(--midnight-pink);
-  --ir-link-color: var(--midnight-green);
-  --ir-bracket-color: var(--midnight-blue);
-  --ir-paren-color: var(--midnight-cyan);
+  --sv-heading-color: var(--midnight-purple);
+  --sv-title-color: var(--midnight-muted);
+  --sv-bi-color: var(--midnight-pink);
+  --sv-link-color: var(--midnight-green);
+  --sv-bracket-color: var(--midnight-blue);
+  --sv-paren-color: var(--midnight-cyan);
 
   border: 0;
   border-radius: 0;
@@ -83,7 +83,6 @@ body {
 
 /* ── Editor and split preview surfaces ─────────────────────────────────── */
 #app .vditor-content,
-#app .vditor-ir,
 #app .vditor-wysiwyg,
 #app .vditor-sv,
 #app .vditor-preview,
@@ -104,7 +103,6 @@ body {
   border-left-color: var(--midnight-border);
 }
 
-#app .vditor-ir pre.vditor-reset:focus,
 #app .vditor-wysiwyg pre.vditor-reset:focus,
 #app .vditor-sv:focus {
   background: var(--midnight-bg);
@@ -441,8 +439,7 @@ body {
   accent-color: var(--midnight-cyan);
 }
 
-/* ── Source/IR markers and line numbers ────────────────────────────────── */
-#app.vditor .vditor-ir__marker,
+/* ── Source markers and line numbers ───────────────────────────────────── */
 #app.vditor .vditor-sv__marker {
   color: var(--midnight-faint);
   font-family: var(--midnight-mono);

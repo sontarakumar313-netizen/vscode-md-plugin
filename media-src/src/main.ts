@@ -19,7 +19,12 @@ import { format } from 'date-fns'
 import 'vditor/dist/index.css'
 import { captureCaretAnchor, restoreCaretAnchor } from './caret-anchor'
 import { lang } from './lang'
-import { installToolbarSelectionPreserver, toolbar } from './toolbar'
+import {
+  installEditorModeShortcuts,
+  installToolbarSelectionPreserver,
+  syncEditorModeToolbar,
+  toolbar,
+} from './toolbar'
 import { initTableContextMenu } from './table-context-menu'
 import { customizeWysiwygPopover } from './wysiwyg-popover'
 import {
@@ -144,6 +149,7 @@ function installCodeCopyHandler(): void {
 }
 
 installStructuredTabPolicy()
+installEditorModeShortcuts()
 installCodeCopyHandler()
 
 // Set to true only for local debugging of scroll-position persistence; verbose and
@@ -160,7 +166,6 @@ function getScrollEl(): HTMLElement | null {
   // hardcoding one selector.
   const mode = getVditorMode()
   const selectorsByMode: Record<string, string[]> = {
-    ir: ['.vditor-ir .vditor-reset', '.vditor-ir'],
     wysiwyg: ['.vditor-wysiwyg .vditor-reset', '.vditor-wysiwyg'],
     sv: ['.vditor-sv.vditor-reset', '.vditor-sv'],
   }
@@ -616,6 +621,7 @@ function initVditor(msg) {
   document.body.removeAttribute('data-vmd-ready')
   // Keeps Vditor off unpkg.com for its parser. Staying in the merge base lets the
   // host, and the interaction harness, point it somewhere else.
+  const requestedMode = msg.options?.mode === 'sv' ? 'sv' : 'wysiwyg'
   let defaultOptions: any = {
     _lutePath: localVditorAsset('lute.min.js'),
     // Lute appends /<name>.png, so this stays a directory URL with no trailing
@@ -629,6 +635,9 @@ function initVditor(msg) {
       }
     }
   })
+  // Enforce the complete supported-mode set again at the renderer boundary.
+  // Persisted, malformed, or older host options cannot reactivate another mode.
+  defaultOptions.mode = requestedMode
   // Supplying `i18n` makes Vditor use the object instead of fetching a locale
   // script from the CDN. Resolved after the merge because a host-supplied `lang`
   // overrides this webview's own, and the two must not disagree.
@@ -705,7 +714,7 @@ function initVditor(msg) {
     minHeight: '100%',
     lang,
     value: content,
-    mode: 'ir',
+    mode: 'wysiwyg',
     cache: { enable: false },
     toolbar,
     toolbarConfig: { pin: true },
@@ -743,6 +752,7 @@ function initVditor(msg) {
       )
       handleToolbarClick()
       installToolbarSelectionPreserver(vditor)
+      syncEditorModeToolbar(vditor)
       installWysiwygListCommands(vditor)
       if (!(window as any).__vmdDetails) {
         ;(window as any).__vmdDetails = initWysiwygDetails()
@@ -790,7 +800,7 @@ function initVditor(msg) {
       })
     },
     input() {
-      // getValue() serializes the complete document in IR/WYSIWYG mode. Coalesce
+      // getValue() serializes the complete document in both supported modes. Coalesce
       // typing bursts while flushing synchronously for composition, save, blur,
       // and page hiding so the final edit is never lost.
       if (!vmdIsComposing) scheduleEditorContent()

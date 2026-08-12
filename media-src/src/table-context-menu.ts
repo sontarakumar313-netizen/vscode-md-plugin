@@ -7,7 +7,6 @@ import { t } from './lang'
 
 const MENU_ID = 'vmd-table-context-menu'
 
-type EditorMode = 'ir' | 'wysiwyg'
 type TableAction =
   | 'left'
   | 'center'
@@ -23,7 +22,6 @@ type TableAction =
 interface MenuState {
   cell: HTMLTableCellElement
   range: Range | null
-  mode: EditorMode
 }
 
 interface ContextMenuApi {
@@ -49,10 +47,8 @@ function getActionRange(state: MenuState): Range {
   return range
 }
 
-function getCellMode(cell: HTMLTableCellElement): EditorMode | null {
-  if (cell.closest('.vditor-ir .vditor-reset')) return 'ir'
-  if (cell.closest('.vditor-wysiwyg .vditor-reset')) return 'wysiwyg'
-  return null
+function isWysiwygCell(cell: HTMLTableCellElement): boolean {
+  return !!cell.closest('.vditor-wysiwyg .vditor-reset')
 }
 
 function createMenu(): HTMLDivElement {
@@ -147,8 +143,8 @@ function deleteTable(
 }
 
 /**
- * Replaces the floating table toolbars with one context menu shared by IR and
- * WYSIWYG modes. The cell under the mouse is captured before the menu opens so
+ * Replaces the floating WYSIWYG table toolbar with one context menu. The cell
+ * under the mouse is captured before the menu opens so
  * every action targets that row/column even when the editor selection is stale.
  */
 export function initTableContextMenu(): void {
@@ -171,7 +167,6 @@ export function initTableContextMenu(): void {
 
   const show = (
     cell: HTMLTableCellElement,
-    mode: EditorMode,
     event: MouseEvent
   ) => {
     const selection = window.getSelection()
@@ -182,7 +177,7 @@ export function initTableContextMenu(): void {
         ? selection.getRangeAt(0).cloneRange()
         : null
 
-    state = { cell, range: selectedRange, mode }
+    state = { cell, range: selectedRange }
     setAlignState(menu, cell)
 
     const deleteRowButton = menu.querySelector<HTMLButtonElement>(
@@ -202,7 +197,7 @@ export function initTableContextMenu(): void {
       !current ||
       !internal ||
       !current.cell.isConnected ||
-      internal.currentMode !== current.mode
+      internal.currentMode !== 'wysiwyg'
     ) {
       hide()
       return
@@ -265,15 +260,14 @@ export function initTableContextMenu(): void {
       }
 
       const cell = target?.closest<HTMLTableCellElement>('td, th') || null
-      const mode = cell ? getCellMode(cell) : null
-      if (!cell || !mode) {
+      if (!cell || !isWysiwygCell(cell)) {
         hide()
         return
       }
 
       event.preventDefault()
       event.stopPropagation()
-      show(cell, mode, event)
+      show(cell, event)
     },
     true
   )

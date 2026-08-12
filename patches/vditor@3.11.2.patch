@@ -1,0 +1,1675 @@
+diff --git a/dist/css/content-theme/ant-design.css b/dist/css/content-theme/ant-design.css
+index 77d5457518096bfd6a3a86221dc5403d62823a26..f61dc6c8ded3d26288a63a2099018e6948999bdc 100644
+--- a/dist/css/content-theme/ant-design.css
++++ b/dist/css/content-theme/ant-design.css
+@@ -202,7 +202,7 @@
+     clear: both;
+ }
+ 
+-.vditor-reset a, .vditor-ir__link {
++.vditor-reset a {
+     color: #1890ff;
+     text-decoration: none;
+     outline: none;
+diff --git a/dist/css/content-theme/dark.css b/dist/css/content-theme/dark.css
+index d026744e080e5aee94b8c7be54613f113368272f..65c4f80c8d8c3268f92b15c84dc350f6dc5e9183 100644
+--- a/dist/css/content-theme/dark.css
++++ b/dist/css/content-theme/dark.css
+@@ -28,7 +28,7 @@
+     color: #d1d5da;
+ }
+ 
+-.vditor-reset a, .vditor-ir__link {
++.vditor-reset a {
+     color: #4285f4;
+ }
+ 
+diff --git a/dist/css/content-theme/wechat.css b/dist/css/content-theme/wechat.css
+index 6956fa9e6072b1fd7af7aff9a28913e0fa2fdeb7..e48a60ad7abba72b05624e0651048be50f9487af 100644
+--- a/dist/css/content-theme/wechat.css
++++ b/dist/css/content-theme/wechat.css
+@@ -29,7 +29,7 @@
+     color: rgb(62, 62, 62);
+ }
+ 
+-.vditor-reset a, .vditor-ir__link {
++.vditor-reset a {
+     color: #576b95;
+ }
+ 
+diff --git a/dist/index.css b/dist/index.css
+index 6b85e80aa76e65bc2239dea7b3643e656ab9e89e..2e98fd6247e61a9c8b803b70c4940bedc6f884e4 100644
+--- a/dist/index.css
++++ b/dist/index.css
+@@ -69,12 +69,12 @@
+   --count-background-color: rgba(27, 31, 35, 0.05);
+   --heading-border-color: #eaecef;
+   --blockquote-color: #6a737d;
+-  --ir-heading-color: #660e7a;
+-  --ir-title-color: #808080;
+-  --ir-bi-color: #0033b3;
+-  --ir-link-color: #008000;
+-  --ir-bracket-color: #0000ff;
+-  --ir-paren-color: #008000;
++  --sv-heading-color: #660e7a;
++  --sv-title-color: #808080;
++  --sv-bi-color: #0033b3;
++  --sv-link-color: #008000;
++  --sv-bracket-color: #0000ff;
++  --sv-paren-color: #008000;
+ }
+ .vditor--dark {
+   --border-color: #141414;
+@@ -93,12 +93,12 @@
+   --count-background-color: rgba(66, 133, 244, 0.36);
+   --heading-border-color: var(--textarea-text-color);
+   --blockquote-color: var(--toolbar-icon-color);
+-  --ir-heading-color: #9876aa;
+-  --ir-title-color: #808080;
+-  --ir-bi-color: #cc7832;
+-  --ir-link-color: #ffc66d;
+-  --ir-bracket-color: #287bde;
+-  --ir-paren-color: #6a8759;
++  --sv-heading-color: #9876aa;
++  --sv-title-color: #808080;
++  --sv-bi-color: #cc7832;
++  --sv-link-color: #ffc66d;
++  --sv-bracket-color: #287bde;
++  --sv-paren-color: #6a8759;
+ }
+ /**
+  * tool tip.
+@@ -1491,228 +1491,6 @@
+     content: none;
+   }
+ }
+-.vditor-ir {
+-  box-sizing: border-box;
+-  flex: 1;
+-  min-width: 1px;
+-  position: relative;
+-  width: 100%;
+-}
+-.vditor-ir__node[data-type="code-block"]:before,
+-.vditor-ir__node[data-type="code-block"]:after,
+-.vditor-ir__node[data-type="yaml-front-matter"]:before,
+-.vditor-ir__node[data-type="yaml-front-matter"]:after,
+-.vditor-ir__node[data-type="math-block"]:before,
+-.vditor-ir__node[data-type="math-block"]:after {
+-  content: ' ';
+-  color: var(--second-color);
+-}
+-.vditor-ir__node:not(.vditor-ir__node--expand) .vditor-ir__marker {
+-  padding: 0 !important;
+-}
+-.vditor-ir__node:not(.vditor-ir__node--expand)[data-type="a"] {
+-  cursor: pointer;
+-}
+-.vditor-ir__node[data-type="link-ref"],
+-.vditor-ir__node[data-type="footnotes-ref"] {
+-  color: #4285f4;
+-}
+-.vditor-ir__node[data-type="html-block"] {
+-  margin-bottom: 1em;
+-}
+-.vditor-ir__node .vditor-ir__marker {
+-  width: 0;
+-  overflow: hidden;
+-  display: inline-block;
+-  height: 0;
+-  transition: all 0.15s ease-in-out;
+-}
+-.vditor-ir__node--hidden .vditor-ir__marker {
+-  visibility: hidden;
+-}
+-.vditor-ir__node--expand .vditor-ir__marker {
+-  color: var(--second-color);
+-  display: inline;
+-  height: auto;
+-  width: auto;
+-}
+-.vditor-ir__node--expand .vditor-ir__marker--hide {
+-  display: none;
+-}
+-.vditor-ir__node--expand .vditor-ir__marker--heading {
+-  color: var(--ir-heading-color);
+-}
+-.vditor-ir__node--expand .vditor-ir__marker--bi {
+-  color: var(--ir-bi-color);
+-}
+-.vditor-ir__node--expand .vditor-ir__marker--link {
+-  color: var(--ir-link-color);
+-}
+-.vditor-ir__node--expand .vditor-ir__marker--title {
+-  color: var(--ir-title-color);
+-}
+-.vditor-ir__node--expand .vditor-ir__marker--bracket {
+-  color: var(--ir-bracket-color);
+-  text-decoration: underline;
+-}
+-.vditor-ir__node--expand .vditor-ir__marker--paren {
+-  color: var(--ir-paren-color);
+-}
+-.vditor-ir__node--expand .vditor-ir__marker--info {
+-  color: var(--ir-heading-color);
+-}
+-.vditor-ir__node--expand .vditor-ir__marker--pre code {
+-  color: var(--textarea-text-color);
+-  height: auto;
+-  text-align: left;
+-}
+-.vditor-ir__node--expand[data-type="code-block"]:before,
+-.vditor-ir__node--expand[data-type="code-block"]:after {
+-  content: '```';
+-}
+-.vditor-ir__node--expand[data-type="yaml-front-matter"]:before,
+-.vditor-ir__node--expand[data-type="yaml-front-matter"]:after {
+-  content: '---';
+-}
+-.vditor-ir__node--expand[data-type="math-block"]:before,
+-.vditor-ir__node--expand[data-type="math-block"]:after {
+-  content: '$$';
+-}
+-.vditor-ir__node span[data-type="code-block-open-marker"],
+-.vditor-ir__node span[data-type="code-block-close-marker"],
+-.vditor-ir__node span[data-type="yaml-front-matter-open-marker"],
+-.vditor-ir__node span[data-type="yaml-front-matter-close-marker"],
+-.vditor-ir__node span[data-type="math-block-open-marker"],
+-.vditor-ir__node span[data-type="math-block-close-marker"] {
+-  display: none;
+-}
+-.vditor-ir__preview {
+-  cursor: pointer;
+-  white-space: initial;
+-  min-height: 27px;
+-}
+-.vditor-ir__link {
+-  color: var(--ir-bracket-color);
+-  text-decoration: underline;
+-}
+-.vditor-ir pre.vditor-reset {
+-  background-color: var(--panel-background-color);
+-  margin: 0;
+-  white-space: pre-wrap;
+-  height: 100%;
+-  box-sizing: border-box;
+-}
+-.vditor-ir pre.vditor-reset[contenteditable="false"] {
+-  opacity: 0.3;
+-  cursor: not-allowed;
+-}
+-.vditor-ir pre.vditor-reset:empty::before {
+-  content: attr(placeholder);
+-  color: var(--second-color);
+-}
+-.vditor-ir pre.vditor-reset:focus {
+-  outline: none;
+-  background-color: var(--textarea-background-color);
+-}
+-.vditor-ir pre.vditor-reset:after {
+-  content: "";
+-  height: var(--editor-bottom);
+-  display: block;
+-}
+-.vditor-ir pre.vditor-reset pre {
+-  margin: 0;
+-}
+-.vditor-ir hr {
+-  display: inline-block;
+-  margin: 12px 0;
+-  width: 100%;
+-}
+-.vditor-ir blockquote:empty::before,
+-.vditor-ir pre > code:empty::before,
+-.vditor-ir p:empty::before,
+-.vditor-ir h1:empty::after,
+-.vditor-ir h2:empty::after,
+-.vditor-ir h3:empty::after,
+-.vditor-ir h4:empty::after,
+-.vditor-ir h5:empty::after,
+-.vditor-ir h6:empty::after {
+-  content: ' ';
+-}
+-.vditor-ir .vditor-reset > h1:before,
+-.vditor-ir .vditor-reset > h2:before,
+-.vditor-ir .vditor-reset > h3:before,
+-.vditor-ir .vditor-reset > h4:before,
+-.vditor-ir .vditor-reset > h5:before,
+-.vditor-ir .vditor-reset > h6:before,
+-.vditor-ir div[data-type="link-ref-defs-block"]:before,
+-.vditor-ir div[data-type="footnotes-block"]:before,
+-.vditor-ir .vditor-toc:before {
+-  float: left;
+-  padding-right: 4px;
+-  margin-left: -29px;
+-  content: 'H1';
+-  font-size: 0.85rem;
+-  font-weight: normal;
+-  color: var(--second-color);
+-}
+-.vditor-ir .vditor-reset > h2:before {
+-  content: 'H2';
+-}
+-.vditor-ir .vditor-reset > h3:before {
+-  content: 'H3';
+-}
+-.vditor-ir .vditor-reset > h4:before {
+-  content: 'H4';
+-}
+-.vditor-ir .vditor-reset > h5:before {
+-  content: 'H5';
+-}
+-.vditor-ir .vditor-reset > h6:before {
+-  content: 'H6';
+-}
+-.vditor-ir div[data-type="link-ref-defs-block"] {
+-  color: var(--blockquote-color);
+-}
+-.vditor-ir div[data-type="link-ref-defs-block"]:before {
+-  content: '"A"';
+-}
+-.vditor-ir div[data-type="footnotes-block"] {
+-  border-top: 2px solid var(--heading-border-color);
+-  padding-top: 24px;
+-  margin-top: 24px;
+-}
+-.vditor-ir div[data-type="footnotes-block"]:before {
+-  content: '^F';
+-}
+-.vditor-ir div[data-type="footnotes-block"] > div[data-type="footnotes-def"] > ul,
+-.vditor-ir div[data-type="footnotes-block"] > div[data-type="footnotes-def"] > ol,
+-.vditor-ir div[data-type="footnotes-block"] > div[data-type="footnotes-def"] > p,
+-.vditor-ir div[data-type="footnotes-block"] > div[data-type="footnotes-def"] > blockquote,
+-.vditor-ir div[data-type="footnotes-block"] > div[data-type="footnotes-def"] > pre,
+-.vditor-ir div[data-type="footnotes-block"] > div[data-type="footnotes-def"] > table,
+-.vditor-ir div[data-type="footnotes-block"] > div[data-type="footnotes-def"] > hr {
+-  margin-left: 8px;
+-}
+-.vditor-ir .vditor-toc:before {
+-  content: "ToC";
+-}
+-.vditor-ir .vditor-toc span[data-type="toc-h"] {
+-  color: #4285f4;
+-  text-decoration: underline;
+-}
+-@media screen and (max-width: 520px) {
+-  .vditor-ir h1:before,
+-  .vditor-ir h2:before,
+-  .vditor-ir h3:before,
+-  .vditor-ir h4:before,
+-  .vditor-ir h5:before,
+-  .vditor-ir h6:before,
+-  .vditor-ir div[data-type="link-ref-defs-block"]:before,
+-  .vditor-ir div[data-type="footnotes-block"]:before,
+-  .vditor-ir .vditor-toc:before {
+-    content: none;
+-  }
+-}
+ .vditor-sv {
+   font-family: "Helvetica Neue", "Luxi Sans", "DejaVu Sans", "Hiragino Sans GB", "Microsoft Yahei", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", "Android Emoji", "EmojiSymbols";
+   margin: 0 1px 0 0;
+@@ -1797,25 +1575,25 @@
+   color: var(--second-color);
+ }
+ .vditor-sv__marker--heading {
+-  color: var(--ir-heading-color);
++  color: var(--sv-heading-color);
+ }
+ .vditor-sv__marker--bi {
+-  color: var(--ir-bi-color);
++  color: var(--sv-bi-color);
+ }
+ .vditor-sv__marker--link {
+-  color: var(--ir-link-color);
++  color: var(--sv-link-color);
+ }
+ .vditor-sv__marker--title {
+-  color: var(--ir-title-color);
++  color: var(--sv-title-color);
+ }
+ .vditor-sv__marker--bracket {
+-  color: var(--ir-bracket-color);
++  color: var(--sv-bracket-color);
+ }
+ .vditor-sv__marker--paren {
+-  color: var(--ir-paren-color);
++  color: var(--sv-paren-color);
+ }
+ .vditor-sv__marker--info {
+-  color: var(--ir-heading-color);
++  color: var(--sv-heading-color);
+ }
+ .vditor-sv__marker--strong {
+   font-weight: bold;
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index fb401c4d5a2b098bad72f54ac83475e7e1ce5944..5db96b3aa11dc6d4837c0fc8e555644ea3398639 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -17,7 +17,7 @@ declare class Vditor extends VditorMethod {
+     /** 获取 Markdown 内容 */
+     getValue(): string;
+     /** 获取编辑器当前编辑模式 */
+-    getCurrentMode(): "sv" | "wysiwyg" | "ir";
++    getCurrentMode(): "sv" | "wysiwyg";
+     /** 聚焦到编辑器 */
+     focus(): void;
+     /** 让编辑器失焦 */
+diff --git a/dist/ts/ir/expandMarker.d.ts b/dist/ts/ir/expandMarker.d.ts
+deleted file mode 100644
+index 7b25f422ffea15b7e22adc0e5501c41f73cea7fb..0000000000000000000000000000000000000000
+diff --git a/dist/ts/ir/highlightToolbarIR.d.ts b/dist/ts/ir/highlightToolbarIR.d.ts
+deleted file mode 100644
+index 35bc0d1e406625e829a0d0e91c30142295ff5987..0000000000000000000000000000000000000000
+diff --git a/dist/ts/ir/index.d.ts b/dist/ts/ir/index.d.ts
+deleted file mode 100644
+index 62d27236cb3a0bc390191dbc447952e7a6534f89..0000000000000000000000000000000000000000
+diff --git a/dist/ts/ir/input.d.ts b/dist/ts/ir/input.d.ts
+deleted file mode 100644
+index 1ba9cf88eca14f648b3094d5b7dbb4a452abd7cd..0000000000000000000000000000000000000000
+diff --git a/dist/ts/ir/process.d.ts b/dist/ts/ir/process.d.ts
+deleted file mode 100644
+index 904df541fbe72347027016f07bfcd4749ab7c142..0000000000000000000000000000000000000000
+diff --git a/dist/ts/ir/processKeydown.d.ts b/dist/ts/ir/processKeydown.d.ts
+deleted file mode 100644
+index b174785ef1f932bea6f2894e96a19e59a275c11b..0000000000000000000000000000000000000000
+diff --git a/dist/ts/undo/index.d.ts b/dist/ts/undo/index.d.ts
+index 3d5c4281a2e54685bddc464a89fe912f5645ae1f..57ef51f472aa99c21c50e3f2a0203cee39c5a0be 100644
+--- a/dist/ts/undo/index.d.ts
++++ b/dist/ts/undo/index.d.ts
+@@ -3,7 +3,6 @@ declare class Undo {
+     private stackSize;
+     private dmp;
+     private wysiwyg;
+-    private ir;
+     private sv;
+     constructor();
+     clearStack(vditor: IVditor): void;
+diff --git a/dist/types/index.d.ts b/dist/types/index.d.ts
+index 110c5a98b2480c86e0cc03f8886434a26622d2f1..9a838bd8bfcb18d6239816a16479f594da09794d 100644
+--- a/dist/types/index.d.ts
++++ b/dist/types/index.d.ts
+@@ -153,11 +153,9 @@ declare class Lute {
+     public SetJSRenderers(options?: {
+         renderers: {
+             HTML2VditorDOM?: ILuteRender,
+-            HTML2VditorIRDOM?: ILuteRender,
+             HTML2Md?: ILuteRender,
+             Md2HTML?: ILuteRender,
+             Md2VditorDOM?: ILuteRender,
+-            Md2VditorIRDOM?: ILuteRender,
+             Md2VditorSVDOM?: ILuteRender,
+         },
+     }): void;
+@@ -170,8 +168,6 @@ declare class Lute {
+ 
+     public SetLinkBase(url: string): void;
+ 
+-    public SetVditorIR(enable: boolean): void;
+-
+     public SetVditorSV(enable: boolean): void;
+ 
+     public SetVditorWYSIWYG(enable: boolean): void;
+@@ -238,21 +234,6 @@ declare class Lute {
+     // 将 md 转换为 wysiwyg
+     public Md2VditorDOM(markdown: string): string;
+ 
+-    // ir 输入渲染
+-    public SpinVditorIRDOM(markdown: string): string;
+-
+-    // ir 获取 md
+-    public VditorIRDOM2Md(html: string): string;
+-
+-    // md 转换为 ir
+-    public Md2VditorIRDOM(text: string): string;
+-
+-    // 获取 HTML
+-    public VditorIRDOM2HTML(html: string): string;
+-
+-    // 粘贴时将 html 转换为 sv
+-    public HTML2VditorIRDOM(html: string): string;
+-
+     // sv 输入渲染
+     public SpinVditorSVDOM(text: string): string;
+ 
+@@ -312,7 +293,6 @@ interface ITips {
+     insertColumnRight: string;
+     insertRowAbove: string;
+     insertRowBelow: string;
+-    instantRendering: string;
+     italic: string;
+     language: string;
+     line: string;
+@@ -510,9 +490,9 @@ interface IMarkdownConfig {
+     toc?: boolean;
+     /** 脚注。默认值: true */
+     footnotes?: boolean;
+-    /** wysiwyg & ir 模式代码块是否渲染。默认值: true */
++    /** wysiwyg 模式代码块是否渲染。默认值: true */
+     codeBlockPreview?: boolean;
+-    /** wysiwyg & ir 模式数学公式块是否渲染。默认值: true */
++    /** wysiwyg 模式数学公式块是否渲染。默认值: true */
+     mathBlockPreview?: boolean;
+     /** 是否启用过滤 XSS。默认值: true */
+     sanitize?: boolean;
+@@ -736,11 +716,9 @@ interface IOptions {
+      *
+      * wysiwyg: 所见即所得
+      *
+-     * ir: 即时渲染
+-     *
+      * sv: 分屏预览
+      */
+-    mode?: "wysiwyg" | "sv" | "ir";
++    mode?: "wysiwyg" | "sv";
+     /** @link https://ld246.com/article/1549638745630#options-preview */
+     preview?: IPreview;
+     /** @link https://ld246.com/article/1549638745630#options-link */
+@@ -826,7 +804,7 @@ interface IVditor {
+     options: IOptions;
+     originalInnerHTML: string;
+     lute: Lute;
+-    currentMode: "sv" | "wysiwyg" | "ir";
++    currentMode: "sv" | "wysiwyg";
+     devtools?: {
+         element: HTMLDivElement,
+         renderEchart(vditor: IVditor): void,
+@@ -897,14 +875,6 @@ interface IVditor {
+         hideComment(): void,
+         unbindListener(): void,
+     };
+-    ir?: {
+-        range: Range,
+-        element: HTMLPreElement,
+-        composingLock: boolean,
+-        preventInput: boolean,
+-        processTimeoutId: number,
+-        hlToolbarTimeoutId: number,
+-    };
+     sv?: {
+         range: Range,
+         element: HTMLPreElement,
+diff --git a/src/assets/less/_ir.less b/src/assets/less/_ir.less
+deleted file mode 100644
+index c6c4a7cb7009875dd94504d7d7752067a19775c6..0000000000000000000000000000000000000000
+diff --git a/src/assets/less/_sv.less b/src/assets/less/_sv.less
+index 4440b6a0a58b6b5b366d67a87f458c4a5593634f..1e9bad7529322933528441a1cd7ac84c010fa9b4 100644
+--- a/src/assets/less/_sv.less
++++ b/src/assets/less/_sv.less
+@@ -98,31 +98,31 @@
+     color: var(--second-color);
+ 
+     &--heading {
+-      color: var(--ir-heading-color);
++      color: var(--sv-heading-color);
+     }
+ 
+     &--bi {
+-      color: var(--ir-bi-color);
++      color: var(--sv-bi-color);
+     }
+ 
+     &--link {
+-      color: var(--ir-link-color);
++      color: var(--sv-link-color);
+     }
+ 
+     &--title {
+-      color: var(--ir-title-color);
++      color: var(--sv-title-color);
+     }
+ 
+     &--bracket {
+-      color: var(--ir-bracket-color);
++      color: var(--sv-bracket-color);
+     }
+ 
+     &--paren {
+-      color: var(--ir-paren-color);
++      color: var(--sv-paren-color);
+     }
+ 
+     &--info {
+-      color: var(--ir-heading-color);
++      color: var(--sv-heading-color);
+     }
+ 
+     &--strong {
+diff --git a/src/assets/less/index.less b/src/assets/less/index.less
+index 0f420052e7f46489ef6ad3da382d521af0b0c509..3214440998e589b25f365c7f83e4af33ed8be3db 100644
+--- a/src/assets/less/index.less
++++ b/src/assets/less/index.less
+@@ -38,12 +38,12 @@
+   --heading-border-color: #eaecef;
+   --blockquote-color: #6a737d;
+ 
+-  --ir-heading-color: #660e7a;
+-  --ir-title-color: #808080;
+-  --ir-bi-color: #0033b3;
+-  --ir-link-color: #008000;
+-  --ir-bracket-color: #0000ff;
+-  --ir-paren-color: #008000;
++  --sv-heading-color: #660e7a;
++  --sv-title-color: #808080;
++  --sv-bi-color: #0033b3;
++  --sv-link-color: #008000;
++  --sv-bracket-color: #0000ff;
++  --sv-paren-color: #008000;
+ 
+   &--dark {
+     --border-color: #141414;
+@@ -68,12 +68,12 @@
+     --heading-border-color: var(--textarea-text-color);
+     --blockquote-color: var(--toolbar-icon-color);
+ 
+-    --ir-heading-color: #9876aa;
+-    --ir-title-color: #808080;
+-    --ir-bi-color: #cc7832;
+-    --ir-link-color: #ffc66d;
+-    --ir-bracket-color: #287bde;
+-    --ir-paren-color: #6a8759;
++    --sv-heading-color: #9876aa;
++    --sv-title-color: #808080;
++    --sv-bi-color: #cc7832;
++    --sv-link-color: #ffc66d;
++    --sv-bracket-color: #287bde;
++    --sv-paren-color: #6a8759;
+   }
+ }
+ 
+@@ -84,5 +84,4 @@
+ @import "_hint";
+ @import "_reset";
+ @import "_wysiwyg";
+-@import "_ir";
+ @import "_sv";
+diff --git a/src/index.ts b/src/index.ts
+index 577eee889c55730bdb2e10093ea377441eeba4a4..6431516bd98a1fad824a10f9ab4390f4ae4d446a 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -1,11 +1,7 @@
+-import "./assets/less/index.less";
+ import VditorMethod from "./method";
+ import {Constants, VDITOR_VERSION} from "./ts/constants";
+ import {DevTools} from "./ts/devtools/index";
+ import {Hint} from "./ts/hint/index";
+-import {IR} from "./ts/ir/index";
+-import {input as irInput} from "./ts/ir/input";
+-import {processAfterRender} from "./ts/ir/process";
+ import {getHTML} from "./ts/markdown/getHTML";
+ import {getMarkdown} from "./ts/markdown/getMarkdown";
+ import {setLute} from "./ts/markdown/setLute";
+@@ -29,7 +25,6 @@ import {Upload} from "./ts/upload/index";
+ import {addScript, addScriptSync} from "./ts/util/addScript";
+ import {getSelectText} from "./ts/util/getSelectText";
+ import {Options} from "./ts/util/Options";
+-import {processCodeRender} from "./ts/util/processCode";
+ import {getCursorPosition, getEditorRange, insertHTML} from "./ts/util/selection";
+ import {afterRenderEvent} from "./ts/wysiwyg/afterRenderEvent";
+ import {WYSIWYG} from "./ts/wysiwyg/index";
+@@ -140,24 +135,12 @@ class Vditor extends VditorMethod {
+ 
+     /** 聚焦到编辑器 */
+     public focus() {
+-        if (this.vditor.currentMode === "sv") {
+-            this.vditor.sv.element.focus();
+-        } else if (this.vditor.currentMode === "wysiwyg") {
+-            this.vditor.wysiwyg.element.focus();
+-        } else if (this.vditor.currentMode === "ir") {
+-            this.vditor.ir.element.focus();
+-        }
++        this.vditor[this.vditor.currentMode].element.focus();
+     }
+ 
+     /** 让编辑器失焦 */
+     public blur() {
+-        if (this.vditor.currentMode === "sv") {
+-            this.vditor.sv.element.blur();
+-        } else if (this.vditor.currentMode === "wysiwyg") {
+-            this.vditor.wysiwyg.element.blur();
+-        } else if (this.vditor.currentMode === "ir") {
+-            this.vditor.ir.element.blur();
+-        }
++        this.vditor[this.vditor.currentMode].element.blur();
+     }
+ 
+     /** 禁用编辑器 */
+@@ -185,13 +168,7 @@ class Vditor extends VditorMethod {
+ 
+     /** 返回选中的字符串 */
+     public getSelection() {
+-        if (this.vditor.currentMode === "wysiwyg") {
+-            return getSelectText(this.vditor.wysiwyg.element);
+-        } else if (this.vditor.currentMode === "sv") {
+-            return getSelectText(this.vditor.sv.element);
+-        } else if (this.vditor.currentMode === "ir") {
+-            return getSelectText(this.vditor.ir.element);
+-        }
++        return getSelectText(this.vditor[this.vditor.currentMode].element);
+     }
+ 
+     /** 设置预览区域内容 */
+@@ -284,25 +261,17 @@ class Vditor extends VditorMethod {
+             if (render) {
+                 inputEvent(this.vditor);
+             }
+-        } else if (this.vditor.currentMode === "wysiwyg") {
++        } else {
+             // 由于 https://github.com/Vanessa219/vditor/issues/1566 不能使用 this.vditor.wysiwyg.preventInput = true;
+             if (render) {
+                 input(this.vditor, getSelection().getRangeAt(0));
+             }
+-        } else if (this.vditor.currentMode === "ir") {
+-            this.vditor.ir.preventInput = true;
+-            if (render) {
+-                irInput(this.vditor, getSelection().getRangeAt(0), true);
+-            }
+         }
+     }
+ 
+     /** 在焦点处插入 Markdown */
+     public insertMD(md: string) {
+-        // https://github.com/Vanessa219/vditor/issues/1640
+-        if (this.vditor.currentMode === "ir") {
+-            insertHTML(this.vditor.lute.Md2VditorIRDOM(md), this.vditor);
+-        } else if (this.vditor.currentMode === "wysiwyg") {
++        if (this.vditor.currentMode === "wysiwyg") {
+             insertHTML(this.vditor.lute.Md2VditorDOM(md), this.vditor);
+         } else {
+             processPaste(this.vditor, md);
+@@ -320,20 +289,8 @@ class Vditor extends VditorMethod {
+                 enableHint: false,
+                 enableInput: false,
+             });
+-        } else if (this.vditor.currentMode === "wysiwyg") {
+-            renderDomByMd(this.vditor, markdown, {
+-                enableAddUndoStack: true,
+-                enableHint: false,
+-                enableInput: false,
+-            });
+         } else {
+-            this.vditor.ir.element.innerHTML = this.vditor.lute.Md2VditorIRDOM(markdown);
+-            this.vditor.ir.element
+-                .querySelectorAll(".vditor-ir__preview[data-render='2']")
+-                .forEach((item: HTMLElement) => {
+-                    processCodeRender(item, this.vditor);
+-                });
+-            processAfterRender(this.vditor, {
++            renderDomByMd(this.vditor, markdown, {
+                 enableAddUndoStack: true,
+                 enableHint: false,
+                 enableInput: false,
+@@ -490,7 +447,7 @@ class Vditor extends VditorMethod {
+             return;
+         }
+         this.vditor = {
+-            currentMode: mergedOptions.mode,
++            currentMode: mergedOptions.mode === "sv" ? "sv" : "wysiwyg",
+             element: id,
+             hint: new Hint(mergedOptions.hint.extend),
+             lute: undefined,
+@@ -503,7 +460,6 @@ class Vditor extends VditorMethod {
+         this.vditor.sv = new Editor(this.vditor);
+         this.vditor.undo = new Undo();
+         this.vditor.wysiwyg = new WYSIWYG(this.vditor);
+-        this.vditor.ir = new IR(this.vditor);
+         this.vditor.toolbar = new Toolbar(this.vditor);
+ 
+         if (mergedOptions.resize.enable) {
+diff --git a/src/ts/hint/index.ts b/src/ts/hint/index.ts
+index 20b64c42af937d0d6a77d02482745e6e902207e8..07057bde812ce38177f72651f17ef5f04ffb4e2e 100644
+--- a/src/ts/hint/index.ts
++++ b/src/ts/hint/index.ts
+@@ -1,9 +1,7 @@
+-import {Constants} from "../constants";
+-import {processAfterRender} from "../ir/process";
+ import {code160to32} from "../util/code160to32";
+ import {isCtrl} from "../util/compatibility";
+ import {execAfterRender} from "../util/fixBrowserBehavior";
+-import {hasClosestByAttribute, hasClosestByClassName} from "../util/hasClosest";
++import {hasClosestByClassName} from "../util/hasClosest";
+ import {processCodeRender} from "../util/processCode";
+ import {getCursorPosition, insertHTML, setSelectionFocus} from "../util/selection";
+ 
+@@ -132,22 +130,6 @@ ${i === 0 ? "class='vditor-hint--current'" : ""}> ${html}</button>`;
+         const value = decodeURIComponent(element.getAttribute("data-value"));
+         const range: Range = window.getSelection().getRangeAt(0);
+ 
+-        // 代码提示
+-        if (vditor.currentMode === "ir") {
+-            const preBeforeElement = hasClosestByAttribute(range.startContainer, "data-type", "code-block-info");
+-            if (preBeforeElement) {
+-                preBeforeElement.textContent = Constants.ZWSP + value.trimRight();
+-                range.selectNodeContents(preBeforeElement);
+-                range.collapse(false);
+-                processAfterRender(vditor);
+-                preBeforeElement.parentElement.querySelectorAll("code").forEach((item) => {
+-                    item.className = "language-" + value.trimRight();
+-                });
+-                processCodeRender(preBeforeElement.parentElement.querySelector(".vditor-ir__preview"), vditor);
+-                this.recentLanguage = value.trimRight();
+-                return;
+-            }
+-        }
+         if (vditor.currentMode === "wysiwyg" && range.startContainer.nodeType !== 3 ) {
+             const startContainer = range.startContainer as HTMLElement;
+             let inputElement: HTMLInputElement;
+@@ -174,10 +156,8 @@ ${i === 0 ? "class='vditor-hint--current'" : ""}> ${html}</button>`;
+         if (vditor.options.hint.parse) {
+             if (vditor.currentMode === "sv") {
+                 insertHTML(vditor.lute.SpinVditorSVDOM(value), vditor);
+-            } else if (vditor.currentMode === "wysiwyg") {
+-                insertHTML(vditor.lute.SpinVditorDOM(value), vditor);
+             } else {
+-                insertHTML(vditor.lute.SpinVditorIRDOM(value), vditor);
++                insertHTML(vditor.lute.SpinVditorDOM(value), vditor);
+             }
+         } else {
+             insertHTML(value, vditor);
+@@ -194,12 +174,6 @@ ${i === 0 ? "class='vditor-hint--current'" : ""}> ${html}</button>`;
+                 preElement.lastElementChild.innerHTML = preElement.firstElementChild.innerHTML;
+                 processCodeRender(preElement.lastElementChild as HTMLElement, vditor);
+             }
+-        } else if (vditor.currentMode === "ir") {
+-            const preElement = hasClosestByClassName(range.startContainer, "vditor-ir__marker--pre");
+-            if (preElement && preElement.nextElementSibling.classList.contains("vditor-ir__preview")) {
+-                preElement.nextElementSibling.innerHTML = preElement.innerHTML;
+-                processCodeRender(preElement.nextElementSibling as HTMLElement, vditor);
+-            }
+         }
+         execAfterRender(vditor);
+     }
+diff --git a/src/ts/ir/expandMarker.ts b/src/ts/ir/expandMarker.ts
+deleted file mode 100644
+index 188b8f3794105ad2fab0fc29419d9452fbfe7a8d..0000000000000000000000000000000000000000
+diff --git a/src/ts/ir/highlightToolbarIR.ts b/src/ts/ir/highlightToolbarIR.ts
+deleted file mode 100644
+index 184f906a3816f55cfcae1db67f84a2169375c4b2..0000000000000000000000000000000000000000
+diff --git a/src/ts/ir/index.ts b/src/ts/ir/index.ts
+deleted file mode 100644
+index 14618c66eacc51ae72611ce8eaa3a098e08226fb..0000000000000000000000000000000000000000
+diff --git a/src/ts/ir/input.ts b/src/ts/ir/input.ts
+deleted file mode 100644
+index d64f4b72f80ee60b45916986323a41c9d12c5cb8..0000000000000000000000000000000000000000
+diff --git a/src/ts/ir/process.ts b/src/ts/ir/process.ts
+deleted file mode 100644
+index 637f8b363a78fab090f2f099857f49ebf0517b4c..0000000000000000000000000000000000000000
+diff --git a/src/ts/ir/processKeydown.ts b/src/ts/ir/processKeydown.ts
+deleted file mode 100644
+index 47e44528a8809157f35e63c049f221f6a5ead80c..0000000000000000000000000000000000000000
+diff --git a/src/ts/markdown/abcRender.ts b/src/ts/markdown/abcRender.ts
+index 577891c7228c71a01fc0dca5366264eea6d29bdb..10ea4b5151d327d59300725c32ed175af30b1227 100644
+--- a/src/ts/markdown/abcRender.ts
++++ b/src/ts/markdown/abcRender.ts
+@@ -11,8 +11,7 @@ export const abcRender = (element: (HTMLElement | Document) = document, cdn = Co
+     if (abcElements.length > 0) {
+         addScript(`${cdn}/dist/js/abcjs/abcjs_basic.min.js`, "vditorAbcjsScript").then(() => {
+             abcElements.forEach((item: HTMLDivElement) => {
+-                if (item.parentElement.classList.contains("vditor-wysiwyg__pre") ||
+-                    item.parentElement.classList.contains("vditor-ir__marker--pre")) {
++                if (item.parentElement.classList.contains("vditor-wysiwyg__pre")) {
+                     return;
+                 }
+                 if (item.getAttribute("data-processed") === "true") {
+diff --git a/src/ts/markdown/chartRender.ts b/src/ts/markdown/chartRender.ts
+index bd6be9f8479b522f6c1b2d4c36eadc2819a2b758..a0624e0ab53be5d1ab711ad78f2318e8ce47b85a 100644
+--- a/src/ts/markdown/chartRender.ts
++++ b/src/ts/markdown/chartRender.ts
+@@ -12,8 +12,7 @@ export const chartRender = (element: (HTMLElement | Document) = document, cdn =
+     if (echartsElements.length > 0) {
+         addScript(`${cdn}/dist/js/echarts/echarts.min.js?v=5.5.1`, "vditorEchartsScript").then(() => {
+             echartsElements.forEach(async (e: HTMLDivElement) => {
+-                if (e.parentElement.classList.contains("vditor-wysiwyg__pre") ||
+-                    e.parentElement.classList.contains("vditor-ir__marker--pre")) {
++                if (e.parentElement.classList.contains("vditor-wysiwyg__pre")) {
+                     return;
+                 }
+ 
+diff --git a/src/ts/markdown/codeRender.ts b/src/ts/markdown/codeRender.ts
+index 0dbc38a5dd52136dbb1bf73f8abace14ce2668c4..7a8ded9c6597c87e60502d72da9611c4541cf946 100644
+--- a/src/ts/markdown/codeRender.ts
++++ b/src/ts/markdown/codeRender.ts
+@@ -3,8 +3,7 @@ import {Constants} from "../constants";
+ 
+ export const codeRender = (element: HTMLElement, option?: IHljs) => {
+     Array.from<HTMLElement>(element.querySelectorAll("pre > code")).filter((e, index) => {
+-        if (e.parentElement.classList.contains("vditor-wysiwyg__pre") ||
+-            e.parentElement.classList.contains("vditor-ir__marker--pre")) {
++        if (e.parentElement.classList.contains("vditor-wysiwyg__pre")) {
+             return false;
+         }
+         if (e.classList.contains("language-mermaid") || e.classList.contains("language-flowchart") ||
+diff --git a/src/ts/markdown/getHTML.ts b/src/ts/markdown/getHTML.ts
+index 20c528ce86c87437bfde936b96b6b680cc207c51..233ab8c20c47314346bb892e86e1aa75f289ec9a 100644
+--- a/src/ts/markdown/getHTML.ts
++++ b/src/ts/markdown/getHTML.ts
+@@ -3,9 +3,6 @@ import {getMarkdown} from "./getMarkdown";
+ export const getHTML = (vditor: IVditor) => {
+     if (vditor.currentMode === "sv") {
+         return vditor.lute.Md2HTML(getMarkdown(vditor));
+-    } else if (vditor.currentMode === "wysiwyg") {
+-        return vditor.lute.VditorDOM2HTML(vditor.wysiwyg.element.innerHTML);
+-    } else if (vditor.currentMode === "ir") {
+-        return vditor.lute.VditorIRDOM2HTML(vditor.ir.element.innerHTML);
+     }
++    return vditor.lute.VditorDOM2HTML(vditor.wysiwyg.element.innerHTML);
+ };
+diff --git a/src/ts/markdown/getMarkdown.ts b/src/ts/markdown/getMarkdown.ts
+index c3578c8e4fea1b9754623da66e4594846a521065..927d07a4e4399914f448b41dcdc80f22307c8d58 100644
+--- a/src/ts/markdown/getMarkdown.ts
++++ b/src/ts/markdown/getMarkdown.ts
+@@ -3,10 +3,6 @@ import {code160to32} from "../util/code160to32";
+ export const getMarkdown = (vditor: IVditor) => {
+     if (vditor.currentMode === "sv") {
+         return code160to32(`${vditor.sv.element.textContent}\n`.replace(/\n\n$/, "\n"));
+-    } else if (vditor.currentMode === "wysiwyg") {
+-        return vditor.lute.VditorDOM2Md(vditor.wysiwyg.element.innerHTML);
+-    } else if (vditor.currentMode === "ir") {
+-        return vditor.lute.VditorIRDOM2Md(vditor.ir.element.innerHTML);
+     }
+-    return "";
++    return vditor.lute.VditorDOM2Md(vditor.wysiwyg.element.innerHTML);
+ };
+diff --git a/src/ts/markdown/graphvizRender.ts b/src/ts/markdown/graphvizRender.ts
+index c809f287441d52c82b0e999f980e52cfa653978a..29ce72e147c909fe6f78b3214f2b839b896e5b1e 100644
+--- a/src/ts/markdown/graphvizRender.ts
++++ b/src/ts/markdown/graphvizRender.ts
+@@ -17,8 +17,7 @@ export const graphvizRender = (element: HTMLElement, cdn = Constants.CDN) => {
+     addScript(`${cdn}/dist/js/graphviz/viz.js`, "vditorGraphVizScript").then(() => {
+         graphvizElements.forEach((e: HTMLDivElement) => {
+             const code = graphvizRenderAdapter.getCode(e);
+-            if (e.parentElement.classList.contains("vditor-wysiwyg__pre") ||
+-                e.parentElement.classList.contains("vditor-ir__marker--pre")) {
++            if (e.parentElement.classList.contains("vditor-wysiwyg__pre")) {
+                 return;
+             }
+ 
+diff --git a/src/ts/markdown/highlightRender.ts b/src/ts/markdown/highlightRender.ts
+index 32946fae120209343c9dea68b5b436d95c4c6726..3df4691dadad5ed7255fb010d5abfaa09a031a52 100644
+--- a/src/ts/markdown/highlightRender.ts
++++ b/src/ts/markdown/highlightRender.ts
+@@ -27,9 +27,8 @@ export const highlightRender = (hljsOption?: IHljs, element: HTMLElement | Docum
+     addScript(`${cdn}/dist/js/highlight.js/highlight.min.js?v=11.7.0`, "vditorHljsScript").then(() => {
+         addScript(`${cdn}/dist/js/highlight.js/third-languages.js?v=1.0.1`, "vditorHljsThirdScript").then(() => {
+             element.querySelectorAll("pre > code").forEach((block) => {
+-                // ir & wysiwyg 区域不渲染
+-                if (block.parentElement.classList.contains("vditor-ir__marker--pre") ||
+-                    block.parentElement.classList.contains("vditor-wysiwyg__pre")) {
++                // WYSIWYG 编辑区域由编辑器自己的渲染流程处理。
++                if (block.parentElement.classList.contains("vditor-wysiwyg__pre")) {
+                     return;
+                 }
+ 
+diff --git a/src/ts/markdown/mathRender.ts b/src/ts/markdown/mathRender.ts
+index 917cbf725a4820be91b05c6b23a147dd0013c188..357f8a79fe69ee45eebf91212f8a5dfcd7efeb03 100644
+--- a/src/ts/markdown/mathRender.ts
++++ b/src/ts/markdown/mathRender.ts
+@@ -45,8 +45,7 @@ export const mathRender = (element: (HTMLElement | Document) = document, options
+         addScript(`${options.cdn}/dist/js/katex/katex.min.js?v=0.16.9`, "vditorKatexScript").then(() => {
+             addScript(`${options.cdn}/dist/js/katex/mhchem.min.js?v=0.16.9`, "vditorKatexChemScript").then(() => {
+                 mathElements.forEach((mathElement) => {
+-                    if (mathElement.parentElement.classList.contains("vditor-wysiwyg__pre") ||
+-                        mathElement.parentElement.classList.contains("vditor-ir__marker--pre")) {
++                    if (mathElement.parentElement.classList.contains("vditor-wysiwyg__pre")) {
+                         return;
+                     }
+                     if (mathElement.getAttribute("data-math")) {
+@@ -131,7 +130,6 @@ export const mathRender = (element: (HTMLElement | Document) = document, options
+             for (let i = 0; i < mathElements.length; i++) {
+                 const mathElement = mathElements[i];
+                 if (!mathElement.parentElement.classList.contains("vditor-wysiwyg__pre") &&
+-                    !mathElement.parentElement.classList.contains("vditor-ir__marker--pre") &&
+                     !mathElement.getAttribute("data-math") && code160to32(mathElement.textContent).trim()) {
+                     chains.push((next: () => void) => {
+                         if (i === mathElements.length - 1) {
+diff --git a/src/ts/markdown/mindmapRender.ts b/src/ts/markdown/mindmapRender.ts
+index 53983c21fddc6f10be0a42d0e0f3f11764b55265..42c32a35c80ba074dd49bb7c7ea43208caf25001 100644
+--- a/src/ts/markdown/mindmapRender.ts
++++ b/src/ts/markdown/mindmapRender.ts
+@@ -11,8 +11,7 @@ export const mindmapRender = (element: (HTMLElement | Document) = document, cdn
+     if (mindmapElements.length > 0) {
+         addScript(`${cdn}/dist/js/echarts/echarts.min.js?v=5.5.1`, "vditorEchartsScript").then(() => {
+             mindmapElements.forEach((e: HTMLDivElement) => {
+-                if (e.parentElement.classList.contains("vditor-wysiwyg__pre") ||
+-                    e.parentElement.classList.contains("vditor-ir__marker--pre")) {
++                if (e.parentElement.classList.contains("vditor-wysiwyg__pre")) {
+                     return;
+                 }
+                 const text = mindmapRenderAdapter.getCode(e);
+diff --git a/src/ts/markdown/outlineRender.ts b/src/ts/markdown/outlineRender.ts
+index cadb84b953a207d6e5d4c511b116504953451076..53f56414ab61c331a5f8dfb3b748a508e5305478 100644
+--- a/src/ts/markdown/outlineRender.ts
++++ b/src/ts/markdown/outlineRender.ts
+@@ -23,8 +23,6 @@ export const outlineRender = (contentElement: HTMLElement, targetElement: Elemen
+         vditor.lute.SetToC(true);
+         if (vditor.currentMode === "wysiwyg" && !vditor.preview.element.contains(contentElement)) {
+             tempElement.innerHTML = vditor.lute.SpinVditorDOM("<p>[ToC]</p>" + tocHTML);
+-        } else if (vditor.currentMode === "ir" && !vditor.preview.element.contains(contentElement)) {
+-            tempElement.innerHTML = vditor.lute.SpinVditorIRDOM("<p>[ToC]</p>" + tocHTML);
+         } else {
+             tempElement.innerHTML = vditor.lute.HTML2VditorDOM("<p>[ToC]</p>" + tocHTML);
+         }
+diff --git a/src/ts/markdown/plantumlRender.ts b/src/ts/markdown/plantumlRender.ts
+index 550f2767dcd258aa8b0be3b3d1da3631914ccb81..c94c348bd93a5cbd74a2d1793a352f718a8259f0 100644
+--- a/src/ts/markdown/plantumlRender.ts
++++ b/src/ts/markdown/plantumlRender.ts
+@@ -13,8 +13,7 @@ export const plantumlRender = (element: (HTMLElement | Document) = document, cdn
+     }
+     addScript(`${cdn}/dist/js/plantuml/plantuml-encoder.min.js`, "vditorPlantumlScript").then(() => {
+         plantumlElements.forEach((e: HTMLDivElement) => {
+-            if (e.parentElement.classList.contains("vditor-wysiwyg__pre") ||
+-                e.parentElement.classList.contains("vditor-ir__marker--pre")) {
++            if (e.parentElement.classList.contains("vditor-wysiwyg__pre")) {
+                 return;
+             }
+             const text = plantumlRenderAdapter.getCode(e).trim();
+diff --git a/src/ts/toolbar/EditMode.ts b/src/ts/toolbar/EditMode.ts
+index 710e717c2c622332cb2f053ebca2324e7973c8b9..e5e54651e16a6dc5ebda7353192be9e62f01d79b 100644
+--- a/src/ts/toolbar/EditMode.ts
++++ b/src/ts/toolbar/EditMode.ts
+@@ -1,12 +1,11 @@
+ import {Constants} from "../constants";
+-import {processAfterRender} from "../ir/process";
+ import {getMarkdown} from "../markdown/getMarkdown";
+ import {mathRender} from "../markdown/mathRender";
++import {combineFootnote} from "../sv/combineFootnote";
+ import {processAfterRender as processSVAfterRender, processSpinVditorSVDOM} from "../sv/process";
+ import {setPadding, setTypewriterPosition} from "../ui/initUI";
+ import {getEventName, updateHotkeyTip} from "../util/compatibility";
+ import {highlightToolbar} from "../util/highlightToolbar";
+-import {processCodeRender} from "../util/processCode";
+ import {renderToc} from "../util/toc";
+ import {renderDomByMd} from "../wysiwyg/renderDomByMd";
+ import {MenuItem} from "./MenuItem";
+@@ -16,11 +15,12 @@ import {
+     hidePanel,
+     hideToolbar,
+     removeCurrentToolbar,
+-    showToolbar, toggleSubMenu,
++    showToolbar,
++    toggleSubMenu,
+ } from "./setToolbar";
+-import {combineFootnote} from "../sv/combineFootnote";
+ 
+ export const setEditMode = (vditor: IVditor, type: string, event: Event | string) => {
++    const nextMode = type === "sv" ? "sv" : "wysiwyg";
+     let markdownText;
+     if (typeof event !== "string") {
+         hidePanel(vditor, ["subToolbar", "hint"]);
+@@ -29,13 +29,13 @@ export const setEditMode = (vditor: IVditor, type: string, event: Event | string
+     } else {
+         markdownText = event;
+     }
+-    if (vditor.currentMode === type && typeof event !== "string") {
++    if (vditor.currentMode === nextMode && typeof event !== "string") {
+         return;
+     }
+     if (vditor.devtools) {
+         vditor.devtools.renderEchart(vditor);
+     }
+-    if (vditor.options.preview.mode === "both" && type === "sv") {
++    if (vditor.options.preview.mode === "both" && nextMode === "sv") {
+         vditor.preview.element.style.display = "block";
+     } else {
+         vditor.preview.element.style.display = "none";
+@@ -45,47 +45,14 @@ export const setEditMode = (vditor: IVditor, type: string, event: Event | string
+     removeCurrentToolbar(vditor.toolbar.elements, Constants.EDIT_TOOLBARS);
+     disableToolbar(vditor.toolbar.elements, ["outdent", "indent"]);
+ 
+-    if (type === "ir") {
+-        hideToolbar(vditor.toolbar.elements, ["both"]);
+-        showToolbar(vditor.toolbar.elements, ["outdent", "indent", "outline", "insert-before", "insert-after"]);
+-        vditor.sv.element.style.display = "none";
+-        vditor.wysiwyg.element.parentElement.style.display = "none";
+-        vditor.ir.element.parentElement.style.display = "block";
+-
+-        vditor.lute.SetVditorIR(true);
+-        vditor.lute.SetVditorWYSIWYG(false);
+-        vditor.lute.SetVditorSV(false);
+-
+-        vditor.currentMode = "ir";
+-        vditor.ir.element.innerHTML = vditor.lute.Md2VditorIRDOM(markdownText);
+-        processAfterRender(vditor, {
+-            enableAddUndoStack: true,
+-            enableHint: false,
+-            enableInput: false,
+-        });
+-
+-        setPadding(vditor);
+-
+-        vditor.ir.element.querySelectorAll(".vditor-ir__preview[data-render='2']").forEach((item: HTMLElement) => {
+-            processCodeRender(item, vditor);
+-        });
+-        vditor.ir.element.querySelectorAll(".vditor-toc").forEach((item: HTMLElement) => {
+-            mathRender(item, {
+-                cdn: vditor.options.cdn,
+-                math: vditor.options.preview.math,
+-            });
+-        });
+-    } else if (type === "wysiwyg") {
++    if (nextMode === "wysiwyg") {
+         hideToolbar(vditor.toolbar.elements, ["both"]);
+         showToolbar(vditor.toolbar.elements, ["outdent", "indent", "outline", "insert-before", "insert-after"]);
+         vditor.sv.element.style.display = "none";
+         vditor.wysiwyg.element.parentElement.style.display = "block";
+-        vditor.ir.element.parentElement.style.display = "none";
+ 
+-        vditor.lute.SetVditorIR(false);
+         vditor.lute.SetVditorWYSIWYG(true);
+         vditor.lute.SetVditorSV(false);
+-
+         vditor.currentMode = "wysiwyg";
+ 
+         setPadding(vditor);
+@@ -101,29 +68,23 @@ export const setEditMode = (vditor: IVditor, type: string, event: Event | string
+             });
+         });
+         vditor.wysiwyg.popover.style.display = "none";
+-    } else if (type === "sv") {
++    } else {
+         showToolbar(vditor.toolbar.elements, ["both"]);
+         hideToolbar(vditor.toolbar.elements, ["outdent", "indent", "outline", "insert-before", "insert-after"]);
+         vditor.wysiwyg.element.parentElement.style.display = "none";
+-        vditor.ir.element.parentElement.style.display = "none";
+-        if (vditor.options.preview.mode === "both") {
+-            vditor.sv.element.style.display = "block";
+-        } else if (vditor.options.preview.mode === "editor") {
+-            vditor.sv.element.style.display = "block";
+-        }
++        vditor.sv.element.style.display = "block";
+ 
+-        vditor.lute.SetVditorIR(false);
+         vditor.lute.SetVditorWYSIWYG(false);
+         vditor.lute.SetVditorSV(true);
+-
+         vditor.currentMode = "sv";
++
+         let svHTML = processSpinVditorSVDOM(markdownText, vditor);
+         if (svHTML === "<div data-block='0'></div>") {
+             // https://github.com/Vanessa219/vditor/issues/654 SV 模式 Placeholder 显示问题
+             svHTML = "";
+         }
+         vditor.sv.element.innerHTML = svHTML;
+-        combineFootnote(vditor.sv.element)
++        combineFootnote(vditor.sv.element);
+         processSVAfterRender(vditor, {
+             enableAddUndoStack: true,
+             enableHint: false,
+@@ -144,10 +105,15 @@ export const setEditMode = (vditor: IVditor, type: string, event: Event | string
+         vditor.toolbar.elements["edit-mode"].querySelectorAll("button").forEach((item) => {
+             item.classList.remove("vditor-menu--current");
+         });
+-        vditor.toolbar.elements["edit-mode"].querySelector(`button[data-mode="${vditor.currentMode}"]`).classList.add("vditor-menu--current");
++        const currentButton = vditor.toolbar.elements["edit-mode"]
++            .querySelector(`button[data-mode="${vditor.currentMode}"]`);
++        if (currentButton) {
++            currentButton.classList.add("vditor-menu--current");
++        }
+     }
+ 
+-    vditor.outline.toggle(vditor, vditor.currentMode !== "sv" && vditor.options.outline.enable, typeof event !== "string");
++    vditor.outline.toggle(vditor, vditor.currentMode !== "sv" && vditor.options.outline.enable,
++        typeof event !== "string");
+ };
+ 
+ export class EditMode extends MenuItem {
+@@ -159,34 +125,23 @@ export class EditMode extends MenuItem {
+         const panelElement = document.createElement("div");
+         panelElement.className = `vditor-hint${menuItem.level === 2 ? "" : " vditor-panel--arrow"}`;
+         panelElement.innerHTML = `<button data-mode="wysiwyg">${window.VditorI18n.wysiwyg} &lt;${updateHotkeyTip("⌥⌘7")}></button>
+-<button data-mode="ir">${window.VditorI18n.instantRendering} &lt;${updateHotkeyTip("⌥⌘8")}></button>
+ <button data-mode="sv">${window.VditorI18n.splitView} &lt;${updateHotkeyTip("⌥⌘9")}></button>`;
+ 
+         this.element.appendChild(panelElement);
+-
+-        this._bindEvent(vditor, panelElement, menuItem);
++        this.bindEvent(vditor, panelElement, menuItem);
+     }
+ 
+-    public _bindEvent(vditor: IVditor, panelElement: HTMLElement, menuItem: IMenuItem) {
++    private bindEvent(vditor: IVditor, panelElement: HTMLElement, menuItem: IMenuItem) {
+         const actionBtn = this.element.children[0] as HTMLElement;
+         toggleSubMenu(vditor, panelElement, actionBtn, menuItem.level);
+ 
+         panelElement.children.item(0).addEventListener(getEventName(), (event: Event) => {
+-            // wysiwyg
+             setEditMode(vditor, "wysiwyg", event);
+             event.preventDefault();
+             event.stopPropagation();
+         });
+ 
+         panelElement.children.item(1).addEventListener(getEventName(), (event: Event) => {
+-            // ir
+-            setEditMode(vditor, "ir", event);
+-            event.preventDefault();
+-            event.stopPropagation();
+-        });
+-
+-        panelElement.children.item(2).addEventListener(getEventName(), (event: Event) => {
+-            // markdown
+             setEditMode(vditor, "sv", event);
+             event.preventDefault();
+             event.stopPropagation();
+diff --git a/src/ts/toolbar/Emoji.ts b/src/ts/toolbar/Emoji.ts
+index 30db4c84ce7e75c7346eb982e79ece814c285bb5..1321ccd6aaca8752ced597969473896be74444c2 100644
+--- a/src/ts/toolbar/Emoji.ts
++++ b/src/ts/toolbar/Emoji.ts
+@@ -48,8 +48,6 @@ data-value=":${key}: " data-key=":${key}:" class="vditor-emojis__icon" src="${em
+                 let html = value;
+                 if (vditor.currentMode === "wysiwyg") {
+                     html = vditor.lute.SpinVditorDOM(value);
+-                } else if (vditor.currentMode === "ir") {
+-                    html = vditor.lute.SpinVditorIRDOM(value);
+                 }
+                 if (value.indexOf(":") > -1 && vditor.currentMode !== "sv") {
+                     const tempElement = document.createElement("div");
+diff --git a/src/ts/toolbar/Headings.ts b/src/ts/toolbar/Headings.ts
+index 229c52668d43682171ec774beab7a3caf6c9b1d6..d94e378340d91f900ce3c096573376f9c1db42a8 100644
+--- a/src/ts/toolbar/Headings.ts
++++ b/src/ts/toolbar/Headings.ts
+@@ -1,5 +1,4 @@
+ import {Constants} from "../constants";
+-import {processHeading} from "../ir/process";
+ import {processHeading as processHeadingSV} from "../sv/process";
+ import {getEventName, updateHotkeyTip} from "../util/compatibility";
+ import {afterRenderEvent} from "../wysiwyg/afterRenderEvent";
+@@ -33,7 +32,6 @@ export class Headings extends MenuItem {
+             event.preventDefault();
+             // https://github.com/Vanessa219/vditor/issues/1391
+             clearTimeout(vditor.wysiwyg.afterRenderTimeoutId);
+-            clearTimeout(vditor.ir.processTimeoutId);
+             clearTimeout(vditor.sv.processTimeoutId);
+             if (actionBtn.classList.contains(Constants.CLASS_MENU_DISABLED)) {
+                 return;
+@@ -43,8 +41,6 @@ export class Headings extends MenuItem {
+                 if (vditor.currentMode === "wysiwyg") {
+                     removeHeading(vditor);
+                     afterRenderEvent(vditor);
+-                } else if (vditor.currentMode === "ir") {
+-                    processHeading(vditor, "");
+                 }
+                 actionBtn.classList.remove("vditor-menu--current");
+             } else {
+@@ -60,9 +56,6 @@ export class Headings extends MenuItem {
+                     setHeading(vditor, (event.target as HTMLElement).getAttribute("data-tag"));
+                     afterRenderEvent(vditor);
+                     actionBtn.classList.add("vditor-menu--current");
+-                } else if (vditor.currentMode === "ir") {
+-                    processHeading(vditor, (event.target as HTMLElement).getAttribute("data-value"));
+-                    actionBtn.classList.add("vditor-menu--current");
+                 } else {
+                     processHeadingSV(vditor, (event.target as HTMLElement).getAttribute("data-value"));
+                 }
+diff --git a/src/ts/toolbar/MenuItem.ts b/src/ts/toolbar/MenuItem.ts
+index e9fb4a1489de8ad8ab776edc10afea26658dc17b..ad19de68d343b426025fd6305a8a69f5acb1e83c 100644
+--- a/src/ts/toolbar/MenuItem.ts
++++ b/src/ts/toolbar/MenuItem.ts
+@@ -1,5 +1,4 @@
+ import {Constants} from "../constants";
+-import {processToolbar} from "../ir/process";
+ import {processToolbar as processToolbarSV} from "../sv/process";
+ import {getEventName} from "../util/compatibility";
+ import {updateHotkeyTip} from "../util/compatibility";
+@@ -42,9 +41,6 @@ export class MenuItem {
+             }
+             if (vditor.currentMode === "wysiwyg") {
+                 toolbarEvent(vditor, this.element.children[0], event);
+-            } else if (vditor.currentMode === "ir") {
+-                processToolbar(vditor, this.element.children[0],
+-                    menuItem.prefix || "", menuItem.suffix || "");
+             } else {
+                 processToolbarSV(vditor, this.element.children[0],
+                     menuItem.prefix || "", menuItem.suffix || "");
+diff --git a/src/ts/ui/initUI.ts b/src/ts/ui/initUI.ts
+index 55497771fdacb48f67c2347564a8363c7a873d3c..34a99c8c14fd2c21b53f9b53d0df275bbfb44006 100644
+--- a/src/ts/ui/initUI.ts
++++ b/src/ts/ui/initUI.ts
+@@ -41,8 +41,6 @@ export const initUI = (vditor: IVditor) => {
+ 
+   contentElement.appendChild(vditor.sv.element);
+ 
+-  contentElement.appendChild(vditor.ir.element.parentElement);
+-
+   contentElement.appendChild(vditor.preview.element);
+ 
+   if (vditor.toolbar.elements.devtools) {
+@@ -113,12 +111,6 @@ export const setPadding = (vditor: IVditor) => {
+     vditor.wysiwyg.element.style.padding = `10px ${Math.max(minPadding, padding)}px`;
+   }
+ 
+-  if (vditor.ir.element.parentElement.style.display !== "none") {
+-    const padding = (vditor.ir.element.parentElement.clientWidth
+-      - vditor.options.preview.maxWidth) / 2;
+-    vditor.ir.element.style.padding = `10px ${Math.max(minPadding, padding)}px`;
+-  }
+-
+   if (vditor.preview.element.style.display !== "block") {
+     vditor.toolbar.element.style.paddingLeft = Math.max(5,
+       parseInt(vditor[vditor.currentMode].element.style.paddingLeft || "0", 10) +
+diff --git a/src/ts/undo/index.ts b/src/ts/undo/index.ts
+index 7fb05e8a1915b7169df20d7291d9ea477de24e0f..ec84817a85209c387900d4a449b1cdd97b880044 100644
+--- a/src/ts/undo/index.ts
++++ b/src/ts/undo/index.ts
+@@ -1,4 +1,4 @@
+-import * as DiffMatchPatch from "diff-match-patch";
++import DiffMatchPatch from "diff-match-patch";
+ import {disableToolbar, enableToolbar, hidePanel} from "../toolbar/setToolbar";
+ import {isFirefox, isSafari} from "../util/compatibility";
+ import {scrollCenter} from "../util/editorCommonEvent";
+@@ -8,18 +8,19 @@ import {processCodeRender} from "../util/processCode";
+ import {setRangeByWbr, setSelectionFocus} from "../util/selection";
+ import {renderToc} from "../util/toc";
+ 
++type PatchObject = any;
++
+ interface IUndo {
+     hasUndo: boolean;
+     lastText: string;
+-    redoStack: DiffMatchPatch.patch_obj[][];
+-    undoStack: DiffMatchPatch.patch_obj[][];
++    redoStack: PatchObject[][];
++    undoStack: PatchObject[][];
+ }
+ 
+ class Undo {
+     private stackSize = 50;
+-    private dmp: DiffMatchPatch.diff_match_patch;
++    private dmp: any;
+     private wysiwyg: IUndo;
+-    private ir: IUndo;
+     private sv: IUndo;
+ 
+     constructor() {
+@@ -98,7 +99,7 @@ class Undo {
+             return;
+         }
+         const text = this.addCaret(vditor);
+-        if (text.replace("<wbr>", "").replace(" vditor-ir__node--expand", "")
++        if (text.replace("<wbr>", "")
+             !== this[vditor.currentMode].undoStack[0][0].diffs[0][1].replace("<wbr>", "")) {
+             // 当还不没有存入 undo 栈时，按下 ctrl 后会覆盖 lastText
+             return;
+@@ -132,7 +133,7 @@ class Undo {
+         }
+     }
+ 
+-    private renderDiff(state: DiffMatchPatch.patch_obj[], vditor: IVditor, isRedo: boolean = false) {
++    private renderDiff(state: PatchObject[], vditor: IVditor, isRedo: boolean = false) {
+         let text;
+         if (isRedo) {
+             const redoPatchList = this.dmp.patch_deepCopy(state).reverse();
+@@ -152,11 +153,8 @@ class Undo {
+             vditor[vditor.currentMode].element.querySelectorAll(`.vditor-${vditor.currentMode}__preview`)
+                 .forEach((blockElement: HTMLElement) => {
+                     if (blockElement.parentElement.querySelector(".language-echarts")) {
+-                        if (vditor.currentMode === "ir") {
+-                            blockElement.parentElement.outerHTML = vditor.lute.SpinVditorIRDOM(blockElement.parentElement.outerHTML);
+-                        } else {
+-                            blockElement.parentElement.outerHTML = vditor.lute.SpinVditorDOM(blockElement.parentElement.outerHTML);
+-                        }
++                        blockElement.parentElement.outerHTML =
++                            vditor.lute.SpinVditorDOM(blockElement.parentElement.outerHTML);
+                     }
+                 });
+             vditor[vditor.currentMode].element.querySelectorAll(`.vditor-${vditor.currentMode}__preview[data-render='2']`)
+@@ -204,12 +202,6 @@ class Undo {
+     }
+ 
+     private resetStack() {
+-        this.ir = {
+-            hasUndo: false,
+-            lastText: "",
+-            redoStack: [],
+-            undoStack: [],
+-        };
+         this.sv = {
+             hasUndo: false,
+             lastText: "",
+diff --git a/src/ts/upload/getElement.ts b/src/ts/upload/getElement.ts
+index eee42245923c356ce13d36bbb063bafaae04b027..d173259af289c347dab281603a04aeaa30603cd7 100644
+--- a/src/ts/upload/getElement.ts
++++ b/src/ts/upload/getElement.ts
+@@ -1,10 +1 @@
+-export const getElement = (vditor: IVditor) => {
+-    switch (vditor.currentMode) {
+-        case "ir":
+-            return vditor.ir.element;
+-        case "wysiwyg":
+-            return vditor.wysiwyg.element;
+-        case "sv":
+-            return vditor.sv.element;
+-    }
+-};
++export const getElement = (vditor: IVditor) => vditor[vditor.currentMode].element;
+diff --git a/src/ts/upload/index.ts b/src/ts/upload/index.ts
+index 22f177eb3d063048ba6097d1fa1bcce60cf0fc7d..8bd4e595e9a34e9eb476fa97e0725213d0d938fe 100644
+--- a/src/ts/upload/index.ts
++++ b/src/ts/upload/index.ts
+@@ -120,8 +120,6 @@ const genUploadedLabel = (responseText: string, vditor: IVditor) => {
+             if (vditor.currentMode === "wysiwyg") {
+                 succFileText += `<div class="vditor-wysiwyg__block" data-type="html-block"
+  data-block="0"><pre><code>&lt;audio controls="controls" src="${path}"&gt;&lt;/audio&gt;</code></pre><pre class="vditor-wysiwyg__preview" data-render="1"><audio controls="controls" src="${path}"></audio></pre></div>\n`;
+-            } else if (vditor.currentMode === "ir") {
+-                succFileText += `<audio controls="controls" src="${path}"></audio>\n`;
+             } else {
+                 succFileText += `[${filename}](${path})\n`;
+             }
+diff --git a/src/ts/util/Options.ts b/src/ts/util/Options.ts
+index ae257514d573163d164110ec51745fb64adc3241..c493ee87af2c16cb801d33495a5b61f5033d658a 100644
+--- a/src/ts/util/Options.ts
++++ b/src/ts/util/Options.ts
+@@ -44,7 +44,7 @@ export class Options {
+         },
+         icon: "ant",
+         lang: "zh_CN",
+-        mode: "ir",
++        mode: "wysiwyg",
+         outline: {
+             enable: false,
+             position: "left",
+@@ -176,6 +176,7 @@ export class Options {
+         }
+ 
+         const mergedOptions = merge(this.defaultOptions, this.options);
++        mergedOptions.mode = mergedOptions.mode === "sv" ? "sv" : "wysiwyg";
+ 
+         if (mergedOptions.cache.enable && !mergedOptions.cache.id) {
+             throw new Error(
+diff --git a/src/ts/util/editorCommonEvent.ts b/src/ts/util/editorCommonEvent.ts
+index e81487a26c3e38c16bbc182bfa8e4b51ceb47781..0407ab37a8611e405e50f312758947877ae80cd1 100644
+--- a/src/ts/util/editorCommonEvent.ts
++++ b/src/ts/util/editorCommonEvent.ts
+@@ -1,6 +1,4 @@
+ import {Constants} from "../constants";
+-import {processHeading} from "../ir/process";
+-import {processKeydown as irProcessKeydown} from "../ir/processKeydown";
+ import {getMarkdown} from "../markdown/getMarkdown";
+ import {previewImage} from "../preview/image";
+ import {processHeading as processHeadingSV} from "../sv/process";
+@@ -40,12 +38,7 @@ export const dblclickEvent = (vditor: IVditor, editorElement: HTMLElement) => {
+ 
+ export const blurEvent = (vditor: IVditor, editorElement: HTMLElement) => {
+     editorElement.addEventListener("blur", (event) => {
+-        if (vditor.currentMode === "ir") {
+-            const expandElement = vditor.ir.element.querySelector(".vditor-ir__node--expand");
+-            if (expandElement) {
+-                expandElement.classList.remove("vditor-ir__node--expand");
+-            }
+-        } else if (vditor.currentMode === "wysiwyg" &&
++        if (vditor.currentMode === "wysiwyg" &&
+             !vditor.wysiwyg.selectPopover.contains(event.relatedTarget as HTMLElement)) {
+             vditor.wysiwyg.hideComment();
+         }
+@@ -137,10 +130,6 @@ export const hotkeyEvent = (vditor: IVditor, editorElement: HTMLElement) => {
+             if (processKeydown(vditor, event)) {
+                 return;
+             }
+-        } else if (vditor.currentMode === "ir") {
+-            if (irProcessKeydown(vditor, event)) {
+-                return;
+-            }
+         }
+ 
+         if (vditor.options.ctrlEnter && matchHotKey("⌘Enter", event)) {
+@@ -184,24 +173,17 @@ export const hotkeyEvent = (vditor: IVditor, editorElement: HTMLElement) => {
+                     setHeading(vditor, tagName);
+                 }
+                 afterRenderEvent(vditor);
+-            } else if (vditor.currentMode === "sv") {
++            } else {
+                 processHeadingSV(vditor, "#".repeat(parseInt(event.code.replace("Digit", ""), 10)) + " ");
+-            } else if (vditor.currentMode === "ir") {
+-                processHeading(vditor, "#".repeat(parseInt(event.code.replace("Digit", ""), 10)) + " ");
+             }
+             event.preventDefault();
+             return true;
+         }
+ 
+         // toggle edit mode
+-        if (isCtrl(event) && event.altKey && !event.shiftKey && /^Digit[7-9]$/.test(event.code)) {
+-            if (event.code === "Digit7") {
+-                setEditMode(vditor, "wysiwyg", event);
+-            } else if (event.code === "Digit8") {
+-                setEditMode(vditor, "ir", event);
+-            } else if (event.code === "Digit9") {
+-                setEditMode(vditor, "sv", event);
+-            }
++        if (isCtrl(event) && event.altKey && !event.shiftKey &&
++            (event.code === "Digit7" || event.code === "Digit9")) {
++            setEditMode(vditor, event.code === "Digit7" ? "wysiwyg" : "sv", event);
+             return true;
+         }
+ 
+diff --git a/src/ts/util/fixBrowserBehavior.ts b/src/ts/util/fixBrowserBehavior.ts
+index 17107ed9e086c6a0705268c07941a95fee45b5c5..afd7ca7ec7e1ae395d08b3ed6c34dfdf840c1195 100644
+--- a/src/ts/util/fixBrowserBehavior.ts
++++ b/src/ts/util/fixBrowserBehavior.ts
+@@ -1,6 +1,4 @@
+ import {Constants} from "../constants";
+-import {input as IRInput} from "../ir/input";
+-import {processAfterRender} from "../ir/process";
+ import {processAfterRender as processSVAfterRender, processPaste} from "../sv/process";
+ import {uploadFiles} from "../upload/index";
+ import {setHeaders} from "../upload/setHeaders";
+@@ -280,11 +278,7 @@ export const listIndent = (vditor: IVditor, liElement: HTMLElement, range: Range
+         previousElement.insertAdjacentHTML("beforeend",
+             `<${liParentElement.tagName} data-block="0">${liHTML}</${liParentElement.tagName}>`);
+ 
+-        if (vditor.currentMode === "wysiwyg") {
+-            liParentElement.outerHTML = vditor.lute.SpinVditorDOM(liParentElement.outerHTML);
+-        } else {
+-            liParentElement.outerHTML = vditor.lute.SpinVditorIRDOM(liParentElement.outerHTML);
+-        }
++        liParentElement.outerHTML = vditor.lute.SpinVditorDOM(liParentElement.outerHTML);
+ 
+         setRangeByWbr(vditor[vditor.currentMode].element, range);
+         const tempTopListElement = getTopList(range.startContainer);
+@@ -349,11 +343,7 @@ export const listOutdent = (vditor: IVditor, liElement: HTMLElement, range: Rang
+             liElements[0].insertAdjacentElement("beforeend", liParentAfterElement);
+         }
+ 
+-        if (vditor.currentMode === "wysiwyg") {
+-            topListElement.outerHTML = vditor.lute.SpinVditorDOM(topListElement.outerHTML);
+-        } else {
+-            topListElement.outerHTML = vditor.lute.SpinVditorIRDOM(topListElement.outerHTML);
+-        }
++        topListElement.outerHTML = vditor.lute.SpinVditorDOM(topListElement.outerHTML);
+ 
+         setRangeByWbr(vditor[vditor.currentMode].element, range);
+         const tempTopListElement = getTopList(range.startContainer);
+@@ -446,9 +436,7 @@ export const execAfterRender = (vditor: IVditor, options = {
+ }) => {
+     if (vditor.currentMode === "wysiwyg") {
+         afterRenderEvent(vditor, options);
+-    } else if (vditor.currentMode === "ir") {
+-        processAfterRender(vditor, options);
+-    } else if (vditor.currentMode === "sv") {
++    } else {
+         processSVAfterRender(vditor, options);
+     }
+ };
+@@ -595,11 +583,8 @@ export const fixMarkdown = (event: KeyboardEvent, vditor: IVditor, pElement: HTM
+ 
+         if (isHeadingMD(pElement.innerHTML)) {
+             // heading 渲染
+-            if (vditor.currentMode === "wysiwyg") {
+-                pElement.outerHTML = vditor.lute.SpinVditorDOM(pElement.innerHTML + '<p data-block="0"><wbr>\n</p>');
+-            } else {
+-                pElement.outerHTML = vditor.lute.SpinVditorIRDOM(pElement.innerHTML + '<p data-block="0"><wbr>\n</p>');
+-            }
++            pElement.outerHTML =
++                vditor.lute.SpinVditorDOM(pElement.innerHTML + '<p data-block="0"><wbr>\n</p>');
+             setRangeByWbr(vditor[vditor.currentMode].element, range);
+             execAfterRender(vditor);
+             scrollCenter(vditor);
+@@ -656,7 +641,7 @@ export const insertRowAbove = (vditor: IVditor, range: Range, cellElement: HTMLE
+         cellElement.parentElement.parentElement.nextElementSibling.insertAdjacentHTML("afterbegin", theadHTML);
+ 
+         cellElement.parentElement.parentElement.remove();
+-        setRangeByWbr(vditor.ir.element, range);
++        setRangeByWbr(vditor[vditor.currentMode].element, range);
+     } else {
+         cellElement.parentElement.insertAdjacentHTML("beforebegin", `<tr>${rowHTML}</tr>`);
+     }
+@@ -910,51 +895,30 @@ export const fixTable = (vditor: IVditor, event: KeyboardEvent, range: Range) =>
+ 
+         // 剧左
+         if (matchHotKey("⇧⌘L", event)) {
+-            if (vditor.currentMode === "ir") {
+-                setTableAlign(tableElement, "left");
+-                execAfterRender(vditor);
++            const itemElement: HTMLElement = vditor.wysiwyg.popover.querySelector('[data-type="left"]');
++            if (itemElement) {
++                itemElement.click();
+                 event.preventDefault();
+                 return true;
+-            } else {
+-                const itemElement: HTMLElement = vditor.wysiwyg.popover.querySelector('[data-type="left"]');
+-                if (itemElement) {
+-                    itemElement.click();
+-                    event.preventDefault();
+-                    return true;
+-                }
+             }
+         }
+ 
+         // 剧中
+         if (matchHotKey("⇧⌘C", event)) {
+-            if (vditor.currentMode === "ir") {
+-                setTableAlign(tableElement, "center");
+-                execAfterRender(vditor);
++            const itemElement: HTMLElement = vditor.wysiwyg.popover.querySelector('[data-type="center"]');
++            if (itemElement) {
++                itemElement.click();
+                 event.preventDefault();
+                 return true;
+-            } else {
+-                const itemElement: HTMLElement = vditor.wysiwyg.popover.querySelector('[data-type="center"]');
+-                if (itemElement) {
+-                    itemElement.click();
+-                    event.preventDefault();
+-                    return true;
+-                }
+             }
+         }
+         // 剧右
+         if (matchHotKey("⇧⌘R", event)) {
+-            if (vditor.currentMode === "ir") {
+-                setTableAlign(tableElement, "right");
+-                execAfterRender(vditor);
++            const itemElement: HTMLElement = vditor.wysiwyg.popover.querySelector('[data-type="right"]');
++            if (itemElement) {
++                itemElement.click();
+                 event.preventDefault();
+                 return true;
+-            } else {
+-                const itemElement: HTMLElement = vditor.wysiwyg.popover.querySelector('[data-type="right"]');
+-                if (itemElement) {
+-                    itemElement.click();
+-                    event.preventDefault();
+-                    return true;
+-                }
+             }
+         }
+     }
+@@ -1004,11 +968,7 @@ export const fixCodeBlock = (vditor: IVditor, event: KeyboardEvent, codeRenderEl
+         range.collapse(false);
+         setSelectionFocus(range);
+         if (!isFirefox()) {
+-            if (vditor.currentMode === "wysiwyg") {
+-                input(vditor, range);
+-            } else {
+-                IRInput(vditor, range);
+-            }
++            input(vditor, range);
+         }
+         scrollCenter(vditor);
+         event.preventDefault();
+@@ -1280,9 +1240,7 @@ export const paste = async (vditor: IVditor, event: (ClipboardEvent | DragEvent)
+     }
+     const renderers: {
+         HTML2VditorDOM?: ILuteRender,
+-        HTML2VditorIRDOM?: ILuteRender,
+         Md2VditorDOM?: ILuteRender,
+-        Md2VditorIRDOM?: ILuteRender,
+         Md2VditorSVDOM?: ILuteRender,
+     } = {};
+     const renderLinkDest: ILuteRenderCallback = (node, entering) => {
+@@ -1329,12 +1287,8 @@ export const paste = async (vditor: IVditor, event: (ClipboardEvent | DragEvent)
+                                 });
+                         } else {
+                             const imgElement: HTMLImageElement =
+-                                vditor[vditor.currentMode].element.querySelector(`img[src="${original}"]`);
++                                vditor.wysiwyg.element.querySelector(`img[src="${original}"]`);
+                             imgElement.src = responseJSON.data.url;
+-                            if (vditor.currentMode === "ir") {
+-                                imgElement.previousElementSibling.previousElementSibling.innerHTML =
+-                                    responseJSON.data.url;
+-                            }
+                         }
+                         execAfterRender(vditor);
+                     } else {
+@@ -1347,9 +1301,7 @@ export const paste = async (vditor: IVditor, event: (ClipboardEvent | DragEvent)
+             };
+             xhr.send(JSON.stringify({url: src}));
+         }
+-        if (vditor.currentMode === "ir") {
+-            return [`<span class="vditor-ir__marker vditor-ir__marker--link">${Lute.EscapeHTMLStr(src)}</span>`, Lute.WalkContinue];
+-        } else if (vditor.currentMode === "wysiwyg") {
++        if (vditor.currentMode === "wysiwyg") {
+             return ["", Lute.WalkContinue];
+         } else {
+             return [`<span class="vditor-sv__marker--link">${Lute.EscapeHTMLStr(src)}</span>`, Lute.WalkContinue];
+@@ -1415,11 +1367,7 @@ export const paste = async (vditor: IVditor, event: (ClipboardEvent | DragEvent)
+             tempElement.querySelectorAll(".vditor-copy").forEach((e) => {
+                 e.remove();
+             });
+-            if (vditor.currentMode === "ir") {
+-                renderers.HTML2VditorIRDOM = {renderLinkDest};
+-                vditor.lute.SetJSRenderers({renderers});
+-                insertHTML(vditor.lute.HTML2VditorIRDOM(tempElement.innerHTML), vditor);
+-            } else if (vditor.currentMode === "wysiwyg") {
++            if (vditor.currentMode === "wysiwyg") {
+                 renderers.HTML2VditorDOM = {renderLinkDest};
+                 vditor.lute.SetJSRenderers({renderers});
+                 insertHTML(vditor.lute.HTML2VditorDOM(tempElement.innerHTML), vditor);
+@@ -1460,11 +1408,7 @@ export const paste = async (vditor: IVditor, event: (ClipboardEvent | DragEvent)
+             if (range.toString() !== "" && vditor.lute.IsValidLinkDest(textPlain)) {
+                 textPlain = `[${range.toString()}](${textPlain})`;
+             }
+-            if (vditor.currentMode === "ir") {
+-                renderers.Md2VditorIRDOM = {renderLinkDest};
+-                vditor.lute.SetJSRenderers({renderers});
+-                insertHTML(Lute.Sanitize(vditor.lute.Md2VditorIRDOM(textPlain)), vditor);
+-            } else if (vditor.currentMode === "wysiwyg") {
++            if (vditor.currentMode === "wysiwyg") {
+                 renderers.Md2VditorDOM = {renderLinkDest};
+                 vditor.lute.SetJSRenderers({renderers});
+                 insertHTML(Lute.Sanitize(vditor.lute.Md2VditorDOM(textPlain)), vditor);
+@@ -1485,11 +1429,7 @@ export const paste = async (vditor: IVditor, event: (ClipboardEvent | DragEvent)
+                 wbr.remove();
+             });
+             range.insertNode(document.createElement("wbr"));
+-            if (vditor.currentMode === "wysiwyg") {
+-                blockElement.outerHTML = vditor.lute.SpinVditorDOM(blockElement.outerHTML);
+-            } else {
+-                blockElement.outerHTML = vditor.lute.SpinVditorIRDOM(blockElement.outerHTML);
+-            }
++            blockElement.outerHTML = vditor.lute.SpinVditorDOM(blockElement.outerHTML);
+             setRangeByWbr(vditor[vditor.currentMode].element, range);
+         }
+         vditor[vditor.currentMode].element.querySelectorAll(`.vditor-${vditor.currentMode}__preview[data-render='2']`)
+diff --git a/src/ts/util/highlightToolbar.ts b/src/ts/util/highlightToolbar.ts
+index 2615e16558c91c2e9f07b6a7cafacde3194300b7..e4d4005362dbcd085ac47dee1f46144b9f54335d 100644
+--- a/src/ts/util/highlightToolbar.ts
++++ b/src/ts/util/highlightToolbar.ts
+@@ -1,10 +1,7 @@
+-import {highlightToolbarIR} from "../ir/highlightToolbarIR";
+ import {highlightToolbarWYSIWYG} from "../wysiwyg/highlightToolbarWYSIWYG";
+ 
+ export const highlightToolbar = (vditor: IVditor) => {
+     if (vditor.currentMode === "wysiwyg") {
+         highlightToolbarWYSIWYG(vditor);
+-    } else if (vditor.currentMode === "ir") {
+-        highlightToolbarIR(vditor);
+     }
+ };

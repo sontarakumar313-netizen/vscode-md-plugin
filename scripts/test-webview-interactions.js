@@ -73,12 +73,18 @@ function testPage() {
     };
     window.acquireVsCodeApi = () => ({ postMessage(message) { window.__vmdMessages.push(message); } });
     window.addEventListener('error', (event) => {
+      window.__vmdRuntimeError = event.error && event.error.stack
+        ? event.error.stack
+        : event.message;
       document.body.dataset.vmdTest = 'failed';
-      document.getElementById('vmd-test-result').textContent = 'runtime: ' + event.message;
+      document.getElementById('vmd-test-result').textContent = 'runtime: ' + window.__vmdRuntimeError;
     });
     window.addEventListener('unhandledrejection', (event) => {
+      window.__vmdRuntimeError = event.reason && event.reason.stack
+        ? event.reason.stack
+        : String(event.reason);
       document.body.dataset.vmdTest = 'failed';
-      document.getElementById('vmd-test-result').textContent = 'rejection: ' + event.reason;
+      document.getElementById('vmd-test-result').textContent = 'rejection: ' + window.__vmdRuntimeError;
     });
   </script>
   <script src="/main.js"></script>
@@ -120,9 +126,9 @@ function testPage() {
     };
     const switchMode = async (mode) => {
       if (window.vditor.vditor.currentMode === mode) return;
-      document.querySelector('.vditor-toolbar [data-type="edit-mode"]').click();
+      document.querySelector('.vditor-toolbar [data-type="vmd-edit-mode"]').click();
       await pause();
-      document.querySelector('.vditor-toolbar [data-mode="' + mode + '"]').click();
+      document.querySelector('.vditor-toolbar [data-type="vmd-mode-' + mode + '"]').click();
       await wait(() => window.vditor.vditor.currentMode === mode);
       await pause();
     };
@@ -134,6 +140,7 @@ function testPage() {
       if (!condition) throw new Error(message);
     };
     const lines = (...values) => values.join(String.fromCharCode(10));
+    const removedModeName = ['i', 'r'].join('');
 
     (async () => {
       try {
@@ -148,7 +155,7 @@ function testPage() {
             editorGeneration: hostGeneration,
             theme: 'light',
             options: {
-              mode: 'wysiwyg',
+              mode: removedModeName,
               undoDelay: 0,
               preview: { delay: 0 },
               lang: 'en_US',
@@ -162,6 +169,33 @@ function testPage() {
         }));
         await wait(() => root());
         await wait(() => window.__vmdMessages.some((message) => message.command === 'editor-baseline'));
+        expect(
+          window.vditor.vditor.currentMode === 'wysiwyg',
+          'an unsupported initialization mode did not fall back to visual editing'
+        );
+        expect(
+          !Object.prototype.hasOwnProperty.call(window.vditor.vditor, removedModeName),
+          'the removed editor object was still constructed'
+        );
+        expect(
+          !document.querySelector('.vditor-' + removedModeName),
+          'the removed editor DOM was still mounted'
+        );
+        expect(
+          !Object.prototype.hasOwnProperty.call(window.VditorI18n, 'instant' + 'Rendering'),
+          'the removed editor label was still bundled'
+        );
+        const modeControl = document.querySelector('.vditor-toolbar [data-type="vmd-edit-mode"]');
+        expect(modeControl, 'the two-mode editor control was not rendered');
+        modeControl.click();
+        await pause();
+        const modeButtons = Array.from(
+          document.querySelectorAll('.vditor-toolbar [data-type^="vmd-mode-"]')
+        ).map((button) => button.getAttribute('data-type'));
+        expect(
+          modeButtons.join(',') === 'vmd-mode-wysiwyg,vmd-mode-sv',
+          'the editor exposed a mode outside the supported pair: ' + modeButtons.join(',')
+        );
         const initialBaselines = window.__vmdMessages.filter((message) => message.command === 'editor-baseline');
         expect(initialBaselines.length === 1, 'initial Vditor projection did not emit exactly one baseline');
         expect(
@@ -494,7 +528,7 @@ function testPage() {
           'toolbar icons do not share the standard 15px size'
         );
         const customIcon = (type) => document.querySelector('.vditor-toolbar [data-type="' + type + '"] > svg');
-        const customIconTypes = ['outline', 'line-numbers', 'save', 'math-block', 'math-inline', 'details'];
+        const customIconTypes = ['outline', 'line-numbers', 'save', 'math-block', 'math-inline', 'details', 'vmd-edit-mode'];
         for (const type of customIconTypes) {
           const svg = customIcon(type);
           expect(svg, 'missing custom toolbar icon: ' + type);
@@ -1024,31 +1058,11 @@ function testPage() {
           'WYSIWYG replacement was enabled for an HTML entity'
         );
 
-        await switchMode('ir');
-        const irRoot = document.querySelector('.vditor-ir .vditor-reset');
-        await setMarkdown('IR folded target');
-        const irFoldedText = textNode(irRoot.querySelector(':scope > p'));
-        select(irFoldedText, 0, irFoldedText, 0);
-        window.vditor.vditor.ir.range = window.getSelection().getRangeAt(0).cloneRange();
-        select(result.firstChild, 0, result.firstChild, 0);
-        document.querySelector('.vditor-toolbar [data-type="details"]').click();
-        await pause();
-        expect(
-          window.vditor.getValue().indexOf('<details>') < window.vditor.getValue().indexOf('IR folded target'),
-          'IR collapsed selection did not insert the collapsible section at the current block'
-        );
-        const irDetailsCloser = Array.from(irRoot.children).find(
-          (element) => element.textContent.includes('</details>')
-        );
-        expect(!!irDetailsCloser, 'IR details closing marker was not rendered');
-        expect(irDetailsCloser.classList.contains('vmd-details-closer'), 'IR details closing marker was not recognized');
-        expect(getComputedStyle(irDetailsCloser).display === 'none', 'IR details closing marker still occupies a blank line');
-
         const copyCodeFence = String.fromCharCode(96).repeat(3);
         await setMarkdown(copyCodeFence + 'js\\nconst copyTarget = 1;\\n' + copyCodeFence);
         await pause(120);
-        const codeCopyButton = document.querySelector('.vditor-ir .vditor-copy .vditor-tooltipped');
-        expect(codeCopyButton, 'IR code block did not render a copy control');
+        const codeCopyButton = document.querySelector('.vditor-wysiwyg .vditor-copy .vditor-tooltipped');
+        expect(codeCopyButton, 'the visual editor code block did not render a copy control');
         const copyAttemptsBefore = window.__vmdCodeCopyAttempts;
         const codeCopyIcon = codeCopyButton.querySelector('svg') || codeCopyButton;
         codeCopyIcon.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
@@ -1056,47 +1070,56 @@ function testPage() {
         expect(window.__vmdCodeCopyAttempts === copyAttemptsBefore + 1, 'code block copy did not invoke the clipboard command');
         expect(codeCopyButton.getAttribute('aria-label') === (window.VditorI18n.copied || 'Copied'), 'code block copy did not report success');
 
-        await setMarkdown('IR replacement target');
-        findInput.value = 'target';
-        findInput.dispatchEvent(new Event('input', { bubbles: true }));
-        await pause();
-        replaceInput.value = 'changed';
-        const beforeIrKeyboardReplace = window.vditor.getValue();
-        replaceInput.dispatchEvent(new KeyboardEvent('keydown', {
-          key: 'Enter',
+        await setMarkdown('two-mode shortcut target');
+        const shortcutText = textNode(root().querySelector(':scope > p'));
+        select(shortcutText, 2, shortcutText, 2);
+        const removedMiddleShortcut = new KeyboardEvent('keydown', {
+          key: '8',
+          code: 'Digit8',
           ctrlKey: true,
+          altKey: true,
+          bubbles: true,
+          cancelable: true,
+        });
+        root().dispatchEvent(removedMiddleShortcut);
+        expect(removedMiddleShortcut.defaultPrevented, 'the removed middle mode shortcut was not consumed');
+        expect(window.vditor.vditor.currentMode === 'wysiwyg', 'the removed middle shortcut changed the editor mode');
+
+        const savedModesBeforeShortcuts = window.__vmdMessages.filter(
+          (message) => message.command === 'save-options'
+        ).length;
+        root().dispatchEvent(new KeyboardEvent('keydown', {
+          key: '9',
+          code: 'Digit9',
+          ctrlKey: true,
+          altKey: true,
           bubbles: true,
           cancelable: true,
         }));
+        await wait(() => window.vditor.vditor.currentMode === 'sv');
         await pause();
-        expect(window.vditor.getValue() === beforeIrKeyboardReplace, 'IR Ctrl+Enter replacement changed Markdown');
-
-        await setMarkdown('IR plain Tab target');
-        const irPlainText = textNode(irRoot.querySelector(':scope > p'));
-        select(irPlainText, 2, irPlainText, 2);
-        const irPlainTabEvent = new KeyboardEvent('keydown', {
-          key: 'Tab',
+        expect(
+          window.__vmdMessages.filter((message) => message.command === 'save-options').at(-1)?.options?.mode === 'sv',
+          'the Split View shortcut did not persist the selected mode'
+        );
+        document.querySelector('.vditor-sv').dispatchEvent(new KeyboardEvent('keydown', {
+          key: '7',
+          code: 'Digit7',
+          ctrlKey: true,
+          altKey: true,
           bubbles: true,
           cancelable: true,
-        });
-        irRoot.dispatchEvent(irPlainTabEvent);
-        expect(irPlainTabEvent.defaultPrevented, 'IR Tab outside a list or table was allowed to move focus');
-
-        await setMarkdown('- first\\n- second\\n- third');
-        const irItems = Array.from(irRoot.querySelectorAll(':scope > ul > li'));
-        const irTabText = textNode(irItems[1]);
-        select(irTabText, 2, irTabText, 2);
-        const irTabEvent = new KeyboardEvent('keydown', {
-          key: 'Tab',
-          bubbles: true,
-          cancelable: true,
-        });
-        irRoot.dispatchEvent(irTabEvent);
-        expect(irTabEvent.defaultPrevented, 'IR list Tab was not intercepted');
-        await pause(40);
-        const irNestedItem = irRoot.querySelector(':scope > ul > li:first-child > ul > li');
-        expect(irNestedItem?.textContent.includes('second'), 'IR Tab did not indent a list item');
-        expect(getComputedStyle(irRoot.querySelector('ul[data-block="0"]')).outlineStyle === 'solid', 'IR list region does not have a visible outline');
+        }));
+        await wait(() => window.vditor.vditor.currentMode === 'wysiwyg');
+        await pause();
+        const savedModeMessages = window.__vmdMessages.filter(
+          (message) => message.command === 'save-options'
+        );
+        expect(
+          savedModeMessages.length === savedModesBeforeShortcuts + 2 &&
+          savedModeMessages.at(-1)?.options?.mode === 'wysiwyg',
+          'the visual editing shortcut did not persist the selected mode'
+        );
 
         await switchMode('sv');
         const svRoot = document.querySelector('.vditor-sv');
@@ -1182,7 +1205,7 @@ function testPage() {
           codeFence,
           ''
         );
-        await switchMode('ir');
+        await switchMode('wysiwyg');
         await setMarkdown(indentedBlock);
         await pause(80);
         expect(
@@ -1219,8 +1242,8 @@ function testPage() {
           lastIndentEdit.content.indexOf('    second();') >= 0,
           'a Split View edit flattened a later code line'
         );
-        // Switching back must not hand IR the flattened text either.
-        await switchMode('ir');
+        // Switching back must not hand the visual editor flattened text either.
+        await switchMode('wysiwyg');
         await pause(120);
         expect(
           window.vditor.getValue().indexOf('    first();') >= 0,
@@ -1581,7 +1604,9 @@ function testPage() {
         result.textContent = 'passed';
       } catch (error) {
         document.body.dataset.vmdTest = 'failed';
-        result.textContent = 'failed: ' + (error && error.message ? error.message : String(error));
+        const message = error && error.message ? error.message : String(error);
+        result.textContent = 'failed: ' + message +
+          (window.__vmdRuntimeError ? ' | runtime: ' + window.__vmdRuntimeError : '');
       }
     })();
   </script>

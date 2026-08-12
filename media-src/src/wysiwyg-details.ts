@@ -16,10 +16,6 @@ function getWysiwygRoot(): HTMLElement | null {
   return document.querySelector('.vditor-wysiwyg .vditor-reset')
 }
 
-function getIrRoot(): HTMLElement | null {
-  return document.querySelector('.vditor-ir .vditor-reset')
-}
-
 function getHtmlBlockCode(block: HTMLElement): HTMLElement | null {
   return block.querySelector<HTMLElement>(
     ':scope > pre:not(.vditor-wysiwyg__preview) > code'
@@ -62,7 +58,6 @@ function getPreviewDetails(opener: HTMLElement): HTMLDetailsElement | null {
 export function initWysiwygDetails() {
   const openState = new WeakMap<HTMLElement, boolean>()
   let root: HTMLElement | null = null
-  let irRoot: HTMLElement | null = null
   // The element the click handler is currently attached to. Tracked separately
   // from `root` so rebind() can unbind the previous root: the handler closes
   // over the shared `root` variable, so a stale listener left behind would
@@ -70,10 +65,9 @@ export function initWysiwygDetails() {
   // cancelling out the first toggle and making summaries stop responding.
   let boundRoot: HTMLElement | null = null
   let observer: MutationObserver | null = null
-  let irObserver: MutationObserver | null = null
   const queuedRoots = new WeakSet<HTMLElement>()
 
-  function refresh(targetRoot: HTMLElement, manageOpenState: boolean): void {
+  function refresh(targetRoot: HTMLElement): void {
     queuedRoots.delete(targetRoot)
     const children = Array.from(targetRoot.children) as HTMLElement[]
     for (const child of children) {
@@ -119,7 +113,6 @@ export function initWysiwygDetails() {
 
     const hiddenBy = new Map<HTMLElement, number>()
     for (const group of groups) {
-      if (!manageOpenState) continue
       const preview = getPreviewDetails(group.opener)
       prepareEditableSummary(group.opener)
       preview?.toggleAttribute('open', group.open)
@@ -134,10 +127,10 @@ export function initWysiwygDetails() {
     }
   }
 
-  function queueRefresh(targetRoot: HTMLElement, manageOpenState: boolean): void {
+  function queueRefresh(targetRoot: HTMLElement): void {
     if (queuedRoots.has(targetRoot)) return
     queuedRoots.add(targetRoot)
-    queueMicrotask(() => refresh(targetRoot, manageOpenState))
+    queueMicrotask(() => refresh(targetRoot))
   }
 
   function getSummaryTarget(event: Event): {
@@ -168,7 +161,7 @@ export function initWysiwygDetails() {
     const preview = getPreviewDetails(opener)
     if (!preview || !root) return
     openState.set(opener, !(openState.get(opener) ?? preview.open))
-    queueRefresh(root, true)
+    queueRefresh(root)
   }
 
   function commitSummaryEdit(event: Event): void {
@@ -205,8 +198,6 @@ export function initWysiwygDetails() {
   function unbindRoots(): void {
     observer?.disconnect()
     observer = null
-    irObserver?.disconnect()
-    irObserver = null
     if (boundRoot) {
       boundRoot.removeEventListener('click', onRootClick, true)
       boundRoot.removeEventListener('input', commitSummaryEdit, true)
@@ -219,20 +210,13 @@ export function initWysiwygDetails() {
 
   function rebind(): void {
     const nextRoot = getWysiwygRoot()
-    const nextIrRoot = getIrRoot()
-    if (
-      nextRoot === root &&
-      boundRoot === nextRoot &&
-      nextIrRoot === irRoot
-    ) {
-      if (root) queueRefresh(root, true)
-      if (irRoot) queueRefresh(irRoot, false)
+    if (nextRoot === root && boundRoot === nextRoot) {
+      if (root) queueRefresh(root)
       return
     }
 
     unbindRoots()
     root = nextRoot
-    irRoot = nextIrRoot
     if (root) {
       const observedRoot = root
       observedRoot.addEventListener('click', onRootClick, true)
@@ -242,24 +226,13 @@ export function initWysiwygDetails() {
       observedRoot.addEventListener('keyup', onRootKeyup, true)
       boundRoot = observedRoot
 
-      observer = new MutationObserver(() => queueRefresh(observedRoot, true))
+      observer = new MutationObserver(() => queueRefresh(observedRoot))
       observer.observe(observedRoot, {
         childList: true,
         subtree: true,
         characterData: true,
       })
-      queueRefresh(observedRoot, true)
-    }
-
-    if (irRoot) {
-      const observedIrRoot = irRoot
-      irObserver = new MutationObserver(() => queueRefresh(observedIrRoot, false))
-      irObserver.observe(observedIrRoot, {
-        childList: true,
-        subtree: true,
-        characterData: true,
-      })
-      queueRefresh(observedIrRoot, false)
+      queueRefresh(observedRoot)
     }
   }
 
@@ -269,7 +242,6 @@ export function initWysiwygDetails() {
     dispose() {
       unbindRoots()
       root = null
-      irRoot = null
     },
   }
 }

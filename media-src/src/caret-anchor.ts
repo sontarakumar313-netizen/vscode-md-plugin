@@ -3,11 +3,12 @@ import {
   getVditorInternals,
   getVditorMode,
 } from './vditor-adapter'
+import type { VditorMode } from './vditor-adapter'
 
 export interface EditorSelectionContext {
   root: HTMLElement
   range: Range
-  mode: string
+  mode: VditorMode
 }
 
 export interface CaretAnchor {

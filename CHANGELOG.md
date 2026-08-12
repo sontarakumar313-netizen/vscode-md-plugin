@@ -4,6 +4,15 @@ All notable changes to Markdown Interactor will be documented in this file.
 
 ## Unreleased
 
+- Removed the former intermediate editor mode and its mode-specific code, styles,
+  tests, and toolbar entry. Markdown Interactor now provides visual editing and
+  split source view only, with visual editing as the default.
+- Added pinned two-mode Vditor and Lute builds plus an artifact gate so the
+  removed editor implementation, parser paths, and styles are not emitted into
+  the Webview runtime.
+- Limited Extension Host type checking to `src/`, preventing ignored reference
+  source trees from being pulled into the extension build, and declared pnpm's
+  dependency build policy so frozen installs remain reproducible.
 - Added two bundled light/dark themes that use the active VS Code palette and
   switch automatically when the VS Code color theme changes.
 - Made inline code, fenced code blocks, and syntax highlighting consistently
@@ -58,7 +67,8 @@ All notable changes to Markdown Interactor will be documented in this file.
 ## 0.1.0
 
 - Initial release under the Markdown Interactor name.
-- Added instant-rendering, WYSIWYG, and split-screen editing modes.
+- Originally added three Markdown editing modes: instant rendering, WYSIWYG,
+  and split screen (the first of these was removed in a later release).
 - Added VS Code custom editor, context-menu, command, and keyboard integrations.
 - Added math, diagram, image upload, search, outline, line-number, and table editing support.
 - Added automatic VS Code theme adaptation and workspace-level custom CSS.

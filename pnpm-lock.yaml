@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  vditor@3.11.2:
+    hash: f0a8be09993b64f85f342f1ed105aa6ce6f65a7016739690a4620e71ea5129c7
+    path: patches/vditor@3.11.2.patch
+
 importers:
 
   .:
@@ -43,7 +48,7 @@ importers:
         version: 4.18.1
       vditor:
         specifier: 3.11.2
-        version: 3.11.2
+        version: 3.11.2(patch_hash=f0a8be09993b64f85f342f1ed105aa6ce6f65a7016739690a4620e71ea5129c7)
     devDependencies:
       '@types/node':
         specifier: ^14.14.41
@@ -567,7 +572,7 @@ snapshots:
 
   typescript@4.9.5: {}
 
-  vditor@3.11.2:
+  vditor@3.11.2(patch_hash=f0a8be09993b64f85f342f1ed105aa6ce6f65a7016739690a4620e71ea5129c7):
     dependencies:
       diff-match-patch: 1.0.5
 

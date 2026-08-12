@@ -6,11 +6,14 @@ import { build, context } from 'esbuild'
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const outputDirectory = resolve(root, 'media', 'dist')
 const watch = process.argv.includes('--watch')
+const vditorPackageDirectory = resolve(
+  root,
+  'media-src',
+  'node_modules',
+  'vditor'
+)
 const vditorPackage = JSON.parse(
-  await readFile(
-    resolve(root, 'media-src', 'node_modules', 'vditor', 'package.json'),
-    'utf8'
-  )
+  await readFile(resolve(vditorPackageDirectory, 'package.json'), 'utf8')
 )
 
 if (!watch) {
@@ -18,23 +21,24 @@ if (!watch) {
 }
 await mkdir(outputDirectory, { recursive: true })
 
-const vditorDistDirectory = resolve(
-  root,
-  'media-src',
-  'node_modules',
-  'vditor',
-  'dist'
-)
+const vditorDistDirectory = resolve(vditorPackageDirectory, 'dist')
 
 // Vditor fetches its Markdown parser from unpkg.com unless a local copy is
-// supplied. Emitting it next to main.js lets media-src/src/main.ts resolve it
-// from its own script URL, so a freshly opened editor parses Markdown with no
-// network access and a compromised CDN cannot replace the parser. Renderers
-// Vditor only loads on demand (KaTeX, Mermaid, highlight.js) still use the CDN.
-await copyFile(
-  resolve(vditorDistDirectory, 'js', 'lute', 'lute.min.js'),
-  resolve(outputDirectory, 'lute.min.js')
-)
+// supplied. The checked-in two-mode Lute build physically omits the removed
+// editor's parser/renderer APIs; see vendor/lute/README.md for provenance and
+// reproducible build instructions. Emitting it next to main.js lets
+// media-src/src/main.ts resolve it without network access. Renderers Vditor
+// only loads on demand (KaTeX, Mermaid, highlight.js) still use the CDN.
+await Promise.all([
+  copyFile(
+    resolve(root, 'vendor', 'lute', 'lute.min.js'),
+    resolve(outputDirectory, 'lute.min.js')
+  ),
+  copyFile(
+    resolve(root, 'vendor', 'lute', 'LICENSE'),
+    resolve(outputDirectory, 'lute.LICENSE.txt')
+  ),
+])
 
 // Most emoji shortcodes parse to Unicode text, but Lute renders 18 of them as
 // images from whatever emoji site it is given, including :octocat: and
@@ -47,6 +51,24 @@ await cp(
 )
 
 const i18nAssignment = /^\s*window\.VditorI18n\s*=\s*/
+const removedModeI18nKey = ['instant', 'Rendering'].join('')
+const removedModeI18nEntry = new RegExp(
+  `^\\s*['"]${removedModeI18nKey}['"]\\s*:.*(?:\\r?\\n|$)`,
+  'm'
+)
+
+// The npm entry is Vditor's prebuilt three-mode UMD bundle. Resolve only the
+// bare package import to the patched TypeScript entry so esbuild can omit the
+// deleted editor implementation. Deep imports and runtime assets still resolve
+// normally from the same pinned package.
+const vditorTwoModePlugin = {
+  name: 'vditor-two-mode',
+  setup(pluginBuild) {
+    pluginBuild.onResolve({ filter: /^vditor$/ }, () => ({
+      path: resolve(vditorPackageDirectory, 'src', 'index.ts'),
+    }))
+  },
+}
 
 // The locale bundles are plain `window.VditorI18n = {...}` scripts that Vditor
 // would otherwise load from the CDN one language at a time. All of them together
@@ -76,7 +98,14 @@ const vditorI18nPlugin = {
                 'update the vditor-i18n plugin in scripts/build-media.mjs'
             )
           }
-          const literal = source
+          const withoutRemovedMode = source.replace(removedModeI18nEntry, '')
+          if (withoutRemovedMode === source) {
+            throw new Error(
+              `${file} no longer contains the removed mode label; ` +
+                'update the vditor-i18n plugin in scripts/build-media.mjs'
+            )
+          }
+          const literal = withoutRemovedMode
             .replace(i18nAssignment, '')
             .trim()
             .replace(/;$/, '')
@@ -96,6 +125,7 @@ const options = {
   absWorkingDir: root,
   entryPoints: [resolve(root, 'media-src', 'src', 'main.ts')],
   bundle: true,
+  tsconfig: resolve(root, 'media-src', 'tsconfig.json'),
   minify: !watch,
   sourcemap: true,
   // Vditor's TypeScript sources expect its own build pipeline to inject this
@@ -103,7 +133,7 @@ const options = {
   define: {
     VDITOR_VERSION: JSON.stringify(vditorPackage.version),
   },
-  plugins: [vditorI18nPlugin],
+  plugins: [vditorTwoModePlugin, vditorI18nPlugin],
   outfile: resolve(outputDirectory, 'main.js'),
   logLevel: 'info',
 }

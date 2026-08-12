@@ -49,6 +49,7 @@ Thumbs.db
 
 # Repository-local working material (never commit)
 /.pi-subagents/
+/.pi/
 /00-docs/
 /test/
 /.obsidian/
@@ -56,3 +57,4 @@ Thumbs.db
 /.AGENTS.md
 /TODO.md
 /nul
+/00-refs

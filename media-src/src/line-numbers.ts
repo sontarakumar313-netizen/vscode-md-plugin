@@ -1,4 +1,5 @@
 import { getVditorMode } from './vditor-adapter'
+import type { VditorMode } from './vditor-adapter'
 
 const GUTTER_ID = 'vmd-line-number-gutter'
 
@@ -89,21 +90,14 @@ function getBlockStartLines(source: string): number[] {
   return starts
 }
 
-type EditorMode = 'ir' | 'wysiwyg' | 'sv'
-
 type ActiveEditor = {
-  mode: EditorMode
+  mode: VditorMode
   editor: HTMLElement
   reset: HTMLElement
 }
 
 function getActiveEditor(): ActiveEditor | null {
-  const candidates: { [key in EditorMode]: ActiveEditor | null } = {
-    ir: (() => {
-      const editor = document.querySelector<HTMLElement>('.vditor-ir')
-      const reset = document.querySelector<HTMLElement>('.vditor-ir .vditor-reset')
-      return editor && reset ? { mode: 'ir', editor, reset } : null
-    })(),
+  const candidates: Record<VditorMode, ActiveEditor | null> = {
     wysiwyg: (() => {
       const editor = document.querySelector<HTMLElement>('.vditor-wysiwyg')
       const reset = document.querySelector<HTMLElement>(
@@ -121,7 +115,7 @@ function getActiveEditor(): ActiveEditor | null {
   if (currentMode && candidates[currentMode]) return candidates[currentMode]
 
   return (
-    (Object.keys(candidates) as EditorMode[])
+    (Object.keys(candidates) as VditorMode[])
       .map((mode) => candidates[mode])
       .find((candidate) => candidate && candidate.editor.getClientRects().length > 0) ||
     null
@@ -302,7 +296,7 @@ export function initLineNumbers() {
         resizeObserver.observe(content)
         content
           .querySelectorAll<HTMLElement>(
-            '.vditor-ir, .vditor-wysiwyg, .vditor-sv, .vditor-ir .vditor-reset, .vditor-wysiwyg .vditor-reset'
+            '.vditor-wysiwyg, .vditor-sv, .vditor-wysiwyg .vditor-reset'
           )
           .forEach((element) => resizeObserver?.observe(element))
       }

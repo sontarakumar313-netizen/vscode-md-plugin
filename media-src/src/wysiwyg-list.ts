@@ -19,13 +19,6 @@ function getWysiwygEditor(internal: any): HTMLElement | null {
   return internal?.wysiwyg?.element || null
 }
 
-function getRenderedEditor(internal: any): HTMLElement | null {
-  const mode = internal?.currentMode
-  return mode === 'wysiwyg' || mode === 'ir'
-    ? internal?.[mode]?.element || null
-    : null
-}
-
 function rangeBelongsToEditor(range: Range, editor: HTMLElement): boolean {
   const contains = (node: Node) => node === editor || editor.contains(node)
   return contains(range.startContainer) && contains(range.endContainer)
@@ -33,8 +26,7 @@ function rangeBelongsToEditor(range: Range, editor: HTMLElement): boolean {
 
 function getEditorRange(
   internal: any,
-  editor: HTMLElement,
-  mode: 'wysiwyg' | 'ir' = 'wysiwyg'
+  editor: HTMLElement
 ): Range | null {
   const selection = window.getSelection()
   if (selection?.rangeCount) {
@@ -42,7 +34,7 @@ function getEditorRange(
     if (rangeBelongsToEditor(range, editor)) return range
   }
 
-  const savedRange = internal?.[mode]?.range as Range | undefined
+  const savedRange = internal?.wysiwyg?.range as Range | undefined
   return savedRange && rangeBelongsToEditor(savedRange, editor)
     ? savedRange.cloneRange()
     : null
@@ -440,13 +432,12 @@ export function handleRenderedListTab(vditor: any, event: KeyboardEvent): boolea
   }
 
   const internal = getInternal(vditor)
-  const mode = internal?.currentMode
-  if (mode !== 'wysiwyg' && mode !== 'ir') return false
+  if (internal?.currentMode !== 'wysiwyg') return false
 
-  const editor = getRenderedEditor(internal)
+  const editor = getWysiwygEditor(internal)
   if (!editor) return false
 
-  const range = getEditorRange(internal, editor, mode)
+  const range = getEditorRange(internal, editor)
   if (!range) return false
   const item = closestInEditor(range.startContainer, 'li', editor)
   if (!item) return false
@@ -458,8 +449,8 @@ export function handleRenderedListTab(vditor: any, event: KeyboardEvent): boolea
 
   event.preventDefault()
   queueMicrotask(() => {
-    if (internal.currentMode !== mode) return
-    const currentRange = getEditorRange(internal, editor, mode)
+    if (internal.currentMode !== 'wysiwyg') return
+    const currentRange = getEditorRange(internal, editor)
     if (!currentRange) return
     const currentItem = closestInEditor(currentRange.startContainer, 'li', editor)
     if (!currentItem) return

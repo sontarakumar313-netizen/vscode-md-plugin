@@ -53,7 +53,6 @@ body,
   display: inline-flex!important;
 }
 /* Reserve gutter space in every editable mode. */
-body.vmd-line-numbers-enabled .vditor-ir .vditor-reset,
 body.vmd-line-numbers-enabled .vditor-wysiwyg .vditor-reset,
 body.vmd-line-numbers-enabled .vditor-sv {
   padding-left: 60px!important;
@@ -77,16 +76,13 @@ body:not(.vmd-line-numbers-enabled) #vmd-line-number-gutter {
   font: 11px/1 'Cascadia Code', 'Consolas', monospace;
   color: rgba(150, 150, 150, 0.5);
 }
-.vditor-ir pre.vditor-reset {
-  position: relative;
-}
 /* Prevent the browser's native scroll-anchoring from autonomously shifting scrollTop
    as async content above the viewport (mermaid diagrams, images, lazily-sized
    elements) finishes rendering/loading. That happens independently of any of our own
    JS and previously caused the reading position to visibly jump around on its own
    while a large document's content was still settling. Our own restore logic already
    handles reapplying a saved position across those same layout shifts explicitly. */
-.vditor-ir .vditor-reset {
+.vditor-wysiwyg .vditor-reset {
   overflow-anchor: none;
 }
 /* Unwanted WYSIWYG controls are removed in wysiwyg-popover.ts. Do not leave
@@ -96,15 +92,14 @@ body:not(.vmd-line-numbers-enabled) #vmd-line-number-gutter {
 }
 
 /* Vditor represents HTML details as separate opening, body, and closing blocks
-   in IR/WYSIWYG modes. The controller marks WYSIWYG body blocks while a
-   disclosure is closed and hides the otherwise-empty closing block in both;
-   the native selector also covers details kept in one HTML block. */
+   in WYSIWYG mode. The controller marks body blocks while a disclosure is
+   closed and hides the otherwise-empty closing block; the native selector also
+   covers details kept in one HTML block. */
 .vditor-wysiwyg .vditor-reset details:not([open]) > :not(summary),
 .vditor-wysiwyg .vditor-reset .vmd-details-content--hidden {
   display: none !important;
 }
-.vditor-wysiwyg .vditor-reset .vmd-details-closer,
-.vditor-ir .vditor-reset .vmd-details-closer {
+.vditor-wysiwyg .vditor-reset .vmd-details-closer {
   display: none !important;
 }
 .vditor-wysiwyg .vditor-reset details > summary.vmd-details-summary {
@@ -257,22 +252,18 @@ body:not(.vmd-line-numbers-enabled) #vmd-line-number-gutter {
 /* Each semantic list container has its own outline so independently-created
    lists remain visually distinguishable. Outline does not alter Vditor's list
    indentation or layout, and nested lists retain their own logical boundary. */
-.vditor-ir .vditor-reset ul[data-block="0"],
-.vditor-ir .vditor-reset ol[data-block="0"],
 .vditor-wysiwyg .vditor-reset ul[data-block="0"],
 .vditor-wysiwyg .vditor-reset ol[data-block="0"] {
   outline: 1px solid var(--vscode-editorWidget-border, var(--border-color, rgba(127, 127, 127, 0.55)));
   outline-offset: 3px;
   border-radius: 3px;
 }
-.vditor-ir .vditor-reset ul[data-block="0"]:focus-within,
-.vditor-ir .vditor-reset ol[data-block="0"]:focus-within,
 .vditor-wysiwyg .vditor-reset ul[data-block="0"]:focus-within,
 .vditor-wysiwyg .vditor-reset ol[data-block="0"]:focus-within {
   outline-color: var(--vscode-focusBorder, var(--vscode-editorWidget-border, #007fd4));
 }
 
-/* Table actions shared by IR and WYSIWYG modes. */
+/* WYSIWYG table actions. */
 #vmd-table-context-menu {
   position: fixed;
   z-index: 10000;

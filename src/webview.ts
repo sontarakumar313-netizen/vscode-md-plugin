@@ -12,6 +12,13 @@ import {
 
 export const KeyVditorOptions = 'vditor.options'
 
+export type VditorMode = 'wysiwyg' | 'sv'
+export const DEFAULT_VDITOR_MODE: VditorMode = 'wysiwyg'
+
+export function normalizeVditorMode(value: unknown): VditorMode {
+  return value === 'sv' ? 'sv' : DEFAULT_VDITOR_MODE
+}
+
 export type WebviewTheme = 'dark' | 'light'
 
 export interface WebviewUpdate {
@@ -388,6 +395,7 @@ export function getVditorOptions(
   const {
     theme: _theme,
     preview: _preview,
+    mode: savedMode,
     // Dropped for the same reason as theme and preview: this is the extension's
     // own setting, not one of Vditor's, so a value left in saved editor state
     // must not be able to reach the webview unvalidated.
@@ -398,6 +406,7 @@ export function getVditorOptions(
   return {
     useVscodeThemeColor: config.get<boolean>('useVscodeThemeColor'),
     ...editorOptions,
+    mode: normalizeVditorMode(savedMode),
     frontMatterDisplay: getFrontMatterDisplay(config),
   }
 }
@@ -1288,12 +1297,17 @@ export class MarkdownWebviewController implements vscode.Disposable {
         case 'ready':
           await this.initialize()
           break
-        case 'save-options':
-          await this.host.context.globalState.update(
-            KeyVditorOptions,
-            message.options
-          )
+        case 'save-options': {
+          const options =
+            message.options && typeof message.options === 'object'
+              ? message.options
+              : {}
+          await this.host.context.globalState.update(KeyVditorOptions, {
+            ...options,
+            mode: normalizeVditorMode(options.mode),
+          })
           break
+        }
         case 'scroll':
           this.host.saveScrollPosition(message.top || 0)
           break

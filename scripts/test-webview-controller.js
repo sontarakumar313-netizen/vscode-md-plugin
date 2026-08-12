@@ -104,7 +104,12 @@ const {
   validateWebviewUploadFile,
 } = compiledModule.exports
 
-function createController({ getSnapshot, syncToDocument, postMessage }) {
+function createController({
+  getSnapshot,
+  syncToDocument,
+  postMessage,
+  updateGlobalState = async () => {},
+}) {
   let receiveMessage
   const webview = {
     onDidReceiveMessage(listener) {
@@ -119,7 +124,12 @@ function createController({ getSnapshot, syncToDocument, postMessage }) {
     getText: () => '',
   }
   const controller = new MarkdownWebviewController({
-    context: { globalState: { get: () => ({}) } },
+    context: {
+      globalState: {
+        get: () => ({}),
+        update: updateGlobalState,
+      },
+    },
     panel: { webview },
     uri: document.uri,
     isDisposed: () => false,
@@ -1617,6 +1627,25 @@ async function testStaleHostSnapshotIsDiscardedAfterNewEditorEdit() {
   )
 }
 
+async function testSavedEditorModeIsSanitized() {
+  let saved
+  const { receive } = createController({
+    getSnapshot: async () => ({ content: '', version: 1 }),
+    syncToDocument: async () => undefined,
+    postMessage: async () => true,
+    updateGlobalState: async (_key, value) => {
+      saved = value
+    },
+  })
+
+  receive({
+    command: 'save-options',
+    options: { mode: ['i', 'r'].join(''), retained: true },
+  })
+  await waitFor(() => !!saved, 'saved editor options were not persisted')
+  assert.deepStrictEqual(saved, { mode: 'wysiwyg', retained: true })
+}
+
 async function testConcurrentHostUpdatesAreCoalesced() {
   const posted = []
   let releaseDelivery
@@ -1650,6 +1679,7 @@ async function testConcurrentHostUpdatesAreCoalesced() {
 Promise.resolve()
   .then(testUploadValidation)
   .then(testResourceScopedSafetySettings)
+  .then(testSavedEditorModeIsSanitized)
   .then(testCrlfEditUsesCanonicalLfAndMinimalWrite)
   .then(testOverlappingExternalEditPrefersEditorHunk)
   .then(testMissingMergeBaseFallsBackToEditor)

@@ -5,6 +5,7 @@
 
 import { t } from './lang'
 import { getVditorEditorElement, getVditorMode } from './vditor-adapter'
+import type { VditorMode } from './vditor-adapter'
 
 type SourceSpan = {
   start: number
@@ -55,8 +56,7 @@ function findSourceMatches(
 
 function getEditorRoot(): Element | null {
   const mode = getVditorMode()
-  const roots: Record<string, Element | null> = {
-    ir: document.querySelector('.vditor-ir .vditor-reset'),
+  const roots: Record<VditorMode, Element | null> = {
     wysiwyg: document.querySelector('.vditor-wysiwyg .vditor-reset'),
     sv: document.querySelector('.vditor-sv.vditor-reset'),
   }
