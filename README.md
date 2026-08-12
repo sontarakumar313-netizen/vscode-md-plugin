@@ -45,7 +45,7 @@ Markdown Interactor 是一个基于 [Vditor](https://github.com/Vanessa219/vdito
 | **可视化编辑（WYSIWYG）**   | 默认模式，以接近最终排版的方式直接编辑文档。               |
 | **源码分屏（Split View）**  | 左侧编辑 Markdown 源码，右侧同步预览，并支持双向滚动联动。 |
 
-两种模式作为 VS Code 原生 **Open With...** 中的独立编辑器提供：默认的 **Markdown Interactor: WYSIWYG** 和可选的 **Markdown Interactor: Split View**。请使用编辑器标题栏中的编辑器类型切换入口选择模式；Webview 工具栏不再切换模式。
+VS Code 中只注册一个 **Markdown Interactor Editor**。请使用编辑器顶部工具栏右侧的“编辑模式”按钮，在可视化编辑和源码分屏之间切换；插件会记住最后选择的模式。
 
 ### Markdown 与写作能力
 
@@ -116,7 +116,7 @@ pnpm build
 - 在命令面板运行 **Markdown Interactor: Open with Markdown Interactor**；
 - 在资源管理器中右键 Markdown 文件并选择 **Open with Markdown Interactor**；
 - 在 Markdown 编辑器标签页的右键菜单中选择同名命令；
-- 选择 **Open With... → Markdown Interactor: WYSIWYG** 或 **Markdown Interactor: Split View**；
+- 选择 **Open With... → Markdown Interactor Editor**；
 - 在 **Configure Default Editor...** 中将其设为 Markdown 默认编辑器；
 - Windows / Linux 按 `Ctrl+Shift+Alt+M`，macOS 按 `Cmd+Shift+Alt+M`。
 

@@ -20,6 +20,7 @@ const {
   adjustPlainQuoteDepthAt,
   findQuoteBlockAt,
   sourceLineAt,
+  toggleDefaultAlertAt,
   toggleQuoteAt,
 } = compiledModule.exports
 
@@ -82,6 +83,16 @@ assert.strictEqual(
   content(toggleQuoteAt(warning, warning.indexOf('body'), 'WARNING', 'Alert content', 'body')),
   'body',
   'clicking the active Alert must toggle it off'
+)
+assert.strictEqual(
+  content(toggleDefaultAlertAt(warning, warning.indexOf('body'), 'Alert content', 'body')),
+  'body',
+  'the unified Alert button must remove an active Alert of any type'
+)
+assert.strictEqual(
+  content(toggleDefaultAlertAt(plainQuote, plainQuote.indexOf('second'), 'Alert content', 'second')),
+  '> [!NOTE]\n> first\n> second',
+  'the unified Alert button must convert a plain quote to the default Note type'
 )
 
 const duplicateAlerts = '> [!NOTE]\n> first\n\n> [!NOTE]\n> second'

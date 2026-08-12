@@ -13,6 +13,19 @@ import {
 export const KeyVditorOptions = 'vditor.options'
 
 export type VditorMode = 'wysiwyg' | 'sv'
+export const DEFAULT_VDITOR_MODE: VditorMode = 'wysiwyg'
+
+export function isVditorMode(value: unknown): value is VditorMode {
+  return value === 'wysiwyg' || value === 'sv'
+}
+
+function readVditorModeOption(value: unknown): VditorMode | undefined {
+  if (!value || typeof value !== 'object' || !('mode' in value)) {
+    return undefined
+  }
+  const mode = (value as { mode?: unknown }).mode
+  return isVditorMode(mode) ? mode : undefined
+}
 
 export type WebviewTheme = 'dark' | 'light'
 
@@ -71,7 +84,6 @@ export interface MarkdownWebviewHost {
   readonly context: vscode.ExtensionContext
   readonly panel: vscode.WebviewPanel
   readonly uri: vscode.Uri
-  readonly mode: VditorMode
   isDisposed(): boolean
   getSnapshot(): Promise<MarkdownDocumentSnapshot>
   syncToDocument(content: string): Promise<vscode.TextDocument | undefined>
@@ -383,18 +395,16 @@ export function getWebviewTheme(): WebviewTheme {
  * Split preview is fixed by the webview whenever SV edit mode is selected.
  */
 export function getVditorOptions(
-  _context: vscode.ExtensionContext,
-  uri: vscode.Uri | undefined,
-  mode: VditorMode
-): any {
+  context: vscode.ExtensionContext,
+  uri?: vscode.Uri
+) {
   const config = vscode.workspace.getConfiguration('markdown-interactor', uri)
+  const savedOptions = context.globalState.get<unknown>(KeyVditorOptions)
+  const savedMode = readVditorModeOption(savedOptions)
 
   return {
     useVscodeThemeColor: config.get<boolean>('useVscodeThemeColor'),
-    // The selected VS Code Custom Editor is authoritative. Keep the old saved
-    // mode untouched in global state for downgrade compatibility, but never use
-    // it to change this fixed editor type.
-    mode,
+    mode: savedMode ?? DEFAULT_VDITOR_MODE,
     frontMatterDisplay: getFrontMatterDisplay(config),
   }
 }
@@ -759,11 +769,7 @@ export class MarkdownWebviewController implements vscode.Disposable {
     try {
       await this.update({
         type: 'init',
-        options: getVditorOptions(
-          this.host.context,
-          this.host.uri,
-          this.host.mode
-        ),
+        options: getVditorOptions(this.host.context, this.host.uri),
         theme: getWebviewTheme(),
         workspaceStyleCss: this.workspaceStyle.css,
         workspaceStylePath: this.workspaceStyle.path,
@@ -1289,10 +1295,17 @@ export class MarkdownWebviewController implements vscode.Disposable {
         case 'ready':
           await this.initialize()
           break
-        case 'save-options':
-          // Compatibility with an older webview that may still post its mode
-          // during an extension reload. Fixed editor types never persist it.
+        case 'save-options': {
+          const mode = readVditorModeOption(message.options)
+          if (!mode) {
+            console.warn(
+              '[markdown-interactor] ignored an unsupported saved editor mode.'
+            )
+            break
+          }
+          await this.host.context.globalState.update(KeyVditorOptions, { mode })
           break
+        }
         case 'scroll':
           this.host.saveScrollPosition(message.top || 0)
           break

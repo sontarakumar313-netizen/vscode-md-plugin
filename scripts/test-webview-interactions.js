@@ -142,27 +142,34 @@ function testPage() {
     let hostGeneration = 1;
     const switchMode = async (mode) => {
       if (window.vditor.vditor.currentMode === mode) return;
-      const content = window.vditor.getValue();
-      hostGeneration += 1;
-      window.dispatchEvent(new MessageEvent('message', {
-        data: {
-          command: 'update',
-          type: 'init',
-          content,
-          documentVersion: hostGeneration,
-          editorGeneration: hostGeneration,
-          theme: 'light',
-          options: {
-            mode,
-            undoDelay: 0,
-            preview: { delay: 0 },
-            lang: 'en_US',
-            cdn: location.origin,
-          },
-        },
-      }));
+      const savedModesBefore = window.__vmdMessages.filter(
+        (message) => message.command === 'save-options'
+      ).length;
+      const modeControl = document.querySelector(
+        '.vditor-toolbar [data-type="vmd-edit-mode"]'
+      );
+      expect(modeControl, 'the toolbar editing-mode control is missing');
+      modeControl.click();
+      await pause();
+      document.querySelector(
+        '.vditor-toolbar [data-type="vmd-mode-' + mode + '"]'
+      ).click();
       await wait(() => window.vditor.vditor.currentMode === mode);
       await pause(80);
+      const savedModes = window.__vmdMessages.filter(
+        (message) => message.command === 'save-options'
+      );
+      expect(
+        savedModes.length === savedModesBefore + 1 &&
+          savedModes[savedModes.length - 1].options?.mode === mode,
+        'toolbar mode switching did not persist exactly one validated mode'
+      );
+      expect(
+        document.querySelector(
+          '.vditor-toolbar [data-type="vmd-mode-' + mode + '"]'
+        ).getAttribute('aria-pressed') === 'true',
+        'the toolbar did not mark the switched mode as selected'
+      );
     };
     const setMarkdown = async (markdown) => {
       window.vditor.setValue(markdown);
@@ -217,14 +224,35 @@ function testPage() {
           Object.prototype.hasOwnProperty.call(window.VditorI18n, 'instant' + 'Rendering'),
           'the official locale bundle was physically stripped'
         );
-        expect(
-          !document.querySelector('.vditor-toolbar [data-type="vmd-edit-mode"]'),
-          'the removed Webview mode control was rendered'
+        const modeControl = document.querySelector(
+          '.vditor-toolbar [data-type="vmd-edit-mode"]'
+        );
+        expect(modeControl, 'the toolbar editing-mode control was not rendered');
+        modeControl.click();
+        await pause();
+        const modeButtons = Array.from(
+          document.querySelectorAll('.vditor-toolbar [data-type^="vmd-mode-"]')
         );
         expect(
-          document.querySelectorAll('.vditor-toolbar [data-type^="vmd-mode-"]').length === 0,
-          'the removed Webview mode subbuttons were rendered'
+          modeButtons.map((button) => button.dataset.type).join(',') ===
+            'vmd-mode-wysiwyg,vmd-mode-sv',
+          'the mode menu did not expose exactly visual and split editing'
         );
+        expect(
+          modeButtons[0].classList.contains('vditor-menu--current') &&
+            modeButtons[0].getAttribute('aria-pressed') === 'true' &&
+            modeButtons[1].getAttribute('aria-pressed') === 'false',
+          'the initial visual mode was not marked as selected'
+        );
+        const modePanel = modeControl.parentElement.querySelector('.vditor-hint');
+        expect(modePanel?.style.display === 'block', 'clicking the mode control did not open its menu');
+        expect(
+          modeControl.classList.contains('vmd-toolbar-tooltip--suppressed') &&
+            getComputedStyle(modeControl, '::after').display === 'none',
+          'the open mode menu did not suppress its toolbar tooltip'
+        );
+        modeControl.click();
+        expect(modePanel.style.display === 'none', 'clicking the mode control again did not close its menu');
         const initialBaselines = window.__vmdMessages.filter((message) => message.command === 'editor-baseline');
         expect(initialBaselines.length === 1, 'initial Vditor projection did not emit exactly one baseline');
         expect(
@@ -281,11 +309,11 @@ function testPage() {
           'two insertParagraph calls did not create two consecutive blank paragraphs'
         );
         select(consecutiveBlankParagraphs[2], 0, consecutiveBlankParagraphs[2], 0);
-        document.querySelector('.vditor-toolbar [data-type="vmd-alert-warning"]').click();
+        document.querySelector('.vditor-toolbar [data-type="vmd-alert"]').click();
         await pause(80);
         expect(
           window.vditor.getValue().replace(/\\n+$/, '') ===
-            'before consecutive blanks\\n\\n> [!WARNING]\\n> Alert 内容',
+            'before consecutive blanks\\n\\n> [!NOTE]\\n> Alert 内容',
           'Alert on consecutive blank paragraphs converted the previous content: ' +
             JSON.stringify(window.vditor.getValue())
         );
@@ -893,7 +921,7 @@ function testPage() {
           'toolbar icons do not share the standard 15px size'
         );
         const customIcon = (type) => document.querySelector('.vditor-toolbar [data-type="' + type + '"] > svg');
-        const customIconTypes = ['outline', 'save', 'math-block', 'math-inline', 'details'];
+        const customIconTypes = ['outline', 'save', 'math-block', 'math-inline', 'details', 'vmd-edit-mode'];
         for (const type of customIconTypes) {
           const svg = customIcon(type);
           expect(svg, 'missing custom toolbar icon: ' + type);
@@ -1195,6 +1223,15 @@ function testPage() {
             getComputedStyle(collapsedToggle).transform !== collapsedToggleTransform,
           'open details did not retain its title or rotate its arrow downward'
         );
+        const summaryTextLeft = detailsSummary.getBoundingClientRect().left +
+          Number.parseFloat(getComputedStyle(detailsSummary).paddingLeft);
+        const bodyTextLeft = detailsBody.getBoundingClientRect().left +
+          Number.parseFloat(getComputedStyle(detailsBody).paddingLeft);
+        expect(
+          Math.abs(summaryTextLeft - bodyTextLeft) <= 1,
+          'expanded details body text is not aligned with the summary text: summary=' +
+            summaryTextLeft + ', body=' + bodyTextLeft
+        );
         expect(
           !detailsOpener.querySelector('.vmd-details-title-edit'),
           'opening details created the removed inline title editor'
@@ -1366,7 +1403,7 @@ function testPage() {
           'Enter did not create a real blank WYSIWYG paragraph: ' + root().innerHTML
         );
         select(blankAlertParagraph, 0, blankAlertParagraph, 0);
-        document.querySelector('.vditor-toolbar [data-type="vmd-alert-note"]').click();
+        document.querySelector('.vditor-toolbar [data-type="vmd-alert"]').click();
         await pause(80);
         expect(
           window.vditor.getValue().replace(/\\n+$/, '') ===
@@ -1393,11 +1430,11 @@ function testPage() {
           'insertParagraph did not create a blank paragraph between content lines'
         );
         select(middleBlankAlertParagraph, 0, middleBlankAlertParagraph, 0);
-        document.querySelector('.vditor-toolbar [data-type="vmd-alert-tip"]').click();
+        document.querySelector('.vditor-toolbar [data-type="vmd-alert"]').click();
         await pause(80);
         expect(
           window.vditor.getValue().replace(/\\n+$/, '') ===
-            'before blank alert\\n\\n> [!TIP]\\n> Alert 内容\\n\\nafter blank alert',
+            'before blank alert\\n\\n> [!NOTE]\\n> Alert 内容\\n\\nafter blank alert',
           'Alert on a middle blank line changed adjacent content: ' +
             JSON.stringify(window.vditor.getValue())
         );
@@ -1421,6 +1458,31 @@ function testPage() {
         expect(!boldReachedDocument, 'Ctrl+B bubbled beyond the Vditor editor');
         expect(!!root().querySelector('strong, b'), 'Ctrl+B did not apply bold formatting');
 
+        const selectAlertType = async (alert, type) => {
+          const title = alert.querySelector(':scope > .vmd-alert-title');
+          expect(title?.tagName === 'BUTTON', 'the Alert type marker is not a button');
+          title.click();
+          await pause();
+          const menu = document.getElementById('vmd-alert-type-menu');
+          expect(
+            menu && getComputedStyle(menu).display !== 'none',
+            'clicking the Alert marker did not open its in-place type menu'
+          );
+          expect(
+            menu.querySelector('.vmd-alert-type-menu__current')?.dataset.alertType ===
+              alert.dataset.vmdAlert,
+            'the Alert type menu did not mark the active type'
+          );
+          const item = menu.querySelector('button[data-alert-type="' + type + '"]');
+          expect(item, 'the Alert type menu is missing ' + type);
+          item.click();
+          await pause(80);
+          expect(
+            getComputedStyle(menu).display === 'none',
+            'selecting an Alert type did not close the in-place menu'
+          );
+        };
+
         const alertTypes = ['NOTE', 'TIP', 'IMPORTANT', 'WARNING', 'CAUTION'];
         const alertMarkdown = alertTypes.map((type) => '> [!' + type + ']\\n> ' + type.toLowerCase() + ' body').join('\\n\\n');
         await setMarkdown(alertMarkdown);
@@ -1429,7 +1491,12 @@ function testPage() {
         expect(renderedAlerts.length === alertTypes.length, 'not all five GitHub Alert types rendered');
         for (const [index, alert] of renderedAlerts.entries()) {
           expect(alert.dataset.vmdAlert === alertTypes[index], 'GitHub Alert type was decorated incorrectly');
-          expect(alert.querySelector('.vmd-alert-title')?.textContent === alertTypes[index], 'GitHub Alert title is missing');
+          const title = alert.querySelector('.vmd-alert-title');
+          expect(title?.textContent === alertTypes[index], 'GitHub Alert title is missing');
+          expect(
+            title?.getAttribute('aria-haspopup') === 'menu',
+            'GitHub Alert title does not expose its type menu'
+          );
           expect(getComputedStyle(alert.querySelector('.vmd-alert-marker')).display === 'none', 'GitHub Alert source marker is visible');
         }
         const serializedAlerts = window.vditor.getValue();
@@ -1438,18 +1505,189 @@ function testPage() {
             !serializedAlerts.includes('vmd-alert'),
           'GitHub Alert rendering changed or polluted the Markdown source'
         );
+        renderedAlerts[0].querySelector('.vmd-alert-title').click();
+        await pause();
+        const alertTypeMenu = document.getElementById('vmd-alert-type-menu');
+        expect(
+          getComputedStyle(alertTypeMenu).display !== 'none',
+          'the Alert type menu was not visible before its Escape check'
+        );
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        expect(
+          getComputedStyle(alertTypeMenu).display === 'none' &&
+            window.vditor.getValue() === serializedAlerts,
+          'Escape did not close the Alert type menu without changing Markdown'
+        );
 
         await setMarkdown('selected alert body');
         const alertBodyText = textNode(root().querySelector(':scope > p'));
         select(alertBodyText, 0, alertBodyText, alertBodyText.textContent.length);
-        document.querySelector('.vditor-toolbar [data-type="vmd-alert-warning"]').click();
+        document.querySelector('.vditor-toolbar [data-type="vmd-alert"]').click();
         await pause(80);
         expect(
-          window.vditor.getValue().includes('> [!WARNING]\\n> selected alert body') &&
-            root().querySelector('blockquote.vmd-alert--warning'),
-          'the GitHub Alert toolbar did not insert and render the selected Warning alert: ' +
+          window.vditor.getValue().includes('> [!NOTE]\\n> selected alert body') &&
+            root().querySelector('blockquote.vmd-alert--note'),
+          'the GitHub Alert toolbar did not insert and render the default Note alert: ' +
             JSON.stringify(window.vditor.getValue())
         );
+
+        const deleteThroughBlockMenu = async (target, expectedKind) => {
+          target.dispatchEvent(new MouseEvent('contextmenu', {
+            bubbles: true,
+            cancelable: true,
+            button: 2,
+            clientX: 40,
+            clientY: 40,
+          }));
+          await pause();
+          const menu = document.getElementById('vmd-block-context-menu');
+          expect(
+            menu?.dataset.kind === expectedKind &&
+              getComputedStyle(menu).display !== 'none',
+            'the block context menu did not target ' + expectedKind
+          );
+          const button = menu.querySelector('button[data-type="delete-block"]');
+          expect(button, 'the block context menu has no whole-region delete action');
+          button.click();
+          await pause(80);
+        };
+
+        await setMarkdown('before delete quote\\n\\n> quote first\\n> quote second\\n\\nafter delete quote');
+        const deletedQuote = root().querySelector(':scope > blockquote');
+        await deleteThroughBlockMenu(deletedQuote, 'quote');
+        expect(
+          window.vditor.getValue().replace(/\\n+$/, '') ===
+            'before delete quote\\n\\nafter delete quote',
+          'deleting a quote did not remove its complete source block: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
+        const afterQuoteSelection = window.getSelection();
+        const afterQuoteSelectionElement = afterQuoteSelection?.rangeCount
+          ? (afterQuoteSelection.getRangeAt(0).startContainer.nodeType === Node.ELEMENT_NODE
+              ? afterQuoteSelection.getRangeAt(0).startContainer
+              : afterQuoteSelection.getRangeAt(0).startContainer.parentElement)
+          : null;
+        expect(
+          afterQuoteSelectionElement?.closest('p')?.textContent.includes('after delete quote'),
+          'deleting a quote did not move the caret to the following block'
+        );
+        window.vditor.vditor.undo.undo(window.vditor.vditor);
+        await pause(80);
+        expect(
+          window.vditor.getValue().includes('> quote first\\n> quote second'),
+          'whole-region deletion could not be undone'
+        );
+
+        await setMarkdown('> only deleted quote');
+        await deleteThroughBlockMenu(root().querySelector(':scope > blockquote'), 'quote');
+        expect(
+          !window.vditor.getValue().trim() &&
+            root().children.length === 1 &&
+            root().firstElementChild?.tagName === 'P',
+          'deleting the only region did not leave one editable empty paragraph'
+        );
+
+        await setMarkdown('before delete alert\\n\\n> [!CAUTION]\\n> remove alert body\\n\\nafter delete alert');
+        await pause(80);
+        const deletedAlert = root().querySelector(':scope > blockquote.vmd-alert--caution');
+        await deleteThroughBlockMenu(deletedAlert, 'alert');
+        expect(
+          window.vditor.getValue().replace(/\\n+$/, '') ===
+            'before delete alert\\n\\nafter delete alert',
+          'deleting a GitHub Alert left its marker or body in the document: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
+
+        await setMarkdown(
+          'before delete details\\n\\n<details>\\n<summary>Outer delete title</summary>' +
+            '\\n\\nouter delete body\\n\\n<details>\\n<summary>Inner delete title</summary>' +
+            '\\n\\ninner delete body\\n\\n</details>\\n\\nouter delete tail\\n\\n</details>' +
+            '\\n\\nafter delete details'
+        );
+        await pause(80);
+        let deletionOpeners = root().querySelectorAll(':scope > .vmd-details-opener');
+        expect(deletionOpeners.length === 2, 'nested deletion fixture did not render two details groups');
+        await deleteThroughBlockMenu(deletionOpeners[1], 'details');
+        expect(
+          window.vditor.getValue().includes('Outer delete title') &&
+            window.vditor.getValue().includes('outer delete tail') &&
+            !window.vditor.getValue().includes('Inner delete title') &&
+            !window.vditor.getValue().includes('inner delete body'),
+          'deleting nested details did not remove only the innermost complete group: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
+        await pause(80);
+        const remainingDetailsOpener = root().querySelector(':scope > .vmd-details-opener');
+        remainingDetailsOpener.querySelector('summary').click();
+        await pause(80);
+        const outerDeleteBody = Array.from(root().querySelectorAll(':scope > p')).find(
+          (paragraph) => paragraph.textContent.includes('outer delete body')
+        );
+        expect(
+          outerDeleteBody &&
+            !outerDeleteBody.classList.contains('vmd-details-content--hidden'),
+          'the outer details body was not expanded before its context-menu test'
+        );
+        await deleteThroughBlockMenu(outerDeleteBody, 'details');
+        expect(
+          window.vditor.getValue().replace(/\\n+$/, '') ===
+            'before delete details\\n\\nafter delete details',
+          'right-clicking details content did not delete the complete details group: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
+
+        await setMarkdown(
+          'before delete code\\n\\n' + markerFence + 'js\\nconst deleteCode = true;\\n' +
+            markerFence + '\\n\\nafter delete code'
+        );
+        const deletedCode = root().querySelector(
+          ':scope > .vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        await deleteThroughBlockMenu(deletedCode, 'code-block');
+        expect(
+          window.vditor.getValue().replace(/\\n+$/, '') ===
+            'before delete code\\n\\nafter delete code',
+          'deleting a code block left its fence or content in the document: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
+
+        await setMarkdown('before delete math\\n\\n$$\\ndeleteMath\\n$$');
+        const deletedMath = root().querySelector(
+          ':scope > .vditor-wysiwyg__block[data-type="math-block"]'
+        );
+        await deleteThroughBlockMenu(deletedMath, 'math-block');
+        expect(
+          window.vditor.getValue().replace(/\\n+$/, '') === 'before delete math',
+          'deleting a formula block left its delimiters or content in the document: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
+        const previousMathSelection = window.getSelection();
+        const previousMathSelectionElement = previousMathSelection?.rangeCount
+          ? (previousMathSelection.getRangeAt(0).startContainer.nodeType === Node.ELEMENT_NODE
+              ? previousMathSelection.getRangeAt(0).startContainer
+              : previousMathSelection.getRangeAt(0).startContainer.parentElement)
+          : null;
+        expect(
+          previousMathSelectionElement?.closest('p')?.textContent.includes('before delete math'),
+          'deleting the final region did not move the caret to the preceding block'
+        );
+
+        await setMarkdown('| menu | priority |\\n| --- | --- |\\n| table | cell |');
+        const contextTableCell = root().querySelector('td');
+        contextTableCell.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          button: 2,
+          clientX: 50,
+          clientY: 50,
+        }));
+        await pause();
+        expect(
+          getComputedStyle(document.getElementById('vmd-table-context-menu')).display !== 'none' &&
+            getComputedStyle(document.getElementById('vmd-block-context-menu')).display === 'none',
+          'the whole-block menu overrode the existing table context menu'
+        );
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
         // Quote and GitHub Alert controls transform the caret line in place.
         // They must not insert a separate template for non-empty content or lose
@@ -1457,14 +1695,19 @@ function testPage() {
         const plainQuoteButton = document.querySelector(
           '.vditor-toolbar [data-type="vmd-quote-plain"]'
         );
-        const noteAlertButton = document.querySelector(
-          '.vditor-toolbar [data-type="vmd-alert-note"]'
+        const alertButton = document.querySelector(
+          '.vditor-toolbar [data-type="vmd-alert"]'
         );
-        const tipAlertButton = document.querySelector(
-          '.vditor-toolbar [data-type="vmd-alert-tip"]'
+        expect(plainQuoteButton && alertButton, 'the standalone Quote/Alert buttons are missing');
+        expect(
+          plainQuoteButton.parentElement?.nextElementSibling === alertButton.parentElement,
+          'the standalone Alert button is not immediately after the plain Quote button'
         );
-        const warningAlertButton = document.querySelector(
-          '.vditor-toolbar [data-type="vmd-alert-warning"]'
+        expect(
+          !document.querySelector(
+            '.vditor-toolbar [data-type^="vmd-alert-"]'
+          ),
+          'the toolbar still exposes the old Alert type list'
         );
         const currentQuoteValue = () => window.vditor.getValue().replace(/\\n+$/, '');
         const caretBlockquote = () => {
@@ -1501,23 +1744,26 @@ function testPage() {
 
         currentQuoteText = textNode(root().querySelectorAll(':scope > p')[1]);
         select(currentQuoteText, 7, currentQuoteText, 7);
-        warningAlertButton.click();
+        alertButton.click();
         await pause(80);
         expect(
-          currentQuoteValue() === 'before quote\\n\\n> [!WARNING]\\n> current quote line\\n\\nafter quote',
-          'GitHub Alert inserted a separate template instead of toggling the caret line: ' +
+          currentQuoteValue() === 'before quote\\n\\n> [!NOTE]\\n> current quote line\\n\\nafter quote',
+          'GitHub Alert inserted a separate template instead of the default Note Alert: ' +
             JSON.stringify(window.vditor.getValue())
         );
         expect(
-          caretBlockquote()?.classList.contains('vmd-alert--warning'),
+          caretBlockquote()?.classList.contains('vmd-alert--note'),
           'GitHub Alert projection lost the caret from the transformed line'
         );
-        tipAlertButton.click();
-        await pause(80);
+        await selectAlertType(caretBlockquote(), 'TIP');
         expect(
           currentQuoteValue() === 'before quote\\n\\n> [!TIP]\\n> current quote line\\n\\nafter quote',
-          'GitHub Alert did not switch format in place: ' +
+          'the in-place menu did not switch the Alert type: ' +
             JSON.stringify(window.vditor.getValue())
+        );
+        expect(
+          caretBlockquote()?.classList.contains('vmd-alert--tip'),
+          'switching the Alert type lost the body caret'
         );
         plainQuoteButton.click();
         await pause(80);
@@ -1525,6 +1771,19 @@ function testPage() {
           currentQuoteValue() === 'before quote\\n\\n> current quote line\\n\\nafter quote',
           'GitHub Alert did not switch to a plain quote in place: ' +
             JSON.stringify(window.vditor.getValue())
+        );
+        alertButton.click();
+        await pause(80);
+        expect(
+          currentQuoteValue() === 'before quote\\n\\n> [!NOTE]\\n> current quote line\\n\\nafter quote',
+          'the Alert button did not convert a plain quote to Note in place'
+        );
+        await selectAlertType(caretBlockquote(), 'WARNING');
+        alertButton.click();
+        await pause(80);
+        expect(
+          currentQuoteValue() === 'before quote\\n\\ncurrent quote line\\n\\nafter quote',
+          'the unified Alert button did not remove an active non-Note Alert'
         );
 
         await setMarkdown('> [!NOTE]\\n> first duplicate alert\\n\\n> [!NOTE]\\n> second duplicate alert');
@@ -1540,8 +1799,7 @@ function testPage() {
         }
         expect(secondAlertText, 'the second duplicate Alert body was not rendered');
         select(secondAlertText, 4, secondAlertText, 4);
-        tipAlertButton.click();
-        await pause(80);
+        await selectAlertType(duplicateAlerts[1], 'TIP');
         expect(
           currentQuoteValue() === '> [!NOTE]\\n> first duplicate alert\\n\\n> [!TIP]\\n> second duplicate alert',
           'switching a repeated Alert type changed the wrong block: ' +
@@ -1651,7 +1909,7 @@ function testPage() {
         const emptyQuoteLine = root().querySelectorAll(':scope > p')[1];
         const emptyQuoteText = textNode(emptyQuoteLine);
         select(emptyQuoteText, 0, emptyQuoteText, 0);
-        noteAlertButton.click();
+        alertButton.click();
         await pause(80);
         expect(
           currentQuoteValue() ===
@@ -1663,12 +1921,11 @@ function testPage() {
           caretBlockquote()?.classList.contains('vmd-alert--note'),
           'new Alert projection reloaded the editor and lost its caret'
         );
-        tipAlertButton.click();
-        await pause(80);
+        await selectAlertType(caretBlockquote(), 'TIP');
         expect(
           currentQuoteValue() ===
             'before empty\\n\\n> [!TIP]\\n> empty line\\n\\nafter empty',
-          'the action after Alert insertion ran at the document start instead of the inserted Alert'
+          'the in-place type switch after Alert insertion changed the wrong block'
         );
 
         await setMarkdown('formula target');
@@ -1770,7 +2027,7 @@ function testPage() {
         expect(window.__vmdCodeCopyAttempts === copyAttemptsBefore + 1, 'code block copy did not invoke the clipboard command');
         expect(codeCopyButton.getAttribute('aria-label') === (window.VditorI18n.copied || 'Copied'), 'code block copy did not report success');
 
-        await setMarkdown('two-mode shortcut target');
+        await setMarkdown('toolbar-only mode target');
         const shortcutParagraph = root().querySelector(':scope > p');
         const shortcutWalker = document.createTreeWalker(
           shortcutParagraph,
@@ -1791,8 +2048,8 @@ function testPage() {
           cancelable: true,
         });
         root().dispatchEvent(removedMiddleShortcut);
-        expect(removedMiddleShortcut.defaultPrevented, 'the removed middle mode shortcut was not consumed');
-        expect(window.vditor.vditor.currentMode === 'wysiwyg', 'the removed middle shortcut changed the editor mode');
+        expect(removedMiddleShortcut.defaultPrevented, 'the disabled mode shortcut was not consumed');
+        expect(window.vditor.vditor.currentMode === 'wysiwyg', 'a disabled shortcut changed the editor mode');
 
         const savedModesBeforeShortcuts = window.__vmdMessages.filter(
           (message) => message.command === 'save-options'
@@ -1807,16 +2064,16 @@ function testPage() {
             cancelable: true,
           });
           root().dispatchEvent(shortcut);
-          expect(shortcut.defaultPrevented, code + ' fixed-mode shortcut was not consumed');
+          expect(shortcut.defaultPrevented, code + ' toolbar-only shortcut was not consumed');
           expect(
             window.vditor.vditor.currentMode === 'wysiwyg',
-            code + ' changed the fixed WYSIWYG editor mode'
+            code + ' bypassed the toolbar-only mode policy'
           );
         }
         await pause();
         expect(
           window.__vmdMessages.filter((message) => message.command === 'save-options').length === savedModesBeforeShortcuts,
-          'fixed-mode shortcuts emitted save-options'
+          'disabled mode shortcuts emitted save-options'
         );
 
         await switchMode('sv');
@@ -1834,15 +2091,15 @@ function testPage() {
             cancelable: true,
           });
           svRoot.dispatchEvent(shortcut);
-          expect(shortcut.defaultPrevented, code + ' Split View shortcut was not consumed');
+          expect(shortcut.defaultPrevented, code + ' toolbar-only Split View shortcut was not consumed');
           expect(
             window.vditor.vditor.currentMode === 'sv',
-            code + ' changed the fixed Split View editor mode'
+            code + ' bypassed the toolbar-only Split View policy'
           );
         }
         expect(
           window.__vmdMessages.filter((message) => message.command === 'save-options').length === savedModesBeforeSvShortcuts,
-          'fixed Split View shortcuts emitted save-options'
+          'disabled Split View shortcuts emitted save-options'
         );
         const svQuoteValue = () => window.vditor.getValue().replace(/\\n+$/, '');
         const findSvText = (value) => {
@@ -1875,11 +2132,11 @@ function testPage() {
               root: svRoot.textContent,
             })
         );
-        warningAlertButton.click();
+        alertButton.click();
         await pause(80);
         expect(
-          svQuoteValue() === 'SV before\\n\\n> [!WARNING]\\n> SV current\\n> SV after',
-          'Split View plain quote did not switch to an Alert in place: ' +
+          svQuoteValue() === 'SV before\\n\\n> [!NOTE]\\n> SV current\\n> SV after',
+          'Split View plain quote did not switch to the default Note Alert in place: ' +
             JSON.stringify(window.vditor.getValue())
         );
         const svAfterAlert = window.getSelection();
@@ -1888,14 +2145,7 @@ function testPage() {
             svAfterAlert.getRangeAt(0).startContainer.parentElement?.textContent.includes('SV current'),
           'Split View Alert switch did not keep the caret on its content line'
         );
-        tipAlertButton.click();
-        await pause(80);
-        expect(
-          svQuoteValue() === 'SV before\\n\\n> [!TIP]\\n> SV current\\n> SV after',
-          'Split View Alert type did not switch in place: ' +
-            JSON.stringify(window.vditor.getValue())
-        );
-        tipAlertButton.click();
+        alertButton.click();
         await pause(80);
         expect(
           svQuoteValue() === 'SV before\\n\\nSV current\\nSV after',

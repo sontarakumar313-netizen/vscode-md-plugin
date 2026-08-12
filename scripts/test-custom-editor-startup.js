@@ -75,7 +75,7 @@ const document = {
   getText: () => '# Example',
 }
 
-async function openEditor(mode, savedMode) {
+async function openEditor(savedMode, expectedMode) {
   let receiveMessage
   const postedMessages = []
   const webview = {
@@ -120,7 +120,7 @@ async function openEditor(mode, savedMode) {
     globalState: { get: () => ({ mode: savedMode }) },
   }
 
-  const provider = new MarkdownEditorProvider(context, mode)
+  const provider = new MarkdownEditorProvider(context)
   await provider.resolveCustomTextEditor(document, panel, {})
   await new Promise((resolve) => setImmediate(resolve))
   await new Promise((resolve) => setImmediate(resolve))
@@ -145,7 +145,7 @@ async function openEditor(mode, savedMode) {
       type: 'init',
       options: {
         useVscodeThemeColor: undefined,
-        mode,
+        mode: expectedMode,
         frontMatterDisplay: 'table',
       },
       theme: 'light',
@@ -156,8 +156,8 @@ async function openEditor(mode, savedMode) {
 }
 
 async function testInitialReadyMessages() {
-  await openEditor('wysiwyg', 'sv')
-  await openEditor('sv', 'wysiwyg')
+  await openEditor('sv', 'sv')
+  await openEditor('unsupported', 'wysiwyg')
 }
 
 testInitialReadyMessages()

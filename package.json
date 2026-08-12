@@ -3,7 +3,7 @@
   "displayName": "Markdown Interactor",
   "icon": "media/logo.png",
   "description": "An interactive WYSIWYG Markdown editor with live rendering, diagrams, math, and custom themes.",
-  "version": "0.1.12",
+  "version": "0.1.15",
   "publisher": "sontarakumar313-netizen",
   "author": {
     "name": "sontarakumar313-netizen",
@@ -39,8 +39,7 @@
   "activationEvents": [
     "onCommand:markdown-interactor.openEditor",
     "onCommand:markdown-interactor.generateWorkspaceStyle",
-    "onCustomEditor:markdown-interactor.customEditor",
-    "onCustomEditor:markdown-interactor.splitEditor"
+    "onCustomEditor:markdown-interactor.customEditor"
   ],
   "main": "out/extension.js",
   "contributes": {
@@ -75,23 +74,13 @@
     "customEditors": [
       {
         "viewType": "markdown-interactor.customEditor",
-        "displayName": "Markdown Interactor: WYSIWYG",
+        "displayName": "Markdown Interactor Editor",
         "selector": [
           {
             "filenamePattern": "*.{md,markdown}"
           }
         ],
         "priority": "default"
-      },
-      {
-        "viewType": "markdown-interactor.splitEditor",
-        "displayName": "Markdown Interactor: Split View",
-        "selector": [
-          {
-            "filenamePattern": "*.{md,markdown}"
-          }
-        ],
-        "priority": "option"
       }
     ],
     "configuration": {

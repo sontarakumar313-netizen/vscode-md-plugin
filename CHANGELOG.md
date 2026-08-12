@@ -4,11 +4,9 @@ All notable changes to Markdown Interactor will be documented in this file.
 
 ## Unreleased
 
-- Exposed WYSIWYG and Split View as distinct native VS Code **Open With...**
-  editor choices, while retaining the existing editor identifier for WYSIWYG
-  compatibility and removing the Webview toolbar mode switch.
-- The editor UI provides visual editing and split source view only, rejects
-  unsupported saved modes, and uses visual editing as the default.
+- Restored a single **Markdown Interactor Editor** entry and moved visual/split
+  mode switching back to the Webview toolbar. The last valid toolbar-selected
+  mode is remembered, while unsupported saved modes fall back to visual editing.
 - Replaced the physically stripped Vditor and Lute forks with the pinned official
   package runtime while continuing to hide the unused editor mode in the UI.
 - Restored Vditor's click-to-open source editing for ordinary code blocks and

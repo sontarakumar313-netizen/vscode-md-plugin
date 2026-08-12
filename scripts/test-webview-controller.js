@@ -132,7 +132,6 @@ function createController({
     },
     panel: { webview },
     uri: document.uri,
-    mode: 'wysiwyg',
     isDisposed: () => false,
     getSnapshot,
     syncToDocument,
@@ -1668,14 +1667,14 @@ async function testStaleHostSnapshotIsDiscardedAfterNewEditorEdit() {
   )
 }
 
-async function testSavedEditorModeIsIgnored() {
+async function testSavedEditorModeIsValidated() {
   const saved = []
   const { receive } = createController({
     getSnapshot: async () => ({ content: '', version: 1 }),
     syncToDocument: async () => undefined,
     postMessage: async () => true,
-    updateGlobalState: async (_key, value) => {
-      saved.push(value)
+    updateGlobalState: async (key, value) => {
+      saved.push({ key, value })
     },
   })
 
@@ -1683,12 +1682,16 @@ async function testSavedEditorModeIsIgnored() {
     command: 'save-options',
     options: { mode: 'sv', retained: true },
   })
+  receive({
+    command: 'save-options',
+    options: { mode: 'unsupported' },
+  })
   await nextTurn()
   await nextTurn()
   assert.deepStrictEqual(
     saved,
-    [],
-    'an obsolete webview mode message changed persisted editor state'
+    [{ key: 'vditor.options', value: { mode: 'sv' } }],
+    'mode persistence did not retain only the validated toolbar selection'
   )
 }
 
@@ -1725,7 +1728,7 @@ async function testConcurrentHostUpdatesAreCoalesced() {
 Promise.resolve()
   .then(testUploadValidation)
   .then(testResourceScopedSafetySettings)
-  .then(testSavedEditorModeIsIgnored)
+  .then(testSavedEditorModeIsValidated)
   .then(testCrlfEditUsesCanonicalLfAndMinimalWrite)
   .then(testOverlappingExternalEditPrefersEditorHunk)
   .then(testMissingMergeBaseFallsBackToEditor)

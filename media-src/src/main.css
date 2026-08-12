@@ -277,7 +277,8 @@ body,
     var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.55));
   border-right: 1px solid
     var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.55));
-  padding-left: 0.6em;
+  /* Match the body text with the summary text after its disclosure arrow. */
+  padding-left: calc(1.25em - 1px);
   padding-right: 0.6em;
 }
 .vditor-wysiwyg .vditor-reset .vmd-details-content--first {
@@ -454,11 +455,26 @@ body,
   align-items: center;
   gap: 0.4em;
   margin: 0 0 0.45em;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
   color: var(--vmd-alert-color);
+  background: transparent;
+  font: inherit;
   font-weight: 600;
   line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
 }
-.vditor-wysiwyg .vditor-reset .vmd-alert-title svg {
+.vditor-wysiwyg .vditor-reset .vmd-alert-title:hover {
+  text-decoration: underline;
+}
+.vditor-wysiwyg .vditor-reset .vmd-alert-title:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: 2px;
+}
+:is(.vmd-alert-title, .vmd-alert-type-menu__icon) svg {
   width: 1em;
   height: 1em;
   flex: 0 0 1em;
@@ -475,15 +491,12 @@ body,
   margin-top: 0;
 }
 
-/* WYSIWYG table actions. */
-#vmd-table-context-menu {
+#vmd-alert-type-menu {
   position: fixed;
-  z-index: 10000;
+  z-index: 10001;
   display: none;
-  min-width: 210px;
-  max-height: calc(100vh - 16px);
+  min-width: 168px;
   padding: 4px;
-  overflow-y: auto;
   box-sizing: border-box;
   border: 1px solid var(--vscode-menu-border, var(--border-color));
   border-radius: 5px;
@@ -493,7 +506,7 @@ body,
   font: 13px/1.4 var(--vscode-font-family, sans-serif);
   user-select: none;
 }
-#vmd-table-context-menu button {
+#vmd-alert-type-menu button {
   position: relative;
   display: flex;
   align-items: center;
@@ -510,40 +523,95 @@ body,
   text-align: left;
   cursor: default;
 }
-#vmd-table-context-menu button:not(:disabled):hover,
-#vmd-table-context-menu button:not(:disabled):focus-visible {
+#vmd-alert-type-menu button:hover,
+#vmd-alert-type-menu button:focus-visible {
   color: var(--vscode-menu-selectionForeground, #fff);
   background: var(--vscode-menu-selectionBackground, #04395e);
   outline: none;
 }
-#vmd-table-context-menu button:disabled {
+#vmd-alert-type-menu .vmd-alert-type-menu__icon {
+  display: inline-flex;
+  flex: 0 0 16px;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+  font-size: 16px;
+}
+#vmd-alert-type-menu .vmd-alert-type-menu__current::after {
+  position: absolute;
+  right: 9px;
+  content: '✓';
+}
+
+/* WYSIWYG table and whole-block context menus. */
+:is(#vmd-table-context-menu, #vmd-block-context-menu) {
+  position: fixed;
+  z-index: 10000;
+  display: none;
+  min-width: 210px;
+  max-height: calc(100vh - 16px);
+  padding: 4px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  border: 1px solid var(--vscode-menu-border, var(--border-color));
+  border-radius: 5px;
+  color: var(--vscode-menu-foreground, var(--toolbar-icon-color));
+  background: var(--vscode-menu-background, var(--panel-background-color));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  font: 13px/1.4 var(--vscode-font-family, sans-serif);
+  user-select: none;
+}
+:is(#vmd-table-context-menu, #vmd-block-context-menu) button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 28px 4px 8px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 3px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+:is(#vmd-table-context-menu, #vmd-block-context-menu) button:not(:disabled):hover,
+:is(#vmd-table-context-menu, #vmd-block-context-menu) button:not(:disabled):focus-visible {
+  color: var(--vscode-menu-selectionForeground, #fff);
+  background: var(--vscode-menu-selectionBackground, #04395e);
+  outline: none;
+}
+:is(#vmd-table-context-menu, #vmd-block-context-menu) button:disabled {
   opacity: 0.45;
 }
-#vmd-table-context-menu .vmd-table-context-menu__icon {
+:is(#vmd-table-context-menu, #vmd-block-context-menu) .vmd-table-context-menu__icon {
   display: inline-flex;
   flex: 0 0 16px;
   align-items: center;
   justify-content: center;
 }
-#vmd-table-context-menu .vmd-table-context-menu__icon svg {
+:is(#vmd-table-context-menu, #vmd-block-context-menu) .vmd-table-context-menu__icon svg {
   width: 14px;
   height: 14px;
   fill: currentColor;
 }
-#vmd-table-context-menu .vmd-table-context-menu__label {
+:is(#vmd-table-context-menu, #vmd-block-context-menu) .vmd-table-context-menu__label {
   flex: 1;
 }
-#vmd-table-context-menu .vmd-table-context-menu__current::after {
+:is(#vmd-table-context-menu, #vmd-block-context-menu) .vmd-table-context-menu__current::after {
   position: absolute;
   right: 9px;
   content: '✓';
 }
-#vmd-table-context-menu .vmd-table-context-menu__separator {
+:is(#vmd-table-context-menu, #vmd-block-context-menu) .vmd-table-context-menu__separator {
   height: 1px;
   margin: 4px 6px;
   background: var(--vscode-menu-separatorBackground, var(--border-color));
 }
-#vmd-table-context-menu .vmd-table-context-menu__danger:not(:hover) {
+:is(#vmd-table-context-menu, #vmd-block-context-menu) .vmd-table-context-menu__danger:not(:hover) {
   color: var(--vscode-errorForeground, #f48771);
 }
 

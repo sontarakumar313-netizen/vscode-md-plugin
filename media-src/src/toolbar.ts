@@ -1,12 +1,15 @@
 import {
+	captureCaretAnchor,
 	countTextOccurrences,
 	findTextOccurrence,
 	getEditorSelectionContext,
 	getVisibleTextBefore,
 	getVisibleTextBeforeElement,
 	preserveEditorSelectionForToolbar,
+	restoreCaretAnchor,
 } from './caret-anchor'
 import { t } from './lang'
+import { getScrollElement } from './scroll-target'
 import {
 	captureEditorLineAnchor,
 	createSourceViewAnchor,
@@ -14,13 +17,16 @@ import {
 	restoreEditorLineAnchor,
 	restoreSourceViewAnchor,
 } from './quote-caret'
-import { toggleQuoteAt } from './quote-format'
+import { toggleDefaultAlertAt, toggleQuoteAt } from './quote-format'
 import type { QuoteSourceChange, QuoteType } from './quote-format'
 import { confirm } from './utils'
 import {
 	getVditorEditorElement,
+	getVditorMode,
 	setVditorMarkdown,
+	switchVditorMode,
 } from './vditor-adapter'
+import type { VditorMode } from './vditor-adapter'
 
 const outlineIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 1v22M4 6h1.2M4 11h1.2M4 16h1.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'
 // These follow MathType's Word toolbar idea: inline math sits in a text line,
@@ -30,6 +36,8 @@ const mathBlockIcon = '<svg class="vmd-math-toolbar-icon vmd-math-toolbar-icon--
 const mathInlineIcon = '<svg class="vmd-math-toolbar-icon vmd-math-toolbar-icon--inline" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 6h2M1 18h2M21 6h2M21 18h2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13 2H5l5 10-5 10h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 6h7M16 12h5M16 18h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
 const detailsIcon = '<svg class="vmd-details-toolbar-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4 6h10M4 12h10M4 18h10M17 8l5 4-5 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 const quoteIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M3 5v14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M7 7h14M7 12h11M7 17h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
+const alertIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 10.5v6M12 7.5h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
+const editingModeIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 18.5h3.5L18 9l-3-3-9.5 9.5L5 18.5zm8.5-11 3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 
 // insertMD writes raw Markdown, so a `$` inside the selection would close the
 // math delimiter early and turn `a$b` into the broken `$a$b$`. Normalize every
@@ -111,6 +119,23 @@ function toggleQuoteOrAlert(editor: any, type: QuoteType): void {
 		caret.line.start,
 		type,
 		templateBody,
+		caret.renderedText
+	)
+	applyQuoteSourceChange(editor, change, context, caret.renderedOffset)
+}
+
+/** Creates a NOTE Alert, or removes the active Alert of any type. */
+function toggleDefaultAlert(editor: typeof window.vditor): void {
+	const source = String(editor.getValue?.() || '')
+	const context = getEditorSelectionContext(editor)
+	if (!context) return
+	const caret = resolveCaretLine(source, context)
+	if (!caret) return
+
+	const change = toggleDefaultAlertAt(
+		source,
+		caret.line.start,
+		t('alertContent'),
 		caret.renderedText
 	)
 	applyQuoteSourceChange(editor, change, context, caret.renderedOffset)
@@ -354,7 +379,54 @@ async function copyToClipboard(content: string, label: string): Promise<void> {
 	}
 }
 
-/** Prevents Vditor's private mode shortcuts from changing a fixed editor type. */
+const MODE_BUTTONS: ReadonlyArray<{
+	name: string
+	mode: VditorMode
+}> = [
+	{ name: 'vmd-mode-wysiwyg', mode: 'wysiwyg' },
+	{ name: 'vmd-mode-sv', mode: 'sv' },
+]
+
+export function syncEditorModeToolbar(editor: unknown = window.vditor): void {
+	const current = getVditorMode(editor)
+	for (const { name, mode } of MODE_BUTTONS) {
+		const button = document.querySelector<HTMLElement>(
+			`.vditor-toolbar [data-type="${name}"]`
+		)
+		if (!button) continue
+		const active = current === mode
+		button.classList.toggle('vditor-menu--current', active)
+		button.setAttribute('aria-pressed', String(active))
+	}
+}
+
+function selectEditorMode(mode: VditorMode): void {
+	const editor = window.vditor
+	if (!editor) return
+	if (getVditorMode(editor) === mode) {
+		syncEditorModeToolbar(editor)
+		return
+	}
+
+	const savedScrollTop = getScrollElement()?.scrollTop ?? null
+	const caretAnchor = captureCaretAnchor(editor)
+	window.__vmdBeforeEditorModeChange?.()
+	if (!switchVditorMode(editor, mode)) return
+
+	syncEditorModeToolbar(editor)
+	window.__vmdAfterEditorModeChange?.(mode)
+	requestAnimationFrame(() => {
+		requestAnimationFrame(() => {
+			const scrollElement = getScrollElement()
+			if (scrollElement && savedScrollTop !== null) {
+				scrollElement.scrollTop = savedScrollTop
+			}
+			restoreCaretAnchor(caretAnchor, editor)
+		})
+	})
+}
+
+/** Blocks Vditor's private mode hotkeys so switching is toolbar-only. */
 export function installEditorModeShortcutGuard(): void {
 	if ((window as any).__vmdEditorModeShortcutGuardInstalled) return
 	;(window as any).__vmdEditorModeShortcutGuardInstalled = true
@@ -432,25 +504,20 @@ export const toolbar = [
 	},
 	'|',
 	{
-		name: 'vmd-quote',
-		tip: t('quoteToggle'),
+		name: 'vmd-quote-plain',
+		tip: t('quotePlain'),
 		icon: quoteIcon,
-		toolbar: [
-			{
-				name: 'vmd-quote-plain',
-				icon: t('quotePlain'),
-				click() {
-					toggleQuoteOrAlert(window.vditor, null)
-				},
-			},
-			...(['NOTE', 'TIP', 'IMPORTANT', 'WARNING', 'CAUTION'] as const).map((type) => ({
-				name: `vmd-alert-${type.toLowerCase()}`,
-				icon: t(`alert${type[0]}${type.slice(1).toLowerCase()}`),
-				click() {
-					toggleQuoteOrAlert(window.vditor, type)
-				},
-			})),
-		],
+		click() {
+			toggleQuoteOrAlert(window.vditor, null)
+		},
+	},
+	{
+		name: 'vmd-alert',
+		tip: t('alertToggle'),
+		icon: alertIcon,
+		click() {
+			toggleDefaultAlert(window.vditor)
+		},
 	},
 	'line',
 	'code',
@@ -490,6 +557,28 @@ export const toolbar = [
 	'upload',
 	'table',
 	'|',
+	{
+		name: 'vmd-edit-mode',
+		tipPosition: 'e',
+		tip: t('editingMode'),
+		icon: editingModeIcon,
+		toolbar: [
+			{
+				name: 'vmd-mode-wysiwyg',
+				icon: t('wysiwygMode'),
+				click() {
+					selectEditorMode('wysiwyg')
+				},
+			},
+			{
+				name: 'vmd-mode-sv',
+				icon: t('splitViewMode'),
+				click() {
+					selectEditorMode('sv')
+				},
+			},
+		],
+	},
 	{
 		name: 'more',
 		tipPosition: 'e',

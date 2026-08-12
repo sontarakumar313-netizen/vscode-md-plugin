@@ -15,9 +15,11 @@ import {
   installEditorModeShortcutGuard,
   installToolbarSelectionPreserver,
   installToolbarTooltipDismissal,
+  syncEditorModeToolbar,
   toolbar,
 } from './toolbar'
 import { initTableContextMenu } from './table-context-menu'
+import { initBlockContextMenu } from './block-context-menu'
 import { customizeWysiwygPopover } from './wysiwyg-popover'
 import {
   handleRenderedListTab,
@@ -498,6 +500,30 @@ function flushEditorContent(): void {
   postEditorContent()
 }
 
+function refreshModeDependentFeatures(): void {
+  window.__vmdDetails?.rebind?.()
+  window.__vmdAlerts?.rebind?.()
+  window.__vmdFrontMatter?.rebind?.()
+  window.__vmdSplitScrollSync?.rebind?.(window.vditor)
+}
+
+window.__vmdBeforeEditorModeChange = flushEditorContent
+window.__vmdAfterEditorModeChange = (mode) => {
+  refreshModeDependentFeatures()
+  const content = vditor.getValue()
+  postEditorContent()
+  if (
+    content === lastPostedEditorContent &&
+    sentEditorContent.size === 0
+  ) {
+    postEditorBaseline(content, acknowledgedDocumentVersion)
+  }
+  vscode.postMessage({
+    command: 'save-options',
+    options: { mode },
+  })
+}
+
 function scheduleEditorContent(): void {
   editorSyncPending = true
   if (editorSyncTimer !== null) return
@@ -719,6 +745,7 @@ function initVditor(msg) {
       )
       installToolbarSelectionPreserver(vditor)
       installToolbarTooltipDismissal(vditor)
+      syncEditorModeToolbar(vditor)
       installWysiwygListCommands(vditor)
       if (!(window as any).__vmdDetails) {
         ;(window as any).__vmdDetails = initWysiwygDetails()
@@ -742,6 +769,7 @@ function initVditor(msg) {
         ;(window as any).__vmdFrontMatter.rebind?.()
       }
       initTableContextMenu()
+      initBlockContextMenu()
       vditor.focus()
       // Rebind split scrolling to the newly created editor root after rebuilds.
       if (!(window as any).__vmdSplitScrollSync) {

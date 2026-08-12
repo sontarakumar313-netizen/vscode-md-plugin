@@ -78,6 +78,66 @@ function getSummaryTitleText(summary: HTMLElement): string {
     .trim()
 }
 
+interface DetailsRegion {
+  start: number
+  end: number
+}
+
+/**
+ * Finds the innermost complete details region represented by Vditor's sibling
+ * blocks. Content between the HTML opener and its matching closer is not a DOM
+ * child of `<details>`, so ordinary `closest()` lookup cannot identify it.
+ */
+export function findInnermostDetailsBlocks(
+  root: HTMLElement,
+  target: Element
+): HTMLElement[] | null {
+  const children = Array.from(root.children).filter(
+    (child): child is HTMLElement => child instanceof HTMLElement
+  )
+  const targetIndex = children.findIndex(
+    (child) => child === target || child.contains(target)
+  )
+  if (targetIndex < 0) return null
+
+  const regions: DetailsRegion[] = []
+  const stack: DetailsRegion[] = []
+  for (let index = 0; index < children.length; index += 1) {
+    const child = children[index]
+    const source =
+      child.getAttribute('data-type') === 'html-block'
+        ? getHtmlBlockSource(child)
+        : ''
+
+    if (isDetailsOpenBlock(source)) {
+      const region = { start: index, end: -1 }
+      regions.push(region)
+      stack.push(region)
+      continue
+    }
+
+    const closeCount = countDetailsCloseTags(source)
+    for (let closeIndex = 0; closeIndex < closeCount; closeIndex += 1) {
+      const region = stack.pop()
+      if (region) region.end = index
+    }
+  }
+
+  const region = regions
+    .filter(
+      (candidate) =>
+        candidate.end >= candidate.start &&
+        targetIndex >= candidate.start &&
+        targetIndex <= candidate.end
+    )
+    .sort((left, right) => {
+      if (left.start !== right.start) return right.start - left.start
+      return left.end - right.end
+    })[0]
+
+  return region ? children.slice(region.start, region.end + 1) : null
+}
+
 export function initWysiwygDetails() {
   const openState = new WeakMap<HTMLElement, boolean>()
   let root: HTMLElement | null = null

@@ -65,9 +65,9 @@ try {
 
 const { getVditorOptions } = compiledModule.exports
 const context = { globalState: { get: () => undefined } }
-const optionsFor = (values, mode = 'wysiwyg') => {
+const optionsFor = (values) => {
   configValues = values
-  return getVditorOptions(context, undefined, mode)
+  return getVditorOptions(context, undefined)
 }
 
 for (const mode of ['table', 'codeBlock', 'hide']) {
@@ -105,19 +105,27 @@ configValues = { frontMatterDisplay: 'hide' }
 assert.strictEqual(
   getVditorOptions(
     { globalState: { get: () => ({ frontMatterDisplay: 'bogus' }) } },
-    undefined,
-    'wysiwyg'
+    undefined
   ).frontMatterDisplay,
   'hide',
   'a value left in saved editor state must not override the validated setting'
 )
 
-// The selected Custom Editor type is authoritative for every saved legacy value.
+// The single Custom Editor starts in the last valid toolbar-selected mode.
 configValues = { frontMatterDisplay: 'table' }
+for (const savedMode of ['wysiwyg', 'sv']) {
+  assert.strictEqual(
+    getVditorOptions(
+      { globalState: { get: () => ({ mode: savedMode }) } },
+      undefined
+    ).mode,
+    savedMode,
+    `the valid saved mode was not restored: ${savedMode}`
+  )
+}
+
 const removedMode = ['i', 'r'].join('')
 for (const savedMode of [
-  'wysiwyg',
-  'sv',
   removedMode,
   undefined,
   null,
@@ -127,19 +135,16 @@ for (const savedMode of [
   true,
   {},
 ]) {
-  for (const fixedMode of ['wysiwyg', 'sv']) {
-    assert.strictEqual(
-      getVditorOptions(
-        { globalState: { get: () => ({ mode: savedMode }) } },
-        undefined,
-        fixedMode
-      ).mode,
-      fixedMode,
-      `fixed ${fixedMode} editor was overridden by saved mode: ${JSON.stringify(
-        savedMode
-      )}`
-    )
-  }
+  assert.strictEqual(
+    getVditorOptions(
+      { globalState: { get: () => ({ mode: savedMode }) } },
+      undefined
+    ).mode,
+    'wysiwyg',
+    `an invalid saved mode did not fall back to WYSIWYG: ${JSON.stringify(
+      savedMode
+    )}`
+  )
 }
 
 const withSaved = getVditorOptions(
@@ -154,17 +159,16 @@ const withSaved = getVditorOptions(
       }),
     },
   },
-  undefined,
-  'wysiwyg'
+  undefined
 )
 assert.deepStrictEqual(
   withSaved,
   {
     useVscodeThemeColor: undefined,
-    mode: 'wysiwyg',
+    mode: 'sv',
     frontMatterDisplay: 'table',
   },
-  'persisted Vditor state must not override the fixed editor or restore dropped options'
+  'persisted state must restore only the validated editor mode'
 )
 
 console.log('vditor options tests passed')

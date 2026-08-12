@@ -108,16 +108,13 @@ const context = {
   },
 }
 
-async function testCustomEditorEntries() {
+async function testSingleCustomEditorEntry() {
   compiledModule.exports.activate(context)
 
   assert.deepStrictEqual(
     registeredProviders.map(({ viewType }) => viewType),
-    [
-      'markdown-interactor.customEditor',
-      'markdown-interactor.splitEditor',
-    ],
-    'activation did not register both fixed-mode Custom Editor providers'
+    ['markdown-interactor.customEditor'],
+    'activation did not register exactly one Custom Editor provider'
   )
   const openEditor = commands.get('markdown-interactor.openEditor')
   assert.strictEqual(typeof openEditor, 'function', 'open command was not registered')
@@ -137,44 +134,38 @@ async function testCustomEditorEntries() {
   const editors = packageJson.contributes.customEditors
   assert.deepStrictEqual(
     editors.map((editor) => editor.viewType),
-    [
-      'markdown-interactor.customEditor',
-      'markdown-interactor.splitEditor',
-    ],
-    'the manifest did not contribute both editor choices'
+    ['markdown-interactor.customEditor'],
+    'the manifest contributed more than one Custom Editor'
   )
   assert.deepStrictEqual(
     editors.map((editor) => editor.displayName),
-    ['Markdown Interactor: WYSIWYG', 'Markdown Interactor: Split View'],
-    'the native editor-type switcher labels are not unique and explicit'
+    ['Markdown Interactor Editor'],
+    'the Custom Editor display name is incorrect'
   )
   assert.deepStrictEqual(
-    editors.map((editor) => editor.selector),
-    [
-      [{ filenamePattern: '*.{md,markdown}' }],
-      [{ filenamePattern: '*.{md,markdown}' }],
-    ],
-    'each editor must use exactly one shared Markdown selector registration'
+    editors[0].selector,
+    [{ filenamePattern: '*.{md,markdown}' }],
+    'the editor must use the shared Markdown selector registration'
   )
-  assert.deepStrictEqual(
-    editors.map((editor) => editor.priority),
-    ['default', 'option'],
-    'only WYSIWYG should be the default editor choice'
+  assert.strictEqual(
+    editors[0].priority,
+    'default',
+    'the single Markdown Interactor editor must remain the default choice'
   )
   assert.ok(
     packageJson.activationEvents.includes(
       'onCustomEditor:markdown-interactor.customEditor'
     ) &&
-      packageJson.activationEvents.includes(
+      !packageJson.activationEvents.includes(
         'onCustomEditor:markdown-interactor.splitEditor'
       ),
-    'both editor choices must activate the extension'
+    'activation events still expose the removed Split View editor type'
   )
-  assert.ok(disposables.length >= 4, 'activation did not retain its disposables')
+  assert.ok(disposables.length >= 3, 'activation did not retain its disposables')
 }
 
-testCustomEditorEntries()
-  .then(() => console.log('custom editor registration tests passed'))
+testSingleCustomEditorEntry()
+  .then(() => console.log('single custom editor tests passed'))
   .catch((error) => {
     console.error(error)
     process.exitCode = 1

@@ -205,6 +205,23 @@ export function toggleQuoteAt(
   }
 }
 
+/** Toggles one default NOTE Alert button, regardless of the active Alert type. */
+export function toggleDefaultAlertAt(
+  source: string,
+  lineStart: number,
+  emptyTemplateBody: string,
+  targetText: string
+): QuoteSourceChange {
+  const activeType = findQuoteBlockAt(source, lineStart)?.type
+  return toggleQuoteAt(
+    source,
+    lineStart,
+    activeType ?? 'NOTE',
+    emptyTemplateBody,
+    targetText
+  )
+}
+
 export function adjustPlainQuoteDepthAt(
   source: string,
   lineStart: number,

@@ -8,21 +8,16 @@ import {
   getWebviewOptions,
   applyMinimalDocumentEdit,
   MarkdownWebviewController,
-  VditorMode,
 } from './webview'
 
 /** Provides the `Open With...` and default custom editor integration. */
 export class MarkdownEditorProvider
   implements vscode.CustomTextEditorProvider {
   public static readonly viewType = 'markdown-interactor.customEditor'
-  public static readonly splitViewType = 'markdown-interactor.splitEditor'
 
   private readonly scrollPositions = new Map<string, number>()
 
-  constructor(
-    private readonly context: vscode.ExtensionContext,
-    private readonly mode: VditorMode
-  ) {}
+  constructor(private readonly context: vscode.ExtensionContext) {}
 
   public async resolveCustomTextEditor(
     document: vscode.TextDocument,
@@ -46,7 +41,6 @@ export class MarkdownEditorProvider
       context: this.context,
       panel: webviewPanel,
       uri,
-      mode: this.mode,
       isDisposed: () => panelDisposed,
       getSnapshot: async () => ({
         content: toLf(document.getText()),

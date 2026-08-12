@@ -5,6 +5,7 @@ import {
   refreshVditorWysiwygToolbar,
   showVditorWysiwygLinkPopover,
 } from './vditor-adapter'
+import type { VditorMode } from './vditor-adapter'
 import { setWysiwygPopoverTarget } from './wysiwyg-popover'
 window.vscode =
   (window as any).acquireVsCodeApi && (window as any).acquireVsCodeApi()
@@ -14,6 +15,12 @@ declare global {
   interface Window {
     vditor: Vditor
     vscode: any
+    __vmdBeforeEditorModeChange?: () => void
+    __vmdAfterEditorModeChange?: (mode: VditorMode) => void
+    __vmdDetails?: { rebind?: () => void }
+    __vmdAlerts?: { rebind?: () => void }
+    __vmdFrontMatter?: { rebind?: () => void }
+    __vmdSplitScrollSync?: { rebind?: (editor?: unknown) => void }
   }
 }
 

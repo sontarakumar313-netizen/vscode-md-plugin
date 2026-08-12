@@ -9,6 +9,7 @@ import {
   listOutdent,
 } from 'vditor/src/ts/util/fixBrowserBehavior'
 import { setSelectionFocus } from 'vditor/src/ts/util/selection'
+import { setEditMode } from 'vditor/src/ts/toolbar/EditMode'
 import { afterRenderEvent as commitWysiwygAfterRender } from 'vditor/src/ts/wysiwyg/afterRenderEvent'
 import { renderDomByMd } from 'vditor/src/ts/wysiwyg/renderDomByMd'
 import {
@@ -33,6 +34,23 @@ export function getVditorInternals(editor: any = window.vditor): any | null {
 export function getVditorMode(editor: any = window.vditor): VditorMode | null {
   const mode = getVditorInternals(editor)?.currentMode || editor?.getCurrentMode?.()
   return mode === 'wysiwyg' || mode === 'sv' ? mode : null
+}
+
+/** Switches between the two supported modes without exposing Vditor shortcuts. */
+export function switchVditorMode(
+  editor: unknown,
+  mode: VditorMode
+): boolean {
+  const internal = getVditorInternals(editor)
+  if (!internal) return false
+  if (getVditorMode(editor) === mode) return true
+
+  setEditMode(
+    internal,
+    mode,
+    new Event('vmd-edit-mode', { bubbles: false, cancelable: true })
+  )
+  return getVditorMode(editor) === mode
 }
 
 export function getVditorEditorElement(
