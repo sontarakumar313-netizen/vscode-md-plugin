@@ -15,8 +15,12 @@ export const KeyVditorOptions = 'vditor.options'
 export type VditorMode = 'wysiwyg' | 'sv'
 export const DEFAULT_VDITOR_MODE: VditorMode = 'wysiwyg'
 
+export function isVditorMode(value: unknown): value is VditorMode {
+  return value === 'wysiwyg' || value === 'sv'
+}
+
 export function normalizeVditorMode(value: unknown): VditorMode {
-  return value === 'sv' ? 'sv' : DEFAULT_VDITOR_MODE
+  return isVditorMode(value) ? value : DEFAULT_VDITOR_MODE
 }
 
 export type WebviewTheme = 'dark' | 'light'
@@ -1298,14 +1302,17 @@ export class MarkdownWebviewController implements vscode.Disposable {
           await this.initialize()
           break
         case 'save-options': {
-          const options =
+          const mode =
             message.options && typeof message.options === 'object'
-              ? message.options
-              : {}
-          await this.host.context.globalState.update(KeyVditorOptions, {
-            ...options,
-            mode: normalizeVditorMode(options.mode),
-          })
+              ? message.options.mode
+              : undefined
+          if (!isVditorMode(mode)) {
+            console.warn(
+              '[markdown-interactor] ignored an unsupported saved editor mode.'
+            )
+            break
+          }
+          await this.host.context.globalState.update(KeyVditorOptions, { mode })
           break
         }
         case 'scroll':

@@ -24,7 +24,7 @@
 
 ## 简介
 
-Markdown Interactor 是一个基于 [Vditor](https://github.com/Vanessa219/vditor) 的 VS Code Markdown 编辑器。它在 Webview 中提供丰富的可视化编辑能力，同时始终以 VS Code `TextDocument` 作为文档数据源，因此文件保存、撤销、自动保存和外部修改仍由 VS Code 管理。
+* [ ] Markdown Interactor 是一个基于 [Vditor](https://github.com/Vanessa219/vditor) 的 VS Code Markdown 编辑器。它在 Webview 中提供丰富的可视化编辑能力，同时始终以 VS Code `TextDocument` 作为文档数据源，因此文件保存、撤销、自动保存和外部修改仍由 VS Code 管理。
 
 适合以下场景：
 
@@ -34,6 +34,8 @@ Markdown Interactor 是一个基于 [Vditor](https://github.com/Vanessa219/vdito
 - 在中文输入法、自动保存或外部工具同时修改文件时保持稳定编辑。
 
 ## 核心功能
+
+
 
 ### 两种编辑模式
 
@@ -58,14 +60,14 @@ Markdown Interactor 是一个基于 [Vditor](https://github.com/Vanessa219/vdito
 
 ### 编辑辅助
 
-- 文档目录和源码行号开关；
-- 查找、区分大小写、上一项和下一项导航；
-- 在分屏源码模式中执行单项替换或全部替换；
+- 文档目录；
+- 使用 VS Code 内置 Webview 查找；
 - 公式块和行内公式快捷插入；
 - 长文档滚动位置恢复；
 - 中、英、日、韩界面文本适配，缺失文本自动回退到英文。
 
-> 为避免可视文本与 Markdown 语法偏移不一致，可视化编辑模式只提供查找与定位；替换操作仅在源码分屏模式的编辑区启用。
+
+> 三大帝国
 
 ### 稳定的文档同步
 
@@ -204,7 +206,7 @@ GitHub Actions 会在代码推送到 `main` 后自动构建并打包 VSIX，无�
 | 路径             | 作用                                             |
 | ---------------- | ------------------------------------------------ |
 | `src/`           | VS Code Extension Host、文档同步、上传和链接处理 |
-| `media-src/src/` | Webview、Vditor、工具栏、查找、行号和交互逻辑    |
+| `media-src/src/` | Webview、Vditor、工具栏和交互逻辑                |
 | `scripts/`       | 构建脚本与自动化测试                             |
 | `00-styles/`     | 工作区自定义 CSS 示例                            |
 

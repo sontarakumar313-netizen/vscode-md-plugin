@@ -1,0 +1,3 @@
+- [x] 清理死代码和废弃依赖；
+- [x] 删除 Vditor/Lute 的物理 IR 补丁，只在插件界面隐藏 IR 模式并拒绝保存 IR 配置；
+- [x] 合并为单一 Custom Editor 入口；

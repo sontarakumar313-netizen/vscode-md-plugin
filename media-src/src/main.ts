@@ -7,21 +7,19 @@ import 'vditor/dist/js/icons/ant.js'
 
 import {
   fileToBase64,
-  fixCut,
   fixLinkClick,
   handleToolbarClick,
   saveVditorOptions,
 } from './utils'
 
-import { merge } from 'lodash'
 import Vditor from 'vditor'
-import { format } from 'date-fns'
 import 'vditor/dist/index.css'
 import { captureCaretAnchor, restoreCaretAnchor } from './caret-anchor'
 import { lang } from './lang'
 import {
   installEditorModeShortcuts,
   installToolbarSelectionPreserver,
+  installToolbarTooltipDismissal,
   syncEditorModeToolbar,
   toolbar,
 } from './toolbar'
@@ -33,13 +31,11 @@ import {
 } from './wysiwyg-list'
 import { initWysiwygDetails } from './wysiwyg-details'
 import { initWysiwygAlerts } from './wysiwyg-alert'
-import { initWysiwygCodeBlocks } from './wysiwyg-code-block'
 import {
   attachFrontMatterSeparator,
   initWysiwygFrontMatter,
 } from './wysiwyg-front-matter'
 import type { FrontMatterDisplay } from './wysiwyg-front-matter'
-import { initSearch } from './search'
 import {
   canApplyHostUpdate,
   keepNewestHostUpdate,
@@ -53,6 +49,8 @@ import { installStructuredTabPolicy } from './editor-tab-policy'
 import { initSplitScrollSync } from './split-scroll-sync'
 import { getScrollElement } from './scroll-target'
 import { installSvCodeIndentRepair } from './sv-code-indent'
+import { formatUploadTimestamp } from './upload-timestamp'
+import { installWysiwygSourcePanelAutoClose } from './wysiwyg-source-panel'
 import { vditorI18n } from 'virtual:vditor-i18n'
 import './themes/light.css'
 import './themes/dark.css'
@@ -152,6 +150,7 @@ function installCodeCopyHandler(): void {
 installStructuredTabPolicy()
 installEditorModeShortcuts()
 installCodeCopyHandler()
+installWysiwygSourcePanelAutoClose()
 
 // Set to true only for local debugging of scroll-position persistence; verbose and
 // not meant to ship enabled (this would spam the console for every scroll event).
@@ -602,20 +601,42 @@ function initVditor(msg) {
   // Keeps Vditor off unpkg.com for its parser. Staying in the merge base lets the
   // host, and the interaction harness, point it somewhere else.
   const requestedMode = msg.options?.mode === 'sv' ? 'sv' : 'wysiwyg'
-  let defaultOptions: any = {
+  const receivedOptions =
+    msg.options && typeof msg.options === 'object' ? msg.options : {}
+  const receivedHint =
+    receivedOptions.hint && typeof receivedOptions.hint === 'object'
+      ? receivedOptions.hint
+      : {}
+  const receivedPreview =
+    receivedOptions.preview && typeof receivedOptions.preview === 'object'
+      ? receivedOptions.preview
+      : {}
+  const receivedMath =
+    receivedPreview.math && typeof receivedPreview.math === 'object'
+      ? receivedPreview.math
+      : {}
+  const defaultOptions: any = {
     _lutePath: localVditorAsset('lute.min.js'),
+    ...receivedOptions,
     // Lute appends /<name>.png, so this stays a directory URL with no trailing
     // slash, matching the CDN default it replaces.
-    hint: { emojiPath: localVditorAsset('emoji') },
-  }
-  defaultOptions = merge(defaultOptions, msg.options, {
+    hint: {
+      emojiPath: localVditorAsset('emoji'),
+      ...receivedHint,
+    },
     preview: {
+      ...receivedPreview,
       math: {
+        ...receivedMath,
         inlineDigit: true,
-        engine: "MathJax",
-      }
-    }
-  })
+        // Vditor loads MathJax with a synchronous XHR and assumes startup
+        // succeeded. A blocked or failed CDN request then aborts initialization
+        // before `after()` can reveal the editor. KaTeX loads asynchronously, so
+        // documents containing formulas can still open when the CDN is unavailable.
+        engine: 'KaTeX',
+      },
+    },
+  }
   // Enforce the complete supported-mode set again at the renderer boundary.
   // Persisted, malformed, or older host options cannot reactivate another mode.
   defaultOptions.mode = requestedMode
@@ -728,6 +749,7 @@ function initVditor(msg) {
       )
       handleToolbarClick()
       installToolbarSelectionPreserver(vditor)
+      installToolbarTooltipDismissal(vditor)
       syncEditorModeToolbar(vditor)
       installWysiwygListCommands(vditor)
       if (!(window as any).__vmdDetails) {
@@ -739,11 +761,6 @@ function initVditor(msg) {
         ;(window as any).__vmdAlerts = initWysiwygAlerts()
       } else {
         ;(window as any).__vmdAlerts.rebind?.()
-      }
-      if (!(window as any).__vmdCodeBlocks) {
-        ;(window as any).__vmdCodeBlocks = initWysiwygCodeBlocks()
-      } else {
-        ;(window as any).__vmdCodeBlocks.rebind?.()
       }
       // Unknown values were already rejected by the host, so this only has to
       // cover the case of an older host that sends no value at all.
@@ -758,13 +775,7 @@ function initVditor(msg) {
       }
       initTableContextMenu()
       vditor.focus()
-      // Keep the search bar across Vditor re-inits, but rebind its observer to
-      // the newly created editor root after every rebuild.
-      if (!(window as any).__vmdSearch) {
-        ;(window as any).__vmdSearch = initSearch()
-      } else {
-        ;(window as any).__vmdSearch.rebind?.()
-      }
+      // Rebind split scrolling to the newly created editor root after rebuilds.
       if (!(window as any).__vmdSplitScrollSync) {
         ;(window as any).__vmdSplitScrollSync = initSplitScrollSync(vditor)
       } else {
@@ -804,7 +815,7 @@ function initVditor(msg) {
             return {
               base64: await fileToBase64(f),
               mime: f.type,
-              name: `${format(new Date(), 'yyyyMMdd_HHmmss_SSS')}_${index}_${randomPart}_${safeName}`,
+              name: `${formatUploadTimestamp(new Date())}_${index}_${randomPart}_${safeName}`,
               size: f.size,
             }
           })
@@ -980,6 +991,5 @@ window.addEventListener('message', (e) => {
 })
 
 fixLinkClick()
-fixCut()
 
 vscode.postMessage({ command: 'ready' })

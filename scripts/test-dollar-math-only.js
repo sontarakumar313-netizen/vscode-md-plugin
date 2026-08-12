@@ -14,7 +14,16 @@ assert.ok(
   'the webview still installs alternate math delimiter compatibility'
 )
 
-require(path.join(root, 'vendor/lute/lute.min.js'))
+const configuredMathEngine = mainSource.match(
+  /engine:\s*['"]([^'"]+)['"]/
+)?.[1]
+assert.strictEqual(
+  configuredMathEngine,
+  'KaTeX',
+  'formula documents must use the non-blocking KaTeX initialization path'
+)
+
+require(path.join(root, 'media-src/node_modules/vditor/dist/js/lute/lute.min.js'))
 const lute = global.Lute.New()
 lute.SetVditorWYSIWYG(true)
 

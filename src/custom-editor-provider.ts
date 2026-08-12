@@ -1,6 +1,5 @@
 import * as NodePath from 'path'
 import * as vscode from 'vscode'
-import { EditorPanel } from './editor-panel'
 import { toLf } from './eol'
 import { openMarkdownLink } from './link-handler'
 import {
@@ -15,6 +14,8 @@ import {
 export class MarkdownEditorProvider
   implements vscode.CustomTextEditorProvider {
   public static readonly viewType = 'markdown-interactor.customEditor'
+
+  private readonly scrollPositions = new Map<string, number>()
 
   constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -48,9 +49,9 @@ export class MarkdownEditorProvider
       syncToDocument: syncToEditor,
       getAssetsFolder: () => getAssetsFolder(uri),
       openLink: (href) => openMarkdownLink(uri, href),
-      getScrollTop: () => EditorPanel.getScrollTop(uri),
+      getScrollTop: () => this.scrollPositions.get(uri.toString()) || 0,
       saveScrollPosition: (top) => {
-        EditorPanel.saveScrollPosition(uri, top)
+        this.scrollPositions.set(uri.toString(), top)
       },
     })
     disposables.push(controller)

@@ -126,6 +126,11 @@ async function testInitialReadyMessage() {
   await new Promise((resolve) => setImmediate(resolve))
 
   assert.ok(webview.html.includes('media/dist/main.js'))
+  assert.strictEqual(
+    webview.options.enableFindWidget,
+    true,
+    'the Custom Editor must delegate Ctrl/Cmd+F to VS Code Find Widget'
+  )
   assert.ok(
     webview.html.includes('img-src vscode-webview://test https: data: blob:'),
     'remote media must remain enabled by default for compatibility'

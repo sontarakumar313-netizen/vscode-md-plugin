@@ -63,14 +63,26 @@ function testPage() {
   <script>
     window.__vmdMessages = [];
     window.__vmdCodeCopyAttempts = 0;
+    window.__vmdClipboardText = '';
     const nativeExecCommand = document.execCommand.bind(document);
     document.execCommand = (command, ...args) => {
       if (command === 'copy') {
         window.__vmdCodeCopyAttempts += 1;
+        window.__vmdClipboardText = document.activeElement?.value || '';
         return true;
       }
       return nativeExecCommand(command, ...args);
     };
+    window.__vmdInstalledExecCommand = document.execCommand;
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText(value) {
+          window.__vmdClipboardText = String(value);
+          return Promise.resolve();
+        },
+      },
+    });
     window.acquireVsCodeApi = () => ({ postMessage(message) { window.__vmdMessages.push(message); } });
     window.addEventListener('error', (event) => {
       window.__vmdRuntimeError = event.error && event.error.stack
@@ -101,9 +113,12 @@ function testPage() {
     });
     const pause = (milliseconds = 20) => new Promise((resolve) => setTimeout(resolve, milliseconds));
     const root = () => document.querySelector('.vditor-wysiwyg .vditor-reset');
-    const textNode = (element) => {
+    const textNode = (element, minimumLength = 1) => {
       const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-      const node = walker.nextNode();
+      let node = walker.nextNode();
+      while (node && node.textContent.length < minimumLength) {
+        node = walker.nextNode();
+      }
       if (!node) throw new Error('Expected a text node');
       return node;
     };
@@ -174,16 +189,17 @@ function testPage() {
           'an unsupported initialization mode did not fall back to visual editing'
         );
         expect(
-          !Object.prototype.hasOwnProperty.call(window.vditor.vditor, removedModeName),
-          'the removed editor object was still constructed'
+          Object.prototype.hasOwnProperty.call(window.vditor.vditor, removedModeName),
+          'the pinned official Vditor runtime was physically stripped'
+        );
+        const unusedModeElement = document.querySelector('.vditor-' + removedModeName);
+        expect(
+          unusedModeElement && getComputedStyle(unusedModeElement).display === 'none',
+          'the unused editor mode became visible despite the WYSIWYG fallback'
         );
         expect(
-          !document.querySelector('.vditor-' + removedModeName),
-          'the removed editor DOM was still mounted'
-        );
-        expect(
-          !Object.prototype.hasOwnProperty.call(window.VditorI18n, 'instant' + 'Rendering'),
-          'the removed editor label was still bundled'
+          Object.prototype.hasOwnProperty.call(window.VditorI18n, 'instant' + 'Rendering'),
+          'the official locale bundle was physically stripped'
         );
         const modeControl = document.querySelector('.vditor-toolbar [data-type="vmd-edit-mode"]');
         expect(modeControl, 'the two-mode editor control was not rendered');
@@ -196,6 +212,39 @@ function testPage() {
           modeButtons.join(',') === 'vmd-mode-wysiwyg,vmd-mode-sv',
           'the editor exposed a mode outside the supported pair: ' + modeButtons.join(',')
         );
+        const modePanel = modeControl.parentElement.querySelector('.vditor-hint');
+        expect(modePanel?.style.display === 'block', 'clicking the mode control did not open its dropdown');
+        expect(
+          modeControl.classList.contains('vmd-toolbar-tooltip--suppressed') &&
+            getComputedStyle(modeControl, '::after').display === 'none',
+          'clicking a toolbar dropdown did not hide its tooltip: class=' + modeControl.className + ', display=' + getComputedStyle(modeControl, '::after').display
+        );
+        modeControl.dispatchEvent(new PointerEvent('pointerout', {
+          bubbles: true,
+          relatedTarget: document.body,
+        }));
+        expect(
+          modeControl.classList.contains('vmd-toolbar-tooltip--suppressed'),
+          'the tooltip was restored on pointer leave instead of waiting for re-entry'
+        );
+        modeControl.dispatchEvent(new PointerEvent('pointerover', {
+          bubbles: true,
+          relatedTarget: document.body,
+        }));
+        expect(
+          !modeControl.classList.contains('vmd-toolbar-tooltip--suppressed'),
+          'the toolbar tooltip did not reset after pointer leave and re-entry'
+        );
+        modeControl.click();
+        expect(modePanel.style.display === 'none', 'the mode dropdown did not close after its second click');
+        modeControl.dispatchEvent(new PointerEvent('pointerout', {
+          bubbles: true,
+          relatedTarget: document.body,
+        }));
+        modeControl.dispatchEvent(new PointerEvent('pointerover', {
+          bubbles: true,
+          relatedTarget: document.body,
+        }));
         const initialBaselines = window.__vmdMessages.filter((message) => message.command === 'editor-baseline');
         expect(initialBaselines.length === 1, 'initial Vditor projection did not emit exactly one baseline');
         expect(
@@ -204,6 +253,10 @@ function testPage() {
           initialBaselines[0].projectionSerial === 1 &&
           initialBaselines[0].content.replace(/\\n+$/, '') === 'initial',
           'initial editor baseline was not paired with the init snapshot'
+        );
+        expect(
+          document.execCommand === window.__vmdInstalledExecCommand,
+          'the Webview replaced the browser execCommand implementation'
         );
 
         // Reaching this point already proves the parser loaded from the bundled
@@ -259,27 +312,47 @@ function testPage() {
           window.getComputedStyle(mathBlock, '::before').display === 'none',
           'the math-block "$$" marker is still laid out'
         );
+        const mathSource = mathBlock.querySelector(':scope > pre:first-child');
+        const mathPreview = mathBlock.querySelector(':scope > .vditor-wysiwyg__preview');
+        expect(getComputedStyle(mathSource).display === 'none', 'formula source was initially exposed');
+        mathPreview.click();
+        await pause();
+        expect(getComputedStyle(mathSource).display !== 'none', 'formula preview did not open source editing');
+        document.body.dispatchEvent(new MouseEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+        }));
+        expect(getComputedStyle(mathSource).display === 'none', 'formula source did not auto-close outside');
         const codeBlock = root().querySelector(
           '.vditor-wysiwyg__block[data-type="code-block"]'
         );
-        const codeSource = codeBlock.querySelector(':scope > pre:first-child');
-        const codePreview = codeBlock.querySelector(
-          ':scope > .vditor-wysiwyg__preview'
+        const codeSource = codeBlock.querySelector(':scope > .vditor-wysiwyg__pre');
+        const codePreview = codeBlock.querySelector(':scope > .vditor-wysiwyg__preview');
+        expect(
+          !codeBlock.classList.contains('vmd-code-inline-edit') &&
+            !codeBlock.querySelector('.vmd-code-lang-wrap'),
+          'the removed direct-edit code surface or language control was still installed'
         );
         expect(
           getComputedStyle(codeSource).display === 'none',
-          'the code source was visible before entering the code block'
+          'the ordinary code source was visible before opening it'
         );
         expect(
           parseFloat(getComputedStyle(codePreview).borderTopWidth) === 0,
-          'the code divider was visible before entering the code block'
+          'the code divider was visible before opening the source'
         );
         codePreview.click();
         await pause();
         const sourceStyle = getComputedStyle(codeSource);
         const previewStyle = getComputedStyle(codePreview);
-        expect(sourceStyle.display !== 'none', 'clicking the code preview did not reveal its source');
-        expect(parseFloat(sourceStyle.marginBottom) === 0, "the expanded code source kept Vditor's negative bottom margin");
+        expect(
+          sourceStyle.display !== 'none',
+          'clicking the ordinary code preview did not reveal its native source editor'
+        );
+        expect(
+          parseFloat(sourceStyle.marginBottom) === 0,
+          "the expanded code source kept Vditor's negative bottom margin"
+        );
         expect(
           parseFloat(previewStyle.borderTopWidth) === 1 &&
             previewStyle.borderTopStyle === 'solid' &&
@@ -287,7 +360,7 @@ function testPage() {
             parseFloat(previewStyle.paddingTop) <= 8 &&
             parseFloat(previewStyle.marginTop) > 0 &&
             parseFloat(previewStyle.marginTop) <= 8,
-          'the expanded code source and preview divider is not compact and one pixel wide'
+          'the native code source and preview divider is not compact and one pixel wide'
         );
         // Guard against over-hiding: heading labels are a different rule and stay.
         const heading = root().querySelector('h1');
@@ -296,6 +369,262 @@ function testPage() {
           window.getComputedStyle(heading, '::before').display !== 'none',
           'hiding the block markers also removed the heading level label'
         );
+
+        // Plain link clicks edit the raw href; only Ctrl/Cmd+click follows it.
+        await setMarkdown('[visible **link**](relative/path.md?x=1#part "old title")');
+        let renderedLink = root().querySelector('a');
+        const renderedStrong = renderedLink.querySelector('strong');
+        const linkText = textNode(renderedStrong);
+        select(linkText, 2, linkText, 2);
+        const openLinksBeforePlainClick = window.__vmdMessages.filter(
+          (message) => message.command === 'open-link'
+        ).length;
+        renderedStrong.dispatchEvent(new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+        }));
+        await wait(() => {
+          const candidate = document.querySelector('.vditor-wysiwyg > .vmd-url-popover');
+          return candidate?.style.display === 'block';
+        });
+        expect(
+          window.__vmdMessages.filter((message) => message.command === 'open-link').length ===
+            openLinksBeforePlainClick,
+          'a plain WYSIWYG link click still opened the target'
+        );
+        let urlPopover = document.querySelector('.vditor-wysiwyg > .vmd-url-popover');
+        let linkUrlInput = urlPopover.querySelector('.vmd-url-popover__url-input');
+        expect(
+          linkUrlInput.value === 'relative/path.md?x=1#part',
+          'the link popover did not expose the raw Markdown href'
+        );
+        expect(
+          document.activeElement !== linkUrlInput,
+          'plain-clicking an existing link stole its text caret into the URL input'
+        );
+        const hiddenLinkFields = Array.from(
+          urlPopover.querySelectorAll('.vmd-url-popover__hidden-field input')
+        );
+        expect(
+          hiddenLinkFields.length === 2 &&
+            hiddenLinkFields.every((input) => input.isConnected) &&
+            Array.from(urlPopover.querySelectorAll(':scope > span')).filter(
+              (field) => getComputedStyle(field).display !== 'none'
+            ).length === 1,
+          'the link popover did not reduce to one visible URL row while retaining native fields'
+        );
+        await pause();
+        const linkPopoverRect = urlPopover.getBoundingClientRect();
+        const linkTargetRect = renderedLink.getBoundingClientRect();
+        expect(
+          getComputedStyle(urlPopover).opacity === '1' &&
+            getComputedStyle(urlPopover).backgroundColor !== 'rgba(0, 0, 0, 0)' &&
+            linkPopoverRect.bottom <= linkTargetRect.top - 3,
+          'the link popover was translucent or overlapped its target: popover=' + JSON.stringify({top: linkPopoverRect.top, bottom: linkPopoverRect.bottom, left: linkPopoverRect.left, height: linkPopoverRect.height, opacity: getComputedStyle(urlPopover).opacity, background: getComputedStyle(urlPopover).backgroundColor, inlineTop: urlPopover.style.top, position: urlPopover.dataset.vmdPosition}) + '; target=' + JSON.stringify({top: linkTargetRect.top, bottom: linkTargetRect.bottom})
+        );
+        root().dispatchEvent(new Event('scroll'));
+        await pause();
+        expect(
+          urlPopover.getBoundingClientRect().bottom <= renderedLink.getBoundingClientRect().top - 3,
+          'Vditor scroll positioning moved the link popover back over its target'
+        );
+        linkUrlInput.value = 'docs/edited.md?from=popover#target';
+        linkUrlInput.dispatchEvent(new Event('input', { bubbles: true }));
+        await pause();
+        expect(
+          window.vditor.getValue().includes('docs/edited.md?from=popover#target'),
+          'editing the link URL popover did not update Markdown'
+        );
+        const linkCopyButton = urlPopover.querySelector('.vmd-popover-copy-url');
+        linkUrlInput.focus();
+        linkUrlInput.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Tab',
+          bubbles: true,
+          cancelable: true,
+        }));
+        expect(document.activeElement === linkCopyButton, 'Tab did not reach the visible link copy button');
+        linkCopyButton.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Tab',
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }));
+        expect(document.activeElement === linkUrlInput, 'Shift+Tab did not return to the visible link URL input');
+        linkCopyButton.click();
+        await pause();
+        expect(
+          window.__vmdClipboardText === 'docs/edited.md?from=popover#target',
+          'the link URL copy button did not copy the current edited href'
+        );
+        renderedLink = root().querySelector('a');
+        expect(getComputedStyle(renderedLink).cursor === 'text', 'an unmodified link did not use the text cursor');
+        const primaryKey = /Mac|iPhone|iPad/.test(navigator.platform)
+          ? { key: 'Meta', metaKey: true }
+          : { key: 'Control', ctrlKey: true };
+        document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, ...primaryKey }));
+        expect(getComputedStyle(renderedLink).cursor === 'pointer', 'the exact primary modifier did not enable the link pointer');
+        document.dispatchEvent(new KeyboardEvent('keydown', {
+          bubbles: true,
+          ...primaryKey,
+          shiftKey: true,
+        }));
+        expect(getComputedStyle(renderedLink).cursor === 'text', 'a wrong modifier combination enabled the link pointer');
+        document.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Shift', ...primaryKey }));
+        expect(getComputedStyle(renderedLink).cursor === 'pointer', 'releasing the wrong modifier did not restore exact-primary state');
+        window.dispatchEvent(new Event('blur'));
+        expect(getComputedStyle(renderedLink).cursor === 'text', 'window blur left the link pointer state stuck');
+        const openLinksBeforeModifiedClick = window.__vmdMessages.filter(
+          (message) => message.command === 'open-link'
+        ).length;
+        const primaryClick = /Mac|iPhone|iPad/.test(navigator.platform)
+          ? { metaKey: true }
+          : { ctrlKey: true };
+        renderedLink.dispatchEvent(new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          ...primaryClick,
+          shiftKey: true,
+        }));
+        expect(
+          window.__vmdMessages.filter((message) => message.command === 'open-link').length ===
+            openLinksBeforeModifiedClick,
+          'a primary+Shift click opened a link despite requiring the exact modifier'
+        );
+        renderedLink.dispatchEvent(new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          ...primaryClick,
+        }));
+        expect(
+          window.__vmdMessages.filter((message) => message.command === 'open-link').length ===
+            openLinksBeforeModifiedClick + 1 &&
+            window.__vmdMessages.filter((message) => message.command === 'open-link').at(-1).href ===
+              'docs/edited.md?from=popover#target',
+          'the platform Ctrl/Cmd+click did not open the current raw href exactly once'
+        );
+
+        await setMarkdown('insert link here');
+        await wait(() => root().querySelector(':scope > p'));
+        const insertionText = textNode(root().querySelector(':scope > p'));
+        select(insertionText, insertionText.textContent.length, insertionText, insertionText.textContent.length);
+        root().dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+        await pause(240);
+        const linkToolbarButton = document.querySelector('.vditor-toolbar [data-type="link"]');
+        linkToolbarButton.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true,
+          cancelable: true,
+        }));
+        linkToolbarButton.click();
+        await wait(() => {
+          const candidate = document.querySelector('.vditor-wysiwyg > .vmd-url-popover');
+          return candidate?.style.display === 'block' &&
+            candidate.querySelectorAll('input').length === 3 &&
+            document.activeElement === candidate.querySelector('.vmd-url-popover__url-input');
+        }).catch(() => {
+          const candidate = document.querySelector('.vditor-wysiwyg > .vmd-url-popover');
+          throw new Error('empty link insertion did not retain controls and redirect focus to URL: active=' + document.activeElement?.outerHTML?.slice(0, 160) + '; popover=' + candidate?.outerHTML?.slice(0, 400));
+        });
+
+        // Image popovers share the wide URL editor/copy action, hide alt text,
+        // and retain title editing without discarding the existing alt value.
+        await setMarkdown('![kept alt](assets/a-very-long-image-file-name.png "Old title")');
+        const renderedImage = root().querySelector('img');
+        renderedImage.dispatchEvent(new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+        }));
+        await wait(() => {
+          const candidate = document.querySelector('.vditor-wysiwyg > .vmd-url-popover--image');
+          return candidate?.style.display === 'block';
+        });
+        urlPopover = document.querySelector('.vditor-wysiwyg > .vmd-url-popover--image');
+        const imageUrlInput = urlPopover.querySelector('.vmd-url-popover__url-input');
+        const imageTitleInput = urlPopover.querySelector('.vmd-url-popover__title input');
+        expect(
+          imageUrlInput.value === 'assets/a-very-long-image-file-name.png' &&
+            imageTitleInput?.value === 'Old title',
+          'the image popover did not retain its URL and title fields'
+        );
+        expect(
+          urlPopover.querySelectorAll('.vmd-url-popover__hidden-field').length === 1 &&
+            imageUrlInput.getBoundingClientRect().width > 250,
+          'the image alt field remained visible or its URL editor remained too narrow'
+        );
+        await pause();
+        const imagePopoverRect = urlPopover.getBoundingClientRect();
+        const imageTargetRect = renderedImage.getBoundingClientRect();
+        expect(
+          getComputedStyle(urlPopover).opacity === '1' &&
+            getComputedStyle(urlPopover).backgroundColor !== 'rgba(0, 0, 0, 0)' &&
+            imagePopoverRect.bottom <= imageTargetRect.top - 3,
+          'the image popover was translucent or overlapped its target: popover=' + JSON.stringify({top: imagePopoverRect.top, bottom: imagePopoverRect.bottom, left: imagePopoverRect.left, height: imagePopoverRect.height, opacity: getComputedStyle(urlPopover).opacity, background: getComputedStyle(urlPopover).backgroundColor, inlineTop: urlPopover.style.top, position: urlPopover.dataset.vmdPosition}) + '; target=' + JSON.stringify({top: imageTargetRect.top, bottom: imageTargetRect.bottom})
+        );
+        imageUrlInput.value = 'assets/edited-image.png';
+        imageUrlInput.dispatchEvent(new Event('input', { bubbles: true }));
+        imageTitleInput.value = 'Changed title';
+        imageTitleInput.dispatchEvent(new Event('input', { bubbles: true }));
+        await pause();
+        expect(
+          window.vditor.getValue().includes('![kept alt](assets/edited-image.png "Changed title")'),
+          'editing image URL/title lost the hidden alt text or failed to update Markdown'
+        );
+        urlPopover.querySelector('.vmd-popover-copy-url').click();
+        await pause();
+        expect(
+          window.__vmdClipboardText === 'assets/edited-image.png',
+          'the image URL copy button did not copy the current source path'
+        );
+
+        await setMarkdown('[![linked alt](assets/linked.png "Image title")](target.md)');
+        const linkedImage = root().querySelector('a img');
+        const linkedOpenCount = window.__vmdMessages.filter(
+          (message) => message.command === 'open-link'
+        ).length;
+        linkedImage.dispatchEvent(new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+        }));
+        await wait(() => {
+          const candidate = document.querySelector('.vditor-wysiwyg > .vmd-url-popover--image');
+          return candidate?.style.display === 'block';
+        }).catch(() => {
+          throw new Error('linked image popover timed out');
+        });
+        expect(
+          window.__vmdMessages.filter((message) => message.command === 'open-link').length ===
+            linkedOpenCount &&
+            document.querySelector('.vmd-url-popover--image .vmd-url-popover__url-input').value ===
+              'assets/linked.png',
+          'plain-clicking a linked image opened its anchor or failed to edit the image URL'
+        );
+        linkedImage.dispatchEvent(new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          ...primaryClick,
+        }));
+        expect(
+          window.__vmdMessages.filter((message) => message.command === 'open-link').length ===
+            linkedOpenCount + 1 &&
+            window.__vmdMessages.filter((message) => message.command === 'open-link').at(-1).href ===
+              'target.md',
+          'Ctrl/Cmd+clicking a linked image did not open its enclosing link'
+        );
+        await pause(120);
+        const latestTodoEdit = window.__vmdMessages.filter(
+          (message) => message.command === 'edit'
+        ).at(-1);
+        if (latestTodoEdit) {
+          window.dispatchEvent(new MessageEvent('message', {
+            data: {
+              command: 'edit-ack',
+              seq: latestTodoEdit.seq,
+              documentVersion: 1,
+              content: latestTodoEdit.content,
+              generation: hostGeneration,
+            },
+          }));
+          await pause();
+        }
 
         // Vditor reports a trailing newline that the document may not have, so an
         // unchanged host snapshot must still count as already loaded. Host updates
@@ -497,24 +826,22 @@ function testPage() {
         ).length;
         const normalizeBeforeConfirmation = normalizeMessageCount();
         normalizeToolbarItem.click();
-        await wait(() => document.querySelector('.jconfirm .jconfirm-buttons'));
-        const confirmationButton = (label) => Array.from(
-          document.querySelectorAll('.jconfirm .jconfirm-buttons button')
-        ).filter((button) => button.textContent.trim() === label).pop();
-        const cancelNormalize = confirmationButton('Cancel');
-        expect(cancelNormalize, 'normalize confirmation has no Cancel button');
-        cancelNormalize.click();
+        await wait(() => document.querySelector('.vmd-confirm-dialog[open]'));
+        document.querySelector(
+          '.vmd-confirm-dialog [data-action="cancel"]'
+        ).click();
         await pause(80);
         expect(
-          normalizeMessageCount() === normalizeBeforeConfirmation,
-          'canceling normalization posted a destructive command'
+          normalizeMessageCount() === normalizeBeforeConfirmation &&
+            !document.querySelector('.vmd-confirm-dialog'),
+          'canceling normalization posted a destructive command or left its dialog open'
         );
 
         normalizeToolbarItem.click();
-        await wait(() => confirmationButton('Confirm'));
-        const confirmNormalize = confirmationButton('Confirm');
-        expect(confirmNormalize, 'normalize confirmation has no Confirm button');
-        confirmNormalize.click();
+        await wait(() => document.querySelector('.vmd-confirm-dialog[open]'));
+        document.querySelector(
+          '.vmd-confirm-dialog [data-action="confirm"]'
+        ).click();
         await wait(() => normalizeMessageCount() === normalizeBeforeConfirmation + 1);
         expect(
           normalizeMessageCount() === normalizeBeforeConfirmation + 1,
@@ -528,7 +855,7 @@ function testPage() {
           'toolbar icons do not share the standard 15px size'
         );
         const customIcon = (type) => document.querySelector('.vditor-toolbar [data-type="' + type + '"] > svg');
-        const customIconTypes = ['outline', 'line-numbers', 'save', 'math-block', 'math-inline', 'details', 'alerts', 'vmd-edit-mode'];
+        const customIconTypes = ['outline', 'save', 'math-block', 'math-inline', 'details', 'vmd-edit-mode'];
         for (const type of customIconTypes) {
           const svg = customIcon(type);
           expect(svg, 'missing custom toolbar icon: ' + type);
@@ -785,55 +1112,55 @@ function testPage() {
         expect(!/<details\\s+[^>]*\\bopen/.test(window.vditor.getValue()), 'closed details unexpectedly serialized an open attribute');
         const detailsSummary = detailsOpener.querySelector('summary');
         const detailsSource = detailsOpener.querySelector(':scope > pre:not(.vditor-wysiwyg__preview)');
-        expect(detailsSummary.contentEditable === 'true', 'the rendered details title is not directly editable');
+        expect(detailsSummary.contentEditable !== 'true', 'the rendered details summary still accepts a text caret');
         detailsSummary.click();
         await pause();
         expect(getComputedStyle(detailsSource).display === 'none', 'clicking the details title revealed raw HTML source');
-        expect(detailsBody.classList.contains('vmd-details-content--hidden'), 'clicking editable title unexpectedly toggled the details body');
-        const detailsTitleText = textNode(detailsSummary);
+        expect(!detailsBody.classList.contains('vmd-details-content--hidden'), 'clicking the summary did not open the details body');
+        const titleEdit = detailsOpener.querySelector('.vmd-details-title-edit');
+        expect(titleEdit?.contentEditable === 'true', 'opening details did not create its separate title editor');
+        const detailsTitleText = textNode(titleEdit);
         detailsTitleText.data = 'Renamed';
         select(detailsTitleText, detailsTitleText.data.length, detailsTitleText, detailsTitleText.data.length);
-        detailsSummary.dispatchEvent(new InputEvent('input', {
+        titleEdit.dispatchEvent(new InputEvent('input', {
           bubbles: true,
           inputType: 'insertText',
           data: 'Renamed',
         }));
         detailsTitleText.appendData(' title');
         select(detailsTitleText, detailsTitleText.data.length, detailsTitleText, detailsTitleText.data.length);
-        detailsSummary.dispatchEvent(new InputEvent('input', {
+        titleEdit.dispatchEvent(new InputEvent('input', {
           bubbles: true,
           inputType: 'insertText',
           data: ' title',
         }));
         await pause(380);
-        const committedSummary = detailsOpener.querySelector('summary');
+        const committedTitleEdit = detailsOpener.querySelector('.vmd-details-title-edit');
         const committedSelection = window.getSelection();
         expect(
           window.vditor.getValue().includes('<summary>Renamed title</summary>'),
           'editing the rendered details title did not update its hidden HTML source'
         );
         expect(
-          committedSummary.contains(committedSelection.anchorNode) && committedSelection.isCollapsed,
-          'the details title lost its caret after the debounced commit'
+          committedTitleEdit?.contains(committedSelection.anchorNode) && committedSelection.isCollapsed,
+          'the separate details title editor lost its caret after the debounced commit'
         );
         let detailsUndoReachedRoot = false;
         const onDetailsUndo = () => { detailsUndoReachedRoot = true; };
         root().addEventListener('keydown', onDetailsUndo);
-        committedSummary.dispatchEvent(new KeyboardEvent('keydown', {
+        committedTitleEdit.dispatchEvent(new KeyboardEvent('keydown', {
           key: 'z',
           ctrlKey: true,
           bubbles: true,
           cancelable: true,
         }));
         root().removeEventListener('keydown', onDetailsUndo);
-        expect(!detailsUndoReachedRoot, 'Ctrl+Z escaped the editable details title');
+        expect(!detailsUndoReachedRoot, 'Ctrl+Z escaped the separate details title editor');
         expect(
-          !window.vditor.getValue().includes('vmd-details-toggle'),
-          'the details editing control leaked into Markdown'
+          !window.vditor.getValue().includes('vmd-details-toggle') &&
+            !window.vditor.getValue().includes('vmd-details-title-edit'),
+          'details editing controls leaked into Markdown'
         );
-        committedSummary.querySelector('.vmd-details-toggle').click();
-        await pause();
-        expect(!detailsBody.classList.contains('vmd-details-content--hidden'), 'details content does not open from its summary');
         expect(!/<details\\s+[^>]*\\bopen/.test(window.vditor.getValue()), 'opening details changed the Markdown source');
 
         // Manual open state is held in a WeakMap keyed on the opener element, so
@@ -1011,115 +1338,17 @@ function testPage() {
         );
 
         await setMarkdown('find target');
-        const searchText = textNode(root().querySelector(':scope > p'));
-        const start = searchText.textContent.indexOf('target');
-        select(searchText, start, searchText, start + 'target'.length);
-        root().dispatchEvent(new KeyboardEvent('keydown', {
+        const nativeFindEvent = new KeyboardEvent('keydown', {
           key: 'f',
           ctrlKey: true,
           bubbles: true,
           cancelable: true,
-        }));
-        await pause();
-        expect(document.getElementById('vmd-search-bar').classList.contains('vmd-search-bar--open'), 'Ctrl+F did not open search');
-        expect(document.getElementById('vmd-search-input').value === 'target', 'Ctrl+F did not prefill the selected text');
-        const replaceToggle = document.getElementById('vmd-search-replace-toggle');
-        replaceToggle.click();
-        expect(replaceToggle.getAttribute('aria-expanded') === 'true', 'replace toggle did not expand');
-        expect(!document.getElementById('vmd-search-replace-row').hidden, 'replace row did not open');
-
-        await setMarkdown('cat Cat cat');
-        const findInput = document.getElementById('vmd-search-input');
-        const replaceInput = document.getElementById('vmd-search-replace-input');
-        findInput.value = 'cat';
-        findInput.dispatchEvent(new Event('input', { bubbles: true }));
-        await pause();
-        expect(document.getElementById('vmd-search-count').textContent === '1/3', 'WYSIWYG find did not highlight visible matches');
+        });
+        root().dispatchEvent(nativeFindEvent);
         expect(
-          document.getElementById('vmd-search-replace').disabled && document.getElementById('vmd-search-replace-all').disabled,
-          'WYSIWYG replacement was enabled without a source-offset mapping'
-        );
-        replaceInput.value = 'dog';
-        const beforeWysiwygKeyboardReplace = window.vditor.getValue();
-        replaceInput.dispatchEvent(new KeyboardEvent('keydown', {
-          key: 'Enter',
-          bubbles: true,
-          cancelable: true,
-        }));
-        await pause();
-        expect(window.vditor.getValue() === beforeWysiwygKeyboardReplace, 'WYSIWYG Enter replacement changed Markdown');
-        replaceInput.dispatchEvent(new KeyboardEvent('keydown', {
-          key: 'Enter',
-          ctrlKey: true,
-          bubbles: true,
-          cancelable: true,
-        }));
-        await pause();
-        expect(window.vditor.getValue() === beforeWysiwygKeyboardReplace, 'WYSIWYG Ctrl+Enter replacement changed Markdown');
-
-        await switchMode('sv');
-        findInput.dispatchEvent(new Event('input', { bubbles: true }));
-        await pause();
-        expect(!document.getElementById('vmd-search-replace').disabled, 'Split View source replacement was not enabled');
-        replaceInput.value = 'dog';
-        const editCountBeforeReplace = window.__vmdMessages.filter((message) => message.command === 'edit').length;
-        document.getElementById('vmd-search-replace').click();
-        await pause(110);
-        expect(window.vditor.getValue().trimEnd() === 'dog Cat cat', 'Replace did not update only the active source match');
-        expect(
-          window.__vmdMessages.filter((message) => message.command === 'edit').length === editCountBeforeReplace + 1,
-          'Replace did not enter the normal document synchronization queue'
-        );
-        document.getElementById('vmd-search-replace-all').click();
-        await pause(110);
-        expect(window.vditor.getValue().trimEnd() === 'dog dog dog', 'Replace All did not replace every remaining source match');
-        expect(document.getElementById('vmd-search-count').textContent === '0/0', 'replace count did not refresh after Replace All');
-
-        await setMarkdown('**cat** cat');
-        findInput.value = '**cat';
-        findInput.dispatchEvent(new Event('input', { bubbles: true }));
-        await pause();
-        expect(
-          document.getElementById('vmd-search-count').textContent === '1/1',
-          'Split View find missed a source match split across marker spans'
-        );
-        expect(
-          !document.getElementById('vmd-search-replace').disabled,
-          'a match spanning marker spans did not enable replacement'
-        );
-        replaceInput.value = 'dog';
-        document.getElementById('vmd-search-replace').click();
-        await pause(110);
-        expect(
-          window.vditor.getValue().trimEnd() === 'dog** cat',
-          'Replace rewrote the wrong source offsets for a match spanning marker spans'
-        );
-
-        await switchMode('wysiwyg');
-        await setMarkdown('[label](hidden-target)');
-        findInput.value = 'hidden-target';
-        findInput.dispatchEvent(new Event('input', { bubbles: true }));
-        await pause();
-        expect(document.getElementById('vmd-search-count').textContent === '0/0', 'WYSIWYG find exposed a hidden Markdown-only match');
-        expect(
-          document.getElementById('vmd-search-replace').disabled && document.getElementById('vmd-search-replace-all').disabled,
-          'replace actions remained enabled for an ambiguous Markdown-only match'
-        );
-
-        await setMarkdown('\\\\*literal &amp;');
-        findInput.value = '*';
-        findInput.dispatchEvent(new Event('input', { bubbles: true }));
-        await pause();
-        expect(
-          document.getElementById('vmd-search-replace').disabled,
-          'WYSIWYG replacement was enabled for an escaped Markdown character'
-        );
-        findInput.value = '&';
-        findInput.dispatchEvent(new Event('input', { bubbles: true }));
-        await pause();
-        expect(
-          document.getElementById('vmd-search-replace').disabled,
-          'WYSIWYG replacement was enabled for an HTML entity'
+          !nativeFindEvent.defaultPrevented &&
+            !document.getElementById('vmd-search-bar'),
+          'the removed custom search still intercepted Ctrl+F or mounted its UI'
         );
 
         const copyCodeFence = String.fromCharCode(96).repeat(3);
@@ -1135,7 +1364,16 @@ function testPage() {
         expect(codeCopyButton.getAttribute('aria-label') === (window.VditorI18n.copied || 'Copied'), 'code block copy did not report success');
 
         await setMarkdown('two-mode shortcut target');
-        const shortcutText = textNode(root().querySelector(':scope > p'));
+        const shortcutParagraph = root().querySelector(':scope > p');
+        const shortcutWalker = document.createTreeWalker(
+          shortcutParagraph,
+          NodeFilter.SHOW_TEXT
+        );
+        let shortcutText = shortcutWalker.nextNode();
+        while (shortcutText && shortcutText.textContent.length < 2) {
+          shortcutText = shortcutWalker.nextNode();
+        }
+        expect(shortcutText, 'the shortcut target did not contain selectable text');
         select(shortcutText, 2, shortcutText, 2);
         const removedMiddleShortcut = new KeyboardEvent('keydown', {
           key: '8',
@@ -1188,7 +1426,7 @@ function testPage() {
         await switchMode('sv');
         const svRoot = document.querySelector('.vditor-sv');
         await setMarkdown('SV plain Tab target');
-        const svPlainText = textNode(svRoot);
+        const svPlainText = textNode(svRoot, 3);
         select(svPlainText, 2, svPlainText, 2);
         const svPlainTabEvent = new KeyboardEvent('keydown', {
           key: 'Tab',
@@ -1199,7 +1437,7 @@ function testPage() {
         expect(svPlainTabEvent.defaultPrevented, 'SV Tab outside a list was allowed to move focus');
 
         await setMarkdown('| first | second |\\n| --- | --- |\\n| one | two |');
-        const svTableText = textNode(svRoot);
+        const svTableText = textNode(svRoot, 3);
         select(svTableText, 2, svTableText, 2);
         const svTableTabEvent = new KeyboardEvent('keydown', {
           key: 'Tab',
@@ -1364,11 +1602,23 @@ function testPage() {
           ''
         );
         await setMarkdown(frontMatterSource);
+        const bodyHeading = root().querySelector('h1');
+        expect(bodyHeading, 'front matter fixture did not render its body heading');
+        select(
+          bodyHeading,
+          bodyHeading.childNodes.length,
+          bodyHeading,
+          bodyHeading.childNodes.length
+        );
+        document.dispatchEvent(new Event('selectionchange'));
         await pause(160);
         const fmBlock = () => root().querySelector('.vditor-wysiwyg__block[data-type="yaml-front-matter"]');
         expect(fmBlock(), 'front matter did not render as a yaml-front-matter block');
         const fmTable = () => fmBlock().querySelector('table.vmd-front-matter');
-        expect(fmTable(), 'front matter did not render as a table');
+        expect(
+          fmTable(),
+          'front matter did not render as a table: ' + fmBlock().outerHTML.slice(0, 1200)
+        );
         expect(
           fmBlock().querySelector('.vditor-wysiwyg__preview').contains(fmTable()),
           'the table was not placed inside a preview container, so it can leak into Markdown'
@@ -1458,6 +1708,7 @@ function testPage() {
 
         // Clicking the table swaps in the source so it can be edited as a code
         // area, and the caret lands inside that source.
+        await wait(() => fmTable());
         fmTable().dispatchEvent(new MouseEvent('click', { bubbles: true }));
         await pause(160);
         expect(!fmTable(), 'clicking the table did not switch to the source view');
@@ -1668,7 +1919,7 @@ function testPage() {
         result.textContent = 'passed';
       } catch (error) {
         document.body.dataset.vmdTest = 'failed';
-        const message = error && error.message ? error.message : String(error);
+        const message = error?.stack || (error?.message ? error.message : String(error));
         result.textContent = 'failed: ' + message +
           (window.__vmdRuntimeError ? ' | runtime: ' + window.__vmdRuntimeError : '');
       }
@@ -1703,11 +1954,13 @@ async function main() {
     return
   }
 
-  const [mainJs, mainCss, lute, i18n] = await Promise.all([
+  const [mainJs, mainCss, lute, i18n, highlightJs, highlightTheme] = await Promise.all([
     readFile(path.join(root, 'media/dist/main.js')),
     readFile(path.join(root, 'media/dist/main.css')),
     readFile(path.join(root, 'media-src/node_modules/vditor/dist/js/lute/lute.min.js')),
     readFile(path.join(root, 'media-src/node_modules/vditor/dist/js/i18n/en_US.js')),
+    readFile(path.join(root, 'media-src/node_modules/vditor/dist/js/highlight.js/highlight.min.js')),
+    readFile(path.join(root, 'media-src/node_modules/vditor/dist/js/highlight.js/styles/github.min.css')),
   ])
   const server = await startServer({
     '/': { type: 'text/html; charset=utf-8', content: testPage() },
@@ -1717,6 +1970,14 @@ async function main() {
     '/dist/js/i18n/en_US.js': {
       type: 'text/javascript; charset=utf-8',
       content: i18n,
+    },
+    '/dist/js/highlight.js/highlight.min.js?v=11.7.0': {
+      type: 'text/javascript; charset=utf-8',
+      content: highlightJs,
+    },
+    '/dist/js/highlight.js/styles/github.min.css': {
+      type: 'text/css; charset=utf-8',
+      content: highlightTheme,
     },
   })
   const port = server.address().port
@@ -1731,11 +1992,11 @@ async function main() {
         '--no-first-run',
         '--no-default-browser-check',
         `--user-data-dir=${profile}`,
-        '--virtual-time-budget=8000',
+        '--virtual-time-budget=16000',
         '--dump-dom',
         `http://127.0.0.1:${port}/`,
       ],
-      { timeout: 15000, maxBuffer: 2 * 1024 * 1024 }
+      { timeout: 25000, maxBuffer: 2 * 1024 * 1024 }
     )
     assert.match(
       stdout,

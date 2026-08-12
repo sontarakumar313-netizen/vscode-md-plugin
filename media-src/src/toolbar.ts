@@ -379,6 +379,74 @@ function insertDetails(editor: any): void {
 }
 
 const selectionPreserverToolbars = new WeakSet<HTMLElement>()
+const tooltipDismissalToolbars = new WeakSet<HTMLElement>()
+
+/**
+ * Hides a clicked toolbar tooltip until the pointer genuinely leaves and
+ * re-enters its control. This keeps focused/hovered triggers from painting
+ * their high-z-index tooltip over an open dropdown panel.
+ */
+export function installToolbarTooltipDismissal(editor: any): void {
+	const toolbarElement = editor?.vditor?.toolbar?.element
+	if (
+		!(toolbarElement instanceof HTMLElement) ||
+		tooltipDismissalToolbars.has(toolbarElement)
+	) {
+		return
+	}
+
+	const states = new WeakMap<Element, 'awaiting-leave' | 'awaiting-reentry'>()
+	const getControl = (target: EventTarget | null): HTMLElement | null => {
+		const control = target instanceof Element
+			? target.closest<HTMLElement>('.vditor-tooltipped')
+			: null
+		return control && toolbarElement.contains(control) ? control : null
+	}
+
+	toolbarElement.addEventListener(
+		'click',
+		(event) => {
+			const control = getControl(event.target)
+			if (!control) return
+			control.classList.add('vmd-toolbar-tooltip--suppressed')
+			states.set(control, 'awaiting-leave')
+		},
+		true
+	)
+	toolbarElement.addEventListener('pointerout', (event) => {
+		const control = getControl(event.target)
+		const staysInside =
+			!!control &&
+			event.relatedTarget instanceof Node &&
+			control.contains(event.relatedTarget)
+		if (
+			!control ||
+			staysInside ||
+			states.get(control) !== 'awaiting-leave'
+		) {
+			return
+		}
+		states.set(control, 'awaiting-reentry')
+	})
+	toolbarElement.addEventListener('pointerover', (event) => {
+		const control = getControl(event.target)
+		const cameFromInside =
+			!!control &&
+			event.relatedTarget instanceof Node &&
+			control.contains(event.relatedTarget)
+		if (
+			!control ||
+			cameFromInside ||
+			states.get(control) !== 'awaiting-reentry'
+		) {
+			return
+		}
+		control.classList.remove('vmd-toolbar-tooltip--suppressed')
+		states.delete(control)
+	})
+
+	tooltipDismissalToolbars.add(toolbarElement)
+}
 
 /** Capture the caret before a toolbar button takes browser focus. */
 export function installToolbarSelectionPreserver(editor: any): void {
@@ -429,7 +497,6 @@ function refreshModeDependentFeatures(): void {
 	;(window as any).__vmdDetails?.rebind?.()
 	;(window as any).__vmdAlerts?.rebind?.()
 	;(window as any).__vmdFrontMatter?.rebind?.()
-	;(window as any).__vmdSearch?.rebind?.()
 	;(window as any).__vmdSplitScrollSync?.rebind?.(window.vditor)
 }
 
@@ -709,5 +776,9 @@ export const toolbar = [
 		it = { name: it }
 	}
 	it.tipPosition = it.tipPosition || 'n'
+	// Vditor routes unknown custom dropdown triggers through Custom, which calls
+	// menuItem.click unconditionally before its submenu toggler. Supply a no-op
+	// so custom dropdowns open without throwing.
+	if (it.toolbar && typeof it.click !== 'function') it.click = () => {}
 	return it
 })

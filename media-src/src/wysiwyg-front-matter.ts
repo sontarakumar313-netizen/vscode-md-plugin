@@ -317,6 +317,7 @@ export function initWysiwygFrontMatter(display: FrontMatterDisplay = 'table') {
     // Clicking the table is a request to edit it: show the source and put the
     // caret in it, since the preview itself is not editable.
     event.preventDefault()
+    event.stopImmediatePropagation()
     editing = true
     writing = true
     try {

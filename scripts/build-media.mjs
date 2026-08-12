@@ -24,18 +24,16 @@ await mkdir(outputDirectory, { recursive: true })
 const vditorDistDirectory = resolve(vditorPackageDirectory, 'dist')
 
 // Vditor fetches its Markdown parser from unpkg.com unless a local copy is
-// supplied. The checked-in two-mode Lute build physically omits the removed
-// editor's parser/renderer APIs; see vendor/lute/README.md for provenance and
-// reproducible build instructions. Emitting it next to main.js lets
-// media-src/src/main.ts resolve it without network access. Renderers Vditor
+// supplied. Ship the parser from the pinned official package next to main.js so
+// media-src/src/main.ts can resolve it without network access. Renderers Vditor
 // only loads on demand (KaTeX, Mermaid, highlight.js) still use the CDN.
 await Promise.all([
   copyFile(
-    resolve(root, 'vendor', 'lute', 'lute.min.js'),
+    resolve(vditorDistDirectory, 'js', 'lute', 'lute.min.js'),
     resolve(outputDirectory, 'lute.min.js')
   ),
   copyFile(
-    resolve(root, 'vendor', 'lute', 'LICENSE'),
+    resolve(root, 'media-src', 'vendor', 'lute.LICENSE.txt'),
     resolve(outputDirectory, 'lute.LICENSE.txt')
   ),
 ])
@@ -51,22 +49,42 @@ await cp(
 )
 
 const i18nAssignment = /^\s*window\.VditorI18n\s*=\s*/
-const removedModeI18nKey = ['instant', 'Rendering'].join('')
-const removedModeI18nEntry = new RegExp(
-  `^\\s*['"]${removedModeI18nKey}['"]\\s*:.*(?:\\r?\\n|$)`,
-  'm'
-)
 
-// The npm entry is Vditor's prebuilt three-mode UMD bundle. Resolve only the
-// bare package import to the patched TypeScript entry so esbuild can omit the
-// deleted editor implementation. Deep imports and runtime assets still resolve
-// normally from the same pinned package.
-const vditorTwoModePlugin = {
-  name: 'vditor-two-mode',
+// Build from the pinned package's official TypeScript entry so Vditor and this
+// extension's deep utility imports share one module graph. The package's source
+// entry imports Less that is already present as dist/index.css, and its CommonJS
+// diff dependency uses legacy TypeScript import syntax; handle those two build
+// compatibility details without modifying the installed package.
+const vditorSourcePlugin = {
+  name: 'vditor-source',
   setup(pluginBuild) {
     pluginBuild.onResolve({ filter: /^vditor$/ }, () => ({
       path: resolve(vditorPackageDirectory, 'src', 'index.ts'),
     }))
+    pluginBuild.onResolve({ filter: /\.less$/ }, () => ({
+      path: 'vditor-styles',
+      namespace: 'vditor-styles',
+    }))
+    pluginBuild.onLoad(
+      { filter: /.*/, namespace: 'vditor-styles' },
+      () => ({ contents: '', loader: 'empty' })
+    )
+    pluginBuild.onLoad(
+      { filter: /[\\/]vditor[\\/]src[\\/]ts[\\/]undo[\\/]index\.ts$/ },
+      async (args) => {
+        const source = await readFile(args.path, 'utf8')
+        const compatible = source.replace(
+          'import * as DiffMatchPatch from "diff-match-patch";',
+          'import DiffMatchPatch from "diff-match-patch";'
+        )
+        if (compatible === source) {
+          throw new Error(
+            'Vditor undo import changed; update the compatibility transform in scripts/build-media.mjs'
+          )
+        }
+        return { contents: compatible, loader: 'ts' }
+      }
+    )
   },
 }
 
@@ -98,14 +116,7 @@ const vditorI18nPlugin = {
                 'update the vditor-i18n plugin in scripts/build-media.mjs'
             )
           }
-          const withoutRemovedMode = source.replace(removedModeI18nEntry, '')
-          if (withoutRemovedMode === source) {
-            throw new Error(
-              `${file} no longer contains the removed mode label; ` +
-                'update the vditor-i18n plugin in scripts/build-media.mjs'
-            )
-          }
-          const literal = withoutRemovedMode
+          const literal = source
             .replace(i18nAssignment, '')
             .trim()
             .replace(/;$/, '')
@@ -133,7 +144,7 @@ const options = {
   define: {
     VDITOR_VERSION: JSON.stringify(vditorPackage.version),
   },
-  plugins: [vditorTwoModePlugin, vditorI18nPlugin],
+  plugins: [vditorSourcePlugin, vditorI18nPlugin],
   outfile: resolve(outputDirectory, 'main.js'),
   logLevel: 'info',
 }

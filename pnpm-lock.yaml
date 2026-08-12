@@ -4,11 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-patchedDependencies:
-  vditor@3.11.2:
-    hash: f0a8be09993b64f85f342f1ed105aa6ce6f65a7016739690a4620e71ea5129c7
-    path: patches/vditor@3.11.2.patch
-
 importers:
 
   .:
@@ -31,24 +26,9 @@ importers:
 
   media-src:
     dependencies:
-      '@babel/runtime-corejs3':
-        specifier: ^7.13.17
-        version: 7.29.7
-      date-fns:
-        specifier: ^2.21.1
-        version: 2.30.0
-      jquery:
-        specifier: ^3.6.0
-        version: 3.7.1
-      jquery-confirm:
-        specifier: ^3.3.4
-        version: 3.3.4
-      lodash:
-        specifier: ^4.17.21
-        version: 4.18.1
       vditor:
         specifier: 3.11.2
-        version: 3.11.2(patch_hash=f0a8be09993b64f85f342f1ed105aa6ce6f65a7016739690a4620e71ea5129c7)
+        version: 3.11.2
     devDependencies:
       '@types/node':
         specifier: ^14.14.41
@@ -58,14 +38,6 @@ importers:
         version: 4.9.5
 
 packages:
-
-  '@babel/runtime-corejs3@7.29.7':
-    resolution: {integrity: sha512-ppj9ouYku+RX0ljtgZd+KMO5mkM2bCqg8H2PYAFWnLsHEIKIdRojqbJ2i3eVHrisuxy7nOFCmngTDdWtUCdXUQ==}
-    engines: {node: '>=6.9.0'}
-
-  '@babel/runtime@7.29.7':
-    resolution: {integrity: sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw==}
-    engines: {node: '>=6.9.0'}
 
   '@esbuild/aix-ppc64@0.28.1':
     resolution: {integrity: sha512-Svl7tq8k/08+p6CXPpRjQ1fKX+1odH/BQbb48fV6fj3CWHhsoIOoY87w1oHXm0qEpkIK3ZfVgp0hed3XBXzXMQ==}
@@ -260,13 +232,6 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
-  core-js-pure@3.49.0:
-    resolution: {integrity: sha512-XM4RFka59xATyJv/cS3O3Kml72hQXUeGRuuTmMYFxwzc9/7C8OYTaIR/Ji+Yt8DXzsFLNhat15cE/JP15HrCgw==}
-
-  date-fns@2.30.0:
-    resolution: {integrity: sha512-fnULvOpxnC5/Vg3NCiWelDsLiUc9bRwAPs/+LfTLNvetFCtCTN+yQz15C/fs4AwX1R9K5GLtLfn8QW+dWisaAw==}
-    engines: {node: '>=0.11'}
-
   diff-match-patch@1.0.5:
     resolution: {integrity: sha512-IayShXAgj/QMXgB0IWmKx+rOPuGMhqm5w6jvFxmVenXKIzRqTAAsbBPT3kWQeGANj3jGgvcvv4yK6SxqYmikgw==}
 
@@ -293,15 +258,6 @@ packages:
   is-fullwidth-code-point@3.0.0:
     resolution: {integrity: sha512-zymm5+u+sCsSWyD9qNaejV3DFvhCKclKdizYaJUuHA83RLjb7nSuGnddCHGv0hk+KY7BMAlsWeK4Ueg6EV6XQg==}
     engines: {node: '>=8'}
-
-  jquery-confirm@3.3.4:
-    resolution: {integrity: sha512-SF3mX2kWAK9FP/Hut1uLHI30LPZ9DAki3Jq6JId9vg6AlMVugjlh40APtuxPQ/0C44XTkQFSVyRrg57NMbaicA==}
-
-  jquery@3.7.1:
-    resolution: {integrity: sha512-m4avr8yL8kmFN8psrbFFFmB/If14iN5o9nw/NgnnM+kybDJpRsAynV2BsfpTYrTRysYUdADVD7CkUUizgkpLfg==}
-
-  lodash@4.18.1:
-    resolution: {integrity: sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==}
 
   require-directory@2.1.1:
     resolution: {integrity: sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==}
@@ -362,12 +318,6 @@ packages:
     engines: {node: '>=12'}
 
 snapshots:
-
-  '@babel/runtime-corejs3@7.29.7':
-    dependencies:
-      core-js-pure: 3.49.0
-
-  '@babel/runtime@7.29.7': {}
 
   '@esbuild/aix-ppc64@0.28.1':
     optional: true
@@ -485,12 +435,6 @@ snapshots:
       tree-kill: 1.2.2
       yargs: 17.7.2
 
-  core-js-pure@3.49.0: {}
-
-  date-fns@2.30.0:
-    dependencies:
-      '@babel/runtime': 7.29.7
-
   diff-match-patch@1.0.5: {}
 
   emoji-regex@8.0.0: {}
@@ -532,14 +476,6 @@ snapshots:
 
   is-fullwidth-code-point@3.0.0: {}
 
-  jquery-confirm@3.3.4:
-    dependencies:
-      jquery: 3.7.1
-
-  jquery@3.7.1: {}
-
-  lodash@4.18.1: {}
-
   require-directory@2.1.1: {}
 
   rxjs@7.8.2:
@@ -572,7 +508,7 @@ snapshots:
 
   typescript@4.9.5: {}
 
-  vditor@3.11.2(patch_hash=f0a8be09993b64f85f342f1ed105aa6ce6f65a7016739690a4620e71ea5129c7):
+  vditor@3.11.2:
     dependencies:
       diff-match-patch: 1.0.5
 

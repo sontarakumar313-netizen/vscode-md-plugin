@@ -1627,14 +1627,14 @@ async function testStaleHostSnapshotIsDiscardedAfterNewEditorEdit() {
   )
 }
 
-async function testSavedEditorModeIsSanitized() {
-  let saved
+async function testSavedEditorModeIsValidated() {
+  const saved = []
   const { receive } = createController({
     getSnapshot: async () => ({ content: '', version: 1 }),
     syncToDocument: async () => undefined,
     postMessage: async () => true,
     updateGlobalState: async (_key, value) => {
-      saved = value
+      saved.push(value)
     },
   })
 
@@ -1642,8 +1642,20 @@ async function testSavedEditorModeIsSanitized() {
     command: 'save-options',
     options: { mode: ['i', 'r'].join(''), retained: true },
   })
-  await waitFor(() => !!saved, 'saved editor options were not persisted')
-  assert.deepStrictEqual(saved, { mode: 'wysiwyg', retained: true })
+  await nextTurn()
+  await nextTurn()
+  assert.deepStrictEqual(saved, [], 'an unsupported editor mode was persisted')
+
+  receive({
+    command: 'save-options',
+    options: { mode: 'sv', retained: true },
+  })
+  await waitFor(() => saved.length === 1, 'the supported editor mode was not persisted')
+  assert.deepStrictEqual(
+    saved,
+    [{ mode: 'sv' }],
+    'saved editor options were not restricted to the supported mode field'
+  )
 }
 
 async function testConcurrentHostUpdatesAreCoalesced() {
@@ -1679,7 +1691,7 @@ async function testConcurrentHostUpdatesAreCoalesced() {
 Promise.resolve()
   .then(testUploadValidation)
   .then(testResourceScopedSafetySettings)
-  .then(testSavedEditorModeIsSanitized)
+  .then(testSavedEditorModeIsValidated)
   .then(testCrlfEditUsesCanonicalLfAndMinimalWrite)
   .then(testOverlappingExternalEditPrefersEditorHunk)
   .then(testMissingMergeBaseFallsBackToEditor)

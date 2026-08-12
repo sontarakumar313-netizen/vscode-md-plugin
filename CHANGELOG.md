@@ -4,12 +4,16 @@ All notable changes to Markdown Interactor will be documented in this file.
 
 ## Unreleased
 
-- Removed the former intermediate editor mode and its mode-specific code, styles,
-  tests, and toolbar entry. Markdown Interactor now provides visual editing and
-  split source view only, with visual editing as the default.
-- Added pinned two-mode Vditor and Lute builds plus an artifact gate so the
-  removed editor implementation, parser paths, and styles are not emitted into
-  the Webview runtime.
+- The editor UI provides visual editing and split source view only, rejects
+  unsupported saved modes, and uses visual editing as the default.
+- Replaced the physically stripped Vditor and Lute forks with the pinned official
+  package runtime while continuing to hide the unused editor mode in the UI.
+- Restored Vditor's click-to-open source editing for ordinary code blocks and
+  removed the custom direct-edit mirror and language selector.
+- Removed the obsolete NW.js cut workaround plus the jQuery, jquery-confirm,
+  Lodash, and date-fns runtime dependencies.
+- Removed the custom find/replace implementation and delegated `Ctrl/Cmd+F` to
+  VS Code's built-in Webview Find Widget.
 - Limited Extension Host type checking to `src/`, preventing ignored reference
   source trees from being pulled into the extension build, and declared pnpm's
   dependency build policy so frozen installs remain reproducible.

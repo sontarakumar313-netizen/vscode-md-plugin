@@ -1,5 +1,3 @@
-/* @import url('vditor/dist/index.css');
-@import url('jquery-confirm/css/jquery-confirm.css'); */
 body {
   margin: 0;
   padding: 0;
@@ -62,10 +60,107 @@ body,
 .vditor-wysiwyg .vditor-reset {
   overflow-anchor: none;
 }
+/* A clicked toolbar control stays hovered/focused while its dropdown opens.
+   Suppress Vditor's high-z-index pseudo tooltip until pointer leave/re-entry. */
+.vditor-toolbar
+  .vditor-tooltipped.vmd-toolbar-tooltip--suppressed::before,
+.vditor-toolbar
+  .vditor-tooltipped.vmd-toolbar-tooltip--suppressed::after {
+  display: none !important;
+}
+
+.vmd-confirm-dialog {
+  width: min(360px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.5));
+  border-radius: 4px;
+  color: var(--vscode-editorWidget-foreground, inherit);
+  background: var(--vscode-editorWidget-background, #fff);
+}
+.vmd-confirm-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+.vmd-confirm-dialog > p {
+  margin: 0 0 16px;
+  white-space: pre-wrap;
+}
+.vmd-confirm-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.vmd-confirm-dialog__actions > button {
+  padding: 4px 12px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 2px;
+  color: var(--vscode-button-foreground, #fff);
+  background: var(--vscode-button-background, #0e639c);
+  cursor: pointer;
+}
+.vmd-confirm-dialog__actions > button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+  outline-offset: 2px;
+}
+
 /* Unwanted WYSIWYG controls are removed in wysiwyg-popover.ts. Do not leave
    their now-empty popover visible after Vditor positions it. */
 .vditor-wysiwyg > .vmd-wysiwyg-popover--empty {
   display: none!important;
+}
+.vditor-wysiwyg > .vmd-url-popover {
+  box-sizing: border-box;
+  width: min(440px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  padding: 4px;
+  white-space: normal;
+  opacity: 1;
+  background: var(
+    --vscode-editorWidget-background,
+    var(--panel-background-color, #fff)
+  );
+  animation: none;
+}
+.vmd-url-popover__hidden-field {
+  display: none !important;
+}
+.vmd-url-popover__url {
+  display: inline-flex;
+  width: calc(100% - 27px);
+  vertical-align: middle;
+}
+.vmd-url-popover__url-input {
+  box-sizing: border-box;
+  width: 100% !important;
+  min-width: 0;
+}
+.vmd-popover-copy-url {
+  float: none !important;
+  display: inline-flex;
+  vertical-align: middle;
+  align-items: center;
+  justify-content: center;
+}
+.vmd-url-popover__title {
+  display: flex;
+  width: 100%;
+  margin-top: 4px;
+}
+.vmd-url-popover__title > .vditor-input {
+  box-sizing: border-box;
+  width: 100% !important;
+}
+
+/* Vditor's pointer cursor implies that an ordinary click opens a link. This
+   editor instead treats links as text until the exact platform modifier is held. */
+.vditor-wysiwyg .vditor-reset a {
+  cursor: text;
+}
+.vditor-wysiwyg .vditor-reset a img {
+  cursor: default;
+}
+.vmd-link-primary-modifier .vditor-wysiwyg .vditor-reset a,
+.vmd-link-primary-modifier .vditor-wysiwyg .vditor-reset a img {
+  cursor: pointer;
 }
 
 /* Vditor represents HTML details as separate opening, body, and closing blocks
@@ -450,13 +545,6 @@ body,
   padding-right: 35px !important;
 }
 
-.jconfirm {
-  color: black;
-}
-.jconfirm-buttons button {
-  text-transform: none!important;
-}
-
 /* Keep custom and bundled toolbar glyphs on the same visual grid. Vditor
    already reserves a 25px button, so every glyph should occupy its standard
    15px square regardless of an inline width/height attribute in the source. */
@@ -481,191 +569,6 @@ body,
   shape-rendering: geometricPrecision;
 }
 
-/* ── Search and replace ─────────────────────────────────────────────────── */
-#vmd-search-bar {
-  position: fixed;
-  top: 40px;
-  right: 16px;
-  z-index: 9999;
-  display: none;
-  width: min(430px, calc(100vw - 32px));
-  flex-direction: column;
-  gap: 4px;
-  padding: 6px;
-  box-sizing: border-box;
-  border: 1px solid var(--vscode-editorWidget-border, #454545);
-  border-radius: 6px;
-  color: var(--vscode-editorWidget-foreground, #ccc);
-  background: var(--vscode-editorWidget-background, #252526);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-  font-size: 13px;
-}
-#vmd-search-bar.vmd-search-bar--open {
-  display: flex;
-}
-#vmd-search-bar .vmd-search-row {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 4px;
-}
-#vmd-search-replace-row[hidden] {
-  display: none;
-}
-#vmd-search-input,
-#vmd-search-replace-input {
-  width: 200px;
-  min-width: 80px;
-  flex: 1 1 auto;
-  padding: 3px 6px;
-  box-sizing: border-box;
-  border: 1px solid var(--vscode-input-border, #3c3c3c);
-  border-radius: 3px;
-  color: var(--vscode-input-foreground, #ccc);
-  background: var(--vscode-input-background, #3c3c3c);
-  font-size: 13px;
-  outline: none;
-}
-#vmd-search-input:focus,
-#vmd-search-replace-input:focus {
-  border-color: var(--vscode-focusBorder, #007fd4);
-}
-#vmd-search-replace-toggle {
-  width: 22px;
-  min-width: 22px;
-  padding: 2px;
-  font-size: 14px;
-  transition: transform 120ms ease;
-}
-#vmd-search-replace-toggle[aria-expanded="true"] {
-  transform: rotate(180deg);
-}
-#vmd-search-replace-row .vmd-search-replace-indent {
-  width: 22px;
-  min-width: 22px;
-}
-#vmd-search-count {
-  min-width: 44px;
-  color: var(--vscode-descriptionForeground, #888);
-  font-size: 12px;
-  text-align: center;
-}
-#vmd-search-count.vmd-search-count--nomatch {
-  color: var(--vscode-errorForeground, #f48771);
-}
-#vmd-search-bar button {
-  min-height: 24px;
-  padding: 2px 5px;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  color: inherit;
-  background: none;
-  font-size: 12px;
-  line-height: 1;
-  cursor: pointer;
-}
-#vmd-search-bar button:hover:not(:disabled),
-#vmd-search-bar button:focus-visible:not(:disabled) {
-  border-color: var(--vscode-button-border, #555);
-  background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.1));
-  outline: none;
-}
-#vmd-search-bar button:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-#vmd-search-replace,
-#vmd-search-replace-all {
-  white-space: nowrap;
-}
-#vmd-search-case-label {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 4px;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  font-size: 12px;
-  cursor: pointer;
-  user-select: none;
-}
-#vmd-search-case-label:hover {
-  border-color: var(--vscode-button-border, #555);
-  background: var(--vscode-toolbar-hoverBackground, rgba(255, 255, 255, 0.1));
-}
-#vmd-search-case-label input {
-  margin: 0;
-  cursor: pointer;
-}
-@media (max-width: 560px) {
-  #vmd-search-bar {
-    right: 8px;
-    width: calc(100vw - 16px);
-  }
-  #vmd-search-count {
-    min-width: 36px;
-  }
-  #vmd-search-replace,
-  #vmd-search-replace-all {
-    padding-right: 4px;
-    padding-left: 4px;
-  }
-}
-
-/* ── Code block language bar (WYSIWYG) ─────────────────────────────────────
-   The language select and copy button live in a flex row (.vmd-code-lang-wrap)
-   that we inject as the first child of each rendered code block's <pre>.
-   The .vditor-copy div is moved into the wrap so both controls share one row.
-   ───────────────────────────────────────────────────────────────────────── */
-.vditor-wysiwyg .vditor-reset pre > .vmd-code-lang-wrap {
-  display: flex !important;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  /* Bleed to the pre's padding edges so the bar spans the full width. */
-  margin: -0.5em -0.5em 0.4em;
-  padding: 3px 10px 3px 8px;
-  border-bottom: 1px solid
-    var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25));
-  font-family: var(--vscode-editor-font-family, monospace);
-  font-size: 11px;
-  color: var(--vscode-descriptionForeground, rgba(100, 100, 100, 0.85));
-}
-
-.vmd-code-lang-select {
-  font-size: 11px;
-  font-family: inherit;
-  color: var(--vscode-editor-foreground, inherit);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  padding: 1px 4px;
-  cursor: pointer;
-  outline: none;
-  flex: 1 1 auto;
-  min-width: 0;
-  max-width: 140px;
-}
-.vmd-code-lang-select:hover,
-.vmd-code-lang-select:focus {
-  border-color: var(--vscode-focusBorder, #007fd4);
-}
-
-/* Copy button is moved inside .vmd-code-lang-wrap — always visible there,
-   and its inner <span> is pulled out of its original absolute position. */
-.vmd-code-lang-wrap > .vditor-copy {
-  position: static !important;
-  display: flex !important;
-  align-items: center;
-  flex-shrink: 0;
-}
-.vmd-code-lang-wrap > .vditor-copy span {
-  position: static !important;
-  display: flex;
-  align-items: center;
-}
-
 /* WYSIWYG mode labels every block in the left gutter: "</>" for code blocks,
    "$$" for math, "F" for front matter. The heading labels (H1-H6) are useful
    for telling levels apart at a glance, but the block symbols only repeat what
@@ -679,51 +582,3 @@ body,
   display: none;
 }
 
-/* ── Inline-edit mode for regular (non-special) WYSIWYG code blocks ─────────
-   Non-special code blocks are always directly editable — no click-to-open
-   required. The source <pre> is kept permanently visible via CSS (overriding
-   Vditor's inline display:none), and flexbox on the block container swaps the
-   visual order so the language bar (from the preview div) appears above the
-   editable source even though the DOM has source-before-preview order.
-   Special-language blocks (mermaid, math, …) are unaffected.              */
-
-/* Flex column so children can be visually reordered with `order`. */
-.vditor-wysiwyg .vditor-reset .vmd-code-inline-edit {
-  display: flex !important;
-  flex-direction: column !important;
-}
-/* Source <pre>: display:block !important overrides Vditor's inline
-   display:none style, making the code always editable. Visual order 2 puts
-   it below the language bar. */
-.vditor-wysiwyg .vditor-reset .vmd-code-inline-edit > .vditor-wysiwyg__pre {
-  display: block !important;
-  order: 2;
-  margin-bottom: 0 !important;
-}
-/* Preview div: visual order 1 puts it above the source code. Suppress the
-   source/preview divider border that the existing rule would otherwise add. */
-.vditor-wysiwyg .vditor-reset .vmd-code-inline-edit > .vditor-wysiwyg__preview {
-  order: 1;
-  margin-top: 0 !important;
-  padding-top: 0 !important;
-  border-top: none !important;
-}
-/* Strip the preview <pre> box — only .vmd-code-lang-wrap inside it should
-   be visible; the rendered highlighted code is hidden. */
-.vditor-wysiwyg .vditor-reset .vmd-code-inline-edit > .vditor-wysiwyg__preview > pre {
-  padding: 0 !important;
-  margin: 0 !important;
-  background: none !important;
-  border: none !important;
-}
-/* Hide the rendered code element and Vditor's ZWSP helper span. */
-.vditor-wysiwyg .vditor-reset .vmd-code-inline-edit > .vditor-wysiwyg__preview > pre > code,
-.vditor-wysiwyg .vditor-reset .vmd-code-inline-edit > .vditor-wysiwyg__preview > pre > span {
-  display: none !important;
-}
-/* The lang wrap uses negative margins to bleed to the pre's padding edges.
-   With padding:0 on the pre in inline-edit mode, reset those margins — the
-   wrap's own border-bottom already serves as the code/bar separator. */
-.vditor-wysiwyg .vditor-reset .vmd-code-inline-edit > .vditor-wysiwyg__preview > pre > .vmd-code-lang-wrap {
-  margin: 0 !important;
-}

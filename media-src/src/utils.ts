@@ -1,10 +1,10 @@
-import $ from 'jquery'
-require('jquery-confirm')(window, $)
-import 'jquery-confirm/css/jquery-confirm.css'
-
-import _ from 'lodash'
 import Vditor from 'vditor'
-import { getVditorMode } from './vditor-adapter'
+import {
+  getVditorInternals,
+  getVditorMode,
+  refreshVditorWysiwygToolbar,
+} from './vditor-adapter'
+import { setWysiwygPopoverTarget } from './wysiwyg-popover'
 window.vscode =
   (window as any).acquireVsCodeApi && (window as any).acquireVsCodeApi()
 ;(window as any).global = window
@@ -19,25 +19,59 @@ declare global {
   }
 }
 
-export function confirm(msg, onOk) {
-  $.confirm({
-    title: '',
-    animation: 'top',
-    closeAnimation: 'top',
-    animateFromElement: false,
-    boxWidth: '300px',
-    useBootstrap: false,
-    content: msg,
-    buttons: {
-      cancel: {
-        text: 'Cancel',
-      },
-      confirm: {
-        text: 'Confirm',
-        action: onOk,
-      },
-    },
+let activeConfirmDialog: HTMLDialogElement | null = null
+
+export function confirm(msg: string, onOk: () => void): void {
+  if (activeConfirmDialog) {
+    activeConfirmDialog.close()
+    activeConfirmDialog.remove()
+    activeConfirmDialog = null
+  }
+
+  const previousFocus =
+    document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null
+  const dialog = document.createElement('dialog')
+  dialog.className = 'vmd-confirm-dialog'
+  dialog.setAttribute('aria-label', 'Confirmation')
+
+  const content = document.createElement('p')
+  content.textContent = msg
+  dialog.appendChild(content)
+
+  const actions = document.createElement('div')
+  actions.className = 'vmd-confirm-dialog__actions'
+  const cancelButton = document.createElement('button')
+  cancelButton.type = 'button'
+  cancelButton.textContent = 'Cancel'
+  cancelButton.dataset.action = 'cancel'
+  const confirmButton = document.createElement('button')
+  confirmButton.type = 'button'
+  confirmButton.textContent = 'Confirm'
+  confirmButton.dataset.action = 'confirm'
+  actions.append(cancelButton, confirmButton)
+  dialog.appendChild(actions)
+
+  const finish = (confirmed: boolean) => {
+    if (!dialog.isConnected) return
+    if (dialog.open) dialog.close()
+    if (activeConfirmDialog === dialog) activeConfirmDialog = null
+    dialog.remove()
+    if (previousFocus?.isConnected) previousFocus.focus()
+    if (confirmed) onOk()
+  }
+  cancelButton.addEventListener('click', () => finish(false))
+  confirmButton.addEventListener('click', () => finish(true))
+  dialog.addEventListener('cancel', (event) => {
+    event.preventDefault()
+    finish(false)
   })
+
+  document.body.appendChild(dialog)
+  activeConfirmDialog = dialog
+  dialog.showModal()
+  cancelButton.focus()
 }
 // 文件转base64用于传输
 export const fileToBase64 = async (file) => {
@@ -61,19 +95,19 @@ export function saveVditorOptions() {
     options: vditorOptions,
   })
 }
+const optionButtons = new WeakSet<HTMLElement>()
+
 // toolbar 点击时保存配置
-export function handleToolbarClick() {
-  const buttons = $(
+export function handleToolbarClick(): void {
+  const buttons = document.querySelectorAll<HTMLElement>(
     '.vditor-toolbar .vditor-panel--left button, .vditor-toolbar .vditor-panel--arrow button'
   )
-  buttons.off('click.vmd-options').on('click.vmd-options', () => {
-    setTimeout(() => {
-      ;(window as any).__vmdSearch?.rebind?.()
-      ;(window as any).__vmdLineNumbers?.rebind?.()
+  buttons.forEach((button) => {
+    if (optionButtons.has(button)) return
+    button.addEventListener('click', () => {
+      setTimeout(saveVditorOptions, 500)
     })
-    setTimeout(() => {
-      saveVditorOptions()
-    }, 500)
+    optionButtons.add(button)
   })
 }
 
@@ -122,41 +156,83 @@ function scrollToHeadingAnchor(fragment: string): boolean {
   return false
 }
 
+function isExactPrimaryModifier(event: {
+  ctrlKey: boolean
+  metaKey: boolean
+  shiftKey: boolean
+  altKey: boolean
+}): boolean {
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
+  return (
+    !event.shiftKey &&
+    !event.altKey &&
+    (isMac
+      ? event.metaKey && !event.ctrlKey
+      : event.ctrlKey && !event.metaKey)
+  )
+}
+
 /**
- * Sends raw Markdown link targets to the extension host for opening.
- *
- * In WYSIWYG mode a plain click lets Vditor show its link-edit popover;
- * Ctrl/Meta+click opens the link in the host.  In all other modes every
- * click opens the link (preserving the pre-WYSIWYG-popover behaviour).
+ * Owns Markdown-link activation before Vditor's click handler can call
+ * `window.open()`. A plain WYSIWYG click keeps the caret in the link and opens
+ * its editable URL popover; Ctrl/Cmd+click is the only path that follows it.
  */
 export function fixLinkClick() {
   const openLink = (url: string) => {
     vscode.postMessage({ command: 'open-link', href: url })
   }
+  const setModifierCursor = (active: boolean) => {
+    document.body.classList.toggle('vmd-link-primary-modifier', active)
+  }
+  document.addEventListener('keydown', (event) => {
+    setModifierCursor(isExactPrimaryModifier(event))
+  }, true)
+  document.addEventListener('keyup', (event) => {
+    setModifierCursor(isExactPrimaryModifier(event))
+  }, true)
+  window.addEventListener('blur', () => setModifierCursor(false))
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) setModifierCursor(false)
+  })
+
   document.addEventListener(
     'click',
-    (e) => {
-      const target = e.target as HTMLElement
-      const link = target.closest('a')
+    (event) => {
+      const target = event.target
+      const element = target instanceof Element ? target : null
+      const link = element?.closest('a') || null
+      const image = element?.closest('img') || null
+      const isWysiwyg =
+        getVditorMode() === 'wysiwyg' &&
+        !!element?.closest('.vditor-wysiwyg .vditor-reset')
+
+      // Capture every image target before Vditor builds and positions its shared
+      // popover. Unlinked images return below because they have no anchor href.
+      if (image && isWysiwyg) setWysiwygPopoverTarget(image)
+
       const href = link?.getAttribute('href') || undefined
-
       if (!href) return
+      const followsLink = isExactPrimaryModifier(event)
 
-      // Heading anchors: scroll on any click, no modifier required.
-      if (href.startsWith('#')) {
-        e.preventDefault()
-        e.stopImmediatePropagation()
-        scrollToHeadingAnchor(href.slice(1))
+      // A linked image owns its ordinary click: let Vditor's image branch open
+      // the URL/title popover. The exact platform modifier still follows the
+      // enclosing anchor.
+      if (image && isWysiwyg && !followsLink) return
+
+      // Vditor opens anchors from its bubbling listener. Claim every remaining
+      // anchor click here so a plain or incorrectly-modified click cannot escape.
+      event.preventDefault()
+      event.stopImmediatePropagation()
+
+      if (followsLink) {
+        if (href.startsWith('#')) scrollToHeadingAnchor(href.slice(1))
+        else openLink(href)
         return
       }
 
-      // In WYSIWYG mode, a plain (un-modified) click lets Vditor handle it and
-      // show the link-edit popover.  Only Ctrl/Meta+click opens in the host.
-      if (getVditorMode() === 'wysiwyg' && !e.ctrlKey && !e.metaKey) return
-
-      e.preventDefault()
-      e.stopImmediatePropagation()
-      openLink(href)
+      if (isWysiwyg) {
+        refreshVditorWysiwygToolbar(getVditorInternals())
+      }
     },
     true
   )
@@ -166,22 +242,3 @@ export function fixLinkClick() {
   }
 }
 
-
-/** error:
- We don't execute document.execCommand() this time, because it is called recursively.
-(anonymous) @ main.js:32449
-(anonymous) @ main.js:842
-(anonymous) @ host.js:27
-see: https://github.com/nwjs/nw.js/issues/3403 */
-export function fixCut() {
-  let _exec = document.execCommand.bind(document)
-  document.execCommand = (cmd, ...args) => {
-    if (cmd === 'delete') {
-      setTimeout(() => {
-        return _exec(cmd, ...args)
-      })
-    } else {
-      return _exec(cmd, ...args)
-    }
-  }
-}

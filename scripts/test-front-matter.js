@@ -27,7 +27,7 @@ const {
 const lines = (...values) => values.join('\n')
 const fixture = (name) =>
   fs.readFileSync(
-    path.resolve(__dirname, '../test/front-matter', name),
+    path.resolve(__dirname, 'fixtures/front-matter', name),
     'utf8'
   )
 

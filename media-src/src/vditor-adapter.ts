@@ -10,6 +10,7 @@ import {
 } from 'vditor/src/ts/util/fixBrowserBehavior'
 import { setSelectionFocus } from 'vditor/src/ts/util/selection'
 import { afterRenderEvent as commitWysiwygAfterRender } from 'vditor/src/ts/wysiwyg/afterRenderEvent'
+import { highlightToolbarWYSIWYG } from 'vditor/src/ts/wysiwyg/highlightToolbarWYSIWYG'
 
 export type VditorMode = 'wysiwyg' | 'sv'
 
@@ -79,6 +80,12 @@ export function outdentVditorList(
 
 export function focusVditorRange(range: Range): void {
   setSelectionFocus(range)
+}
+
+/** Refreshes Vditor's native contextual popover for the current WYSIWYG caret. */
+export function refreshVditorWysiwygToolbar(internal: any): void {
+  if (!internal || internal.currentMode !== 'wysiwyg') return
+  highlightToolbarWYSIWYG(internal)
 }
 
 /** Commits a DOM edit that intentionally bypasses Vditor's WYSIWYG input parser. */
