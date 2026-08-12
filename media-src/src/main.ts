@@ -32,6 +32,7 @@ import {
   installWysiwygListCommands,
 } from './wysiwyg-list'
 import { initWysiwygDetails } from './wysiwyg-details'
+import { initWysiwygAlerts } from './wysiwyg-alert'
 import {
   attachFrontMatterSeparator,
   initWysiwygFrontMatter,
@@ -39,7 +40,6 @@ import {
 import type { FrontMatterDisplay } from './wysiwyg-front-matter'
 import { initSearch } from './search'
 import { initLineNumbers } from './line-numbers'
-import { LatexMathCompatibility } from './math-delimiters'
 import {
   canApplyHostUpdate,
   keepNewestHostUpdate,
@@ -614,8 +614,7 @@ document.addEventListener(
 function initVditor(msg) {
   console.log('msg', msg)
   const initializationGeneration = editorGeneration
-  const latexMath = new LatexMathCompatibility()
-  const content = latexMath.prepare(msg.content)
+  const content = msg.content
   // Hide the editor for the duration of its initial or explicitly requested rebuild.
   // Ordinary document and theme updates never come through this function.
   document.body.removeAttribute('data-vmd-ready')
@@ -723,15 +722,10 @@ function initVditor(msg) {
     // injecting a second, CDN-hosted icon script after initialization.
     icon: '' as any,
     after() {
-      // Vditor natively parses dollar math delimiters. Patch its public value
-      // boundary so LaTeX-style \[ ... \] and \( ... \) render identically
-      // without rewriting their delimiter style in the Markdown document.
-      latexMath.attach(vditor)
       // Lute deletes the blank line between front matter and the body on every
-      // WYSIWYG round trip. Wrapped after the math patch so it sees the finished
-      // Markdown, and on the fresh instance this callback belongs to, so the
-      // wrappers cannot stack across re-inits. Seeded from the host's text rather
-      // than the editor's, which has already been through the parser once.
+      // WYSIWYG round trip. Attach the repair to this fresh instance so wrappers
+      // cannot stack across re-inits, and seed it from the host's text rather
+      // than the editor's, which has already passed through the parser once.
       attachFrontMatterSeparator(vditor, content)
       installSvCodeIndentRepair(getVditorInternals(vditor)?.lute)
       // A document that opened straight into Split View was rendered once before
@@ -758,6 +752,11 @@ function initVditor(msg) {
         ;(window as any).__vmdDetails = initWysiwygDetails()
       } else {
         ;(window as any).__vmdDetails.rebind?.()
+      }
+      if (!(window as any).__vmdAlerts) {
+        ;(window as any).__vmdAlerts = initWysiwygAlerts()
+      } else {
+        ;(window as any).__vmdAlerts.rebind?.()
       }
       // Unknown values were already rejected by the host, so this only has to
       // cover the case of an older host that sends no value at all.

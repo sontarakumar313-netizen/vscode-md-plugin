@@ -29,8 +29,8 @@ interface ValueApi {
 
 /**
  * Remembers the blank line between the front matter and the document body across
- * a Lute round trip, which would otherwise silently delete it. Wraps the public
- * value boundary, the same seam `math-delimiters.ts` uses for delimiter styles.
+ * a Lute round trip, which would otherwise silently delete it. The public value
+ * boundary keeps the separator repair independent from Vditor's rendered DOM.
  */
 export function attachFrontMatterSeparator(
   editor: ValueApi,

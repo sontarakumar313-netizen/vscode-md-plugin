@@ -249,18 +249,71 @@ body:not(.vmd-line-numbers-enabled) #vmd-line-number-gutter {
   font-size: 0.9em;
   white-space: pre-wrap;
 }
-/* Each semantic list container has its own outline so independently-created
-   lists remain visually distinguishable. Outline does not alter Vditor's list
-   indentation or layout, and nested lists retain their own logical boundary. */
-.vditor-wysiwyg .vditor-reset ul[data-block="0"],
-.vditor-wysiwyg .vditor-reset ol[data-block="0"] {
+/* Draw one boundary around an entire list region. Nested UL/OL elements remain
+   visually part of that region instead of looking like separately boxed lists. */
+.vditor-wysiwyg .vditor-reset :is(ul, ol)[data-block="0"]:not(li *) {
   outline: 1px solid var(--vscode-editorWidget-border, var(--border-color, rgba(127, 127, 127, 0.55)));
   outline-offset: 3px;
   border-radius: 3px;
 }
-.vditor-wysiwyg .vditor-reset ul[data-block="0"]:focus-within,
-.vditor-wysiwyg .vditor-reset ol[data-block="0"]:focus-within {
+.vditor-wysiwyg .vditor-reset :is(ul, ol)[data-block="0"]:not(li *):focus-within {
   outline-color: var(--vscode-focusBorder, var(--vscode-editorWidget-border, #007fd4));
+}
+
+/* GitHub Alerts remain ordinary blockquotes in Markdown. The controller hides
+   only their source marker and adds a serializer-ignored title for editing. */
+.vditor-wysiwyg .vditor-reset blockquote.vmd-alert {
+  --vmd-alert-color: #0969da;
+  --vmd-alert-background: rgba(9, 105, 218, 0.08);
+  margin: 1em 0;
+  padding: 0.75em 1em;
+  border-left: 4px solid var(--vmd-alert-color);
+  color: inherit;
+  background: var(--vmd-alert-background);
+}
+.vditor-wysiwyg .vditor-reset blockquote.vmd-alert--tip {
+  --vmd-alert-color: #1a7f37;
+  --vmd-alert-background: rgba(26, 127, 55, 0.08);
+}
+.vditor-wysiwyg .vditor-reset blockquote.vmd-alert--important {
+  --vmd-alert-color: #8250df;
+  --vmd-alert-background: rgba(130, 80, 223, 0.08);
+}
+.vditor-wysiwyg .vditor-reset blockquote.vmd-alert--warning {
+  --vmd-alert-color: #9a6700;
+  --vmd-alert-background: rgba(154, 103, 0, 0.09);
+}
+.vditor-wysiwyg .vditor-reset blockquote.vmd-alert--caution {
+  --vmd-alert-color: #cf222e;
+  --vmd-alert-background: rgba(207, 34, 46, 0.08);
+}
+.vditor-wysiwyg .vditor-reset .vmd-alert-marker {
+  display: none;
+}
+.vditor-wysiwyg .vditor-reset .vmd-alert-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  margin: 0 0 0.45em;
+  color: var(--vmd-alert-color);
+  font-weight: 600;
+  line-height: 1.25;
+}
+.vditor-wysiwyg .vditor-reset .vmd-alert-title svg {
+  width: 1em;
+  height: 1em;
+  flex: 0 0 1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.35;
+}
+.vditor-wysiwyg .vditor-reset blockquote.vmd-alert > p {
+  margin: 0.45em 0 0;
+}
+.vditor-wysiwyg .vditor-reset blockquote.vmd-alert > .vmd-alert-title + p {
+  margin-top: 0;
 }
 
 /* WYSIWYG table actions. */
@@ -386,7 +439,8 @@ body:not(.vmd-line-numbers-enabled) #vmd-line-number-gutter {
    surrounded by text-line fragments, while display math is separated by
    rules above and below the centered expression. */
 .vditor-toolbar .vmd-math-toolbar-icon,
-.vditor-toolbar .vmd-details-toolbar-icon {
+.vditor-toolbar .vmd-details-toolbar-icon,
+.vditor-toolbar .vmd-alert-toolbar-icon {
   color: currentColor;
   shape-rendering: geometricPrecision;
 }

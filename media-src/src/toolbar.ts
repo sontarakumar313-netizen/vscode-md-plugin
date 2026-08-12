@@ -22,6 +22,7 @@ const lineNumbersIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/
 const mathBlockIcon = '<svg class="vmd-math-toolbar-icon vmd-math-toolbar-icon--display" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 1.5h22M1 22.5h22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M13 4H5l5 8-5 8h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 6h7M16 12h5M16 18h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
 const mathInlineIcon = '<svg class="vmd-math-toolbar-icon vmd-math-toolbar-icon--inline" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 6h2M1 18h2M21 6h2M21 18h2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13 2H5l5 10-5 10h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 6h7M16 12h5M16 18h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
 const detailsIcon = '<svg class="vmd-details-toolbar-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4 6h10M4 12h10M4 18h10M17 8l5 4-5 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+const alertIcon = '<svg class="vmd-alert-toolbar-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 1 23 23H1L12 1Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 8v6M12 18h.01" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
 const editingModeIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 18.5h3.5L18 9l-3-3-9.5 9.5L5 18.5zm8.5-11 3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 
 // insertMD writes raw Markdown, so a `$` inside the selection would close the
@@ -50,6 +51,20 @@ function toDetailsBlock(selected: string): string {
 	return `<details>\n<summary>${t('detailsSummary')}</summary>\n\n${
 		body || t('detailsContent')
 	}\n\n</details>`
+}
+
+function toAlertBlock(selected: string, type: string): string {
+	const body = selected.trim() || t('alertContent')
+	const quotedBody = body
+		.split(/\r?\n/)
+		.map((line) => `> ${line}`)
+		.join('\n')
+	return `> [!${type}]\n${quotedBody}`
+}
+
+function insertAlert(editor: any, type: string): void {
+	insertBlock(editor, (selected) => toAlertBlock(selected, type))
+	;(window as any).__vmdCommitProgrammaticEdit?.()
 }
 
 function expandMarkdownSelection(
@@ -106,7 +121,10 @@ function gapAfterBlock(value: string): string {
 	return value.startsWith('\n') ? '\n' : '\n\n'
 }
 
-function insertDetails(editor: any): void {
+function insertBlock(
+	editor: any,
+	buildBlock: (selected: string) => string
+): void {
 	const source = String(editor.getValue?.() || '')
 	const context = getEditorSelectionContext(editor)
 	const rawSelection = String(
@@ -128,7 +146,7 @@ function insertDetails(editor: any): void {
 			)
 			const before = source.slice(0, selectedRange.start)
 			const after = source.slice(selectedRange.end)
-			const block = toDetailsBlock(
+			const block = buildBlock(
 				source.slice(selectedRange.start, selectedRange.end)
 			)
 			editor.setValue(
@@ -138,7 +156,7 @@ function insertDetails(editor: any): void {
 		}
 	}
 
-	const block = toDetailsBlock('')
+	const block = buildBlock('')
 	if (!context) {
 		// Keep the source unchanged, including trailing whitespace, when no DOM
 		// caret is available (for example immediately after a mode rebuild).
@@ -178,6 +196,10 @@ function insertDetails(editor: any): void {
 	const before = source.slice(0, lineStart)
 	const after = source.slice(lineStart)
 	editor.setValue(`${before}${block}${gapAfterBlock(after)}${after}`)
+}
+
+function insertDetails(editor: any): void {
+	insertBlock(editor, toDetailsBlock)
 }
 
 const selectionPreserverToolbars = new WeakSet<HTMLElement>()
@@ -229,6 +251,7 @@ export function syncEditorModeToolbar(editor: any = window.vditor): void {
 
 function refreshModeDependentFeatures(): void {
 	;(window as any).__vmdDetails?.rebind?.()
+	;(window as any).__vmdAlerts?.rebind?.()
 	;(window as any).__vmdFrontMatter?.rebind?.()
 	;(window as any).__vmdSearch?.rebind?.()
 	;(window as any).__vmdLineNumbers?.rebind?.()
@@ -399,6 +422,18 @@ export const toolbar = [
 			insertDetails(window.vditor)
 			;(window as any).__vmdCommitProgrammaticEdit?.()
 		},
+	},
+	{
+		name: 'alerts',
+		tip: t('githubAlerts'),
+		icon: alertIcon,
+		toolbar: (['NOTE', 'TIP', 'IMPORTANT', 'WARNING', 'CAUTION'] as const).map((type) => ({
+			name: `vmd-alert-${type.toLowerCase()}`,
+			icon: t(`alert${type[0]}${type.slice(1).toLowerCase()}`),
+			click() {
+				insertAlert(window.vditor, type)
+			},
+		})),
 	},
 	'insert-before',
 	'insert-after',

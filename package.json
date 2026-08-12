@@ -149,7 +149,7 @@
     "typecheck:webview": "tsc -p media-src/tsconfig.json --noEmit",
     "test:sync": "npm run build:extension && node scripts/test-text-sync.js",
     "test:lute-reflow": "npm run build:extension && node scripts/test-lute-reflow.js",
-    "test:math": "node scripts/test-math-delimiters.js",
+    "test:math": "node scripts/test-dollar-math-only.js",
     "test:sv-code-indent": "node scripts/test-sv-code-indent.js",
     "test:front-matter": "node scripts/test-front-matter.js",
     "test:vditor-options": "node scripts/test-vditor-options.js",

@@ -528,7 +528,7 @@ function testPage() {
           'toolbar icons do not share the standard 15px size'
         );
         const customIcon = (type) => document.querySelector('.vditor-toolbar [data-type="' + type + '"] > svg');
-        const customIconTypes = ['outline', 'line-numbers', 'save', 'math-block', 'math-inline', 'details', 'vmd-edit-mode'];
+        const customIconTypes = ['outline', 'line-numbers', 'save', 'math-block', 'math-inline', 'details', 'alerts', 'vmd-edit-mode'];
         for (const type of customIconTypes) {
           const svg = customIcon(type);
           expect(svg, 'missing custom toolbar icon: ' + type);
@@ -586,6 +586,15 @@ function testPage() {
         const orderedRegions = Array.from(root().querySelectorAll(':scope > ol[data-block="0"]'));
         expect(orderedRegions.length === 3, 'independently formatted ordered items did not remain separate lists');
         expect(orderedRegions.every((list) => getComputedStyle(list).outlineStyle === 'solid'), 'ordered list regions do not have visible outlines');
+
+        await setMarkdown('- top\\n  - nested\\n    1. deep\\n- tail');
+        const nestedLists = Array.from(root().querySelectorAll('ul, ol'));
+        expect(nestedLists.length === 3, 'the nested-list fixture did not render three list levels');
+        expect(
+          getComputedStyle(nestedLists[0]).outlineStyle === 'solid' &&
+            nestedLists.slice(1).every((list) => getComputedStyle(list).outlineStyle === 'none'),
+          'nested list levels still draw their own outer borders'
+        );
 
         await setMarkdown('plain Tab target');
         const plainText = textNode(root().querySelector(':scope > p'));
@@ -782,22 +791,47 @@ function testPage() {
         expect(getComputedStyle(detailsSource).display === 'none', 'clicking the details title revealed raw HTML source');
         expect(detailsBody.classList.contains('vmd-details-content--hidden'), 'clicking editable title unexpectedly toggled the details body');
         const detailsTitleText = textNode(detailsSummary);
-        detailsTitleText.data = 'Renamed title';
+        detailsTitleText.data = 'Renamed';
+        select(detailsTitleText, detailsTitleText.data.length, detailsTitleText, detailsTitleText.data.length);
         detailsSummary.dispatchEvent(new InputEvent('input', {
           bubbles: true,
           inputType: 'insertText',
-          data: 'Renamed title',
+          data: 'Renamed',
         }));
-        await pause(80);
+        detailsTitleText.appendData(' title');
+        select(detailsTitleText, detailsTitleText.data.length, detailsTitleText, detailsTitleText.data.length);
+        detailsSummary.dispatchEvent(new InputEvent('input', {
+          bubbles: true,
+          inputType: 'insertText',
+          data: ' title',
+        }));
+        await pause(380);
+        const committedSummary = detailsOpener.querySelector('summary');
+        const committedSelection = window.getSelection();
         expect(
           window.vditor.getValue().includes('<summary>Renamed title</summary>'),
           'editing the rendered details title did not update its hidden HTML source'
         );
         expect(
+          committedSummary.contains(committedSelection.anchorNode) && committedSelection.isCollapsed,
+          'the details title lost its caret after the debounced commit'
+        );
+        let detailsUndoReachedRoot = false;
+        const onDetailsUndo = () => { detailsUndoReachedRoot = true; };
+        root().addEventListener('keydown', onDetailsUndo);
+        committedSummary.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'z',
+          ctrlKey: true,
+          bubbles: true,
+          cancelable: true,
+        }));
+        root().removeEventListener('keydown', onDetailsUndo);
+        expect(!detailsUndoReachedRoot, 'Ctrl+Z escaped the editable details title');
+        expect(
           !window.vditor.getValue().includes('vmd-details-toggle'),
           'the details editing control leaked into Markdown'
         );
-        detailsSummary.querySelector('.vmd-details-toggle').click();
+        committedSummary.querySelector('.vmd-details-toggle').click();
         await pause();
         expect(!detailsBody.classList.contains('vmd-details-content--hidden'), 'details content does not open from its summary');
         expect(!/<details\\s+[^>]*\\bopen/.test(window.vditor.getValue()), 'opening details changed the Markdown source');
@@ -872,6 +906,36 @@ function testPage() {
         await pause();
         expect(!boldReachedDocument, 'Ctrl+B bubbled beyond the Vditor editor');
         expect(!!root().querySelector('strong, b'), 'Ctrl+B did not apply bold formatting');
+
+        const alertTypes = ['NOTE', 'TIP', 'IMPORTANT', 'WARNING', 'CAUTION'];
+        const alertMarkdown = alertTypes.map((type) => '> [!' + type + ']\\n> ' + type.toLowerCase() + ' body').join('\\n\\n');
+        await setMarkdown(alertMarkdown);
+        await pause(80);
+        const renderedAlerts = Array.from(root().querySelectorAll(':scope > blockquote.vmd-alert'));
+        expect(renderedAlerts.length === alertTypes.length, 'not all five GitHub Alert types rendered');
+        for (const [index, alert] of renderedAlerts.entries()) {
+          expect(alert.dataset.vmdAlert === alertTypes[index], 'GitHub Alert type was decorated incorrectly');
+          expect(alert.querySelector('.vmd-alert-title')?.textContent === alertTypes[index], 'GitHub Alert title is missing');
+          expect(getComputedStyle(alert.querySelector('.vmd-alert-marker')).display === 'none', 'GitHub Alert source marker is visible');
+        }
+        const serializedAlerts = window.vditor.getValue();
+        expect(
+          alertTypes.every((type) => serializedAlerts.includes('[!' + type + ']')) &&
+            !serializedAlerts.includes('vmd-alert'),
+          'GitHub Alert rendering changed or polluted the Markdown source'
+        );
+
+        await setMarkdown('selected alert body');
+        const alertBodyText = textNode(root().querySelector(':scope > p'));
+        select(alertBodyText, 0, alertBodyText, alertBodyText.textContent.length);
+        document.querySelector('.vditor-toolbar [data-type="vmd-alert-warning"]').click();
+        await pause(80);
+        expect(
+          window.vditor.getValue().includes('> [!WARNING]\\n> selected alert body') &&
+            root().querySelector('blockquote.vmd-alert--warning'),
+          'the GitHub Alert toolbar did not insert and render the selected Warning alert: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
 
         await setMarkdown('formula target');
         const formulaText = textNode(root().querySelector(':scope > p'));

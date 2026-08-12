@@ -11,6 +11,7 @@ interface DetailsGroup {
 
 const DETAILS_SUMMARY_CLASS = 'vmd-details-summary'
 const DETAILS_TOGGLE_CLASS = 'vmd-details-toggle'
+const SUMMARY_COMMIT_DEBOUNCE_MS = 300
 
 function getWysiwygRoot(): HTMLElement | null {
   return document.querySelector('.vditor-wysiwyg .vditor-reset')
@@ -65,6 +66,11 @@ export function initWysiwygDetails() {
   // cancelling out the first toggle and making summaries stop responding.
   let boundRoot: HTMLElement | null = null
   let observer: MutationObserver | null = null
+  let summaryCommitTimer: number | null = null
+  let pendingSummaryCommit: {
+    opener: HTMLElement
+    caretOffset: number
+  } | null = null
   const queuedRoots = new WeakSet<HTMLElement>()
 
   function refresh(targetRoot: HTMLElement): void {
@@ -164,12 +170,45 @@ export function initWysiwygDetails() {
     queueRefresh(root)
   }
 
+  function flushSummaryCommit(restoreCaret: boolean): void {
+    if (summaryCommitTimer !== null) window.clearTimeout(summaryCommitTimer)
+    summaryCommitTimer = null
+    const pending = pendingSummaryCommit
+    pendingSummaryCommit = null
+    if (!pending) return
+
+    const internal = getVditorInternals()
+    if (!internal || internal.currentMode !== 'wysiwyg') return
+    commitVditorWysiwygDomEdit(internal)
+    if (!restoreCaret) return
+
+    queueMicrotask(() => {
+      const summary = prepareEditableSummary(pending.opener)
+      if (summary) restoreSummaryCaretOffset(summary, pending.caretOffset)
+    })
+  }
+
+  function scheduleSummaryCommit(
+    opener: HTMLElement,
+    summary: HTMLElement
+  ): void {
+    pendingSummaryCommit = {
+      opener,
+      caretOffset: getSummaryCaretOffset(summary),
+    }
+    if (summaryCommitTimer !== null) window.clearTimeout(summaryCommitTimer)
+    summaryCommitTimer = window.setTimeout(
+      () => flushSummaryCommit(true),
+      SUMMARY_COMMIT_DEBOUNCE_MS
+    )
+  }
+
   function commitSummaryEdit(event: Event): void {
     const detailsTarget = getSummaryTarget(event)
     if (!detailsTarget) return
     event.stopImmediatePropagation()
     if (!syncSummaryToSource(detailsTarget.opener, detailsTarget.summary)) return
-    commitVditorWysiwygDomEdit(getVditorInternals())
+    scheduleSummaryCommit(detailsTarget.opener, detailsTarget.summary)
   }
 
   function onRootCompositionEnd(event: Event): void {
@@ -179,13 +218,28 @@ export function initWysiwygDetails() {
     if (internal?.wysiwyg) internal.wysiwyg.composingLock = false
     event.stopImmediatePropagation()
     if (syncSummaryToSource(detailsTarget.opener, detailsTarget.summary)) {
-      commitVditorWysiwygDomEdit(internal)
+      scheduleSummaryCommit(detailsTarget.opener, detailsTarget.summary)
     }
+  }
+
+  function onSummaryBlur(event: FocusEvent): void {
+    const detailsTarget = getSummaryTarget(event)
+    if (!detailsTarget || summaryCommitTimer === null) return
+    syncSummaryToSource(detailsTarget.opener, detailsTarget.summary)
+    flushSummaryCommit(false)
   }
 
   function onRootKeydown(event: KeyboardEvent): void {
     if (!getSummaryTarget(event)) return
     if (event.key === 'Enter') event.preventDefault()
+    const isPrimary = event.ctrlKey || event.metaKey
+    if (isPrimary && !event.altKey) {
+      const key = event.key.toLowerCase()
+      if (key === 'z' || key === 'y') {
+        event.stopImmediatePropagation()
+        return
+      }
+    }
     if (!event.ctrlKey && !event.metaKey && !event.altKey) {
       event.stopImmediatePropagation()
     }
@@ -202,6 +256,7 @@ export function initWysiwygDetails() {
       boundRoot.removeEventListener('click', onRootClick, true)
       boundRoot.removeEventListener('input', commitSummaryEdit, true)
       boundRoot.removeEventListener('compositionend', onRootCompositionEnd, true)
+      boundRoot.removeEventListener('blur', onSummaryBlur, true)
       boundRoot.removeEventListener('keydown', onRootKeydown, true)
       boundRoot.removeEventListener('keyup', onRootKeyup, true)
       boundRoot = null
@@ -215,6 +270,9 @@ export function initWysiwygDetails() {
       return
     }
 
+    if (summaryCommitTimer !== null) window.clearTimeout(summaryCommitTimer)
+    summaryCommitTimer = null
+    pendingSummaryCommit = null
     unbindRoots()
     root = nextRoot
     if (root) {
@@ -222,6 +280,7 @@ export function initWysiwygDetails() {
       observedRoot.addEventListener('click', onRootClick, true)
       observedRoot.addEventListener('input', commitSummaryEdit, true)
       observedRoot.addEventListener('compositionend', onRootCompositionEnd, true)
+      observedRoot.addEventListener('blur', onSummaryBlur, true)
       observedRoot.addEventListener('keydown', onRootKeydown, true)
       observedRoot.addEventListener('keyup', onRootKeyup, true)
       boundRoot = observedRoot
@@ -240,6 +299,9 @@ export function initWysiwygDetails() {
   return {
     rebind,
     dispose() {
+      if (summaryCommitTimer !== null) window.clearTimeout(summaryCommitTimer)
+      summaryCommitTimer = null
+      pendingSummaryCommit = null
       unbindRoots()
       root = null
     },
@@ -251,6 +313,70 @@ function escapeHtmlText(value: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+}
+
+function getSummaryTextNodes(summary: HTMLElement): Text[] {
+  const nodes: Text[] = []
+  const walker = document.createTreeWalker(
+    summary,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode(node) {
+        return (node.parentElement?.closest(`.${DETAILS_TOGGLE_CLASS}`))
+          ? NodeFilter.FILTER_REJECT
+          : NodeFilter.FILTER_ACCEPT
+      },
+    }
+  )
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    nodes.push(node as Text)
+  }
+  return nodes
+}
+
+function getSummaryCaretOffset(summary: HTMLElement): number {
+  const selection = window.getSelection()
+  if (!selection?.rangeCount) return summary.textContent?.length || 0
+  const range = selection.getRangeAt(0)
+  if (!summary.contains(range.endContainer)) return summary.textContent?.length || 0
+
+  let offset = 0
+  for (const text of getSummaryTextNodes(summary)) {
+    if (text === range.endContainer) {
+      return offset + Math.min(range.endOffset, text.data.length)
+    }
+    offset += text.data.length
+  }
+  return offset
+}
+
+function restoreSummaryCaretOffset(summary: HTMLElement, offset: number): void {
+  const textNodes = getSummaryTextNodes(summary)
+  let remaining = Math.max(0, offset)
+  let target: Text | null = null
+  let targetOffset = 0
+  for (const text of textNodes) {
+    target = text
+    if (remaining <= text.data.length) {
+      targetOffset = remaining
+      break
+    }
+    remaining -= text.data.length
+    targetOffset = text.data.length
+  }
+
+  const selection = window.getSelection()
+  if (!selection) return
+  const range = document.createRange()
+  if (target) range.setStart(target, targetOffset)
+  else range.setStart(summary, summary.childNodes.length)
+  range.collapse(true)
+  summary.focus({ preventScroll: true })
+  selection.removeAllRanges()
+  selection.addRange(range)
+
+  const internal = getVditorInternals()
+  if (internal?.wysiwyg) internal.wysiwyg.range = range.cloneRange()
 }
 
 function prepareEditableSummary(opener: HTMLElement): HTMLElement | null {

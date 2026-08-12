@@ -26,8 +26,10 @@ All notable changes to Markdown Interactor will be documented in this file.
 - Added three-way merging for concurrent external changes. Independent edits
   merge automatically, while overlapping edits pause and require an explicit
   choice before either side is replaced.
-- Added rendering support for LaTeX inline math delimiters (`\(...\)`) while
-  preserving them when editor content is synchronized back to Markdown.
+- Limited formula parsing and insertion to `$...$` and `$$...$$` delimiters.
+- Added WYSIWYG rendering and a five-type toolbar menu for GitHub Alerts.
+- Fixed nested list borders and editable `<details>` title synchronization in
+  WYSIWYG mode.
 
 ## 0.1.7
 
