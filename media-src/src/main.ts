@@ -14,19 +14,22 @@ import { lang } from './lang'
 import {
   installEditorModeShortcutGuard,
   installToolbarSelectionPreserver,
-  installToolbarTooltipDismissal,
   syncEditorModeToolbar,
   toolbar,
 } from './toolbar'
 import { initTableContextMenu } from './table-context-menu'
 import { initBlockContextMenu } from './block-context-menu'
-import { customizeWysiwygPopover } from './wysiwyg-popover'
+import {
+  closeActiveWysiwygPopover,
+  customizeWysiwygPopover,
+} from './wysiwyg-popover'
 import {
   handleRenderedListTab,
   installWysiwygListCommands,
 } from './wysiwyg-list'
 import { initWysiwygDetails } from './wysiwyg-details'
 import { initWysiwygAlerts } from './wysiwyg-alert'
+import { initWysiwygCodeBlocks } from './wysiwyg-code-block'
 import {
   attachFrontMatterSeparator,
   initWysiwygFrontMatter,
@@ -503,11 +506,15 @@ function flushEditorContent(): void {
 function refreshModeDependentFeatures(): void {
   window.__vmdDetails?.rebind?.()
   window.__vmdAlerts?.rebind?.()
+  window.__vmdCodeBlocks?.rebind?.()
   window.__vmdFrontMatter?.rebind?.()
   window.__vmdSplitScrollSync?.rebind?.(window.vditor)
 }
 
-window.__vmdBeforeEditorModeChange = flushEditorContent
+window.__vmdBeforeEditorModeChange = () => {
+  closeActiveWysiwygPopover()
+  flushEditorContent()
+}
 window.__vmdAfterEditorModeChange = (mode) => {
   refreshModeDependentFeatures()
   const content = vditor.getValue()
@@ -703,6 +710,7 @@ function initVditor(msg) {
     handleRenderedListTab(window.vditor, event)
   }
   if (window.vditor) {
+    closeActiveWysiwygPopover()
     vditor.destroy()
     window.vditor = null
   }
@@ -744,7 +752,6 @@ function initVditor(msg) {
         initializationGeneration
       )
       installToolbarSelectionPreserver(vditor)
-      installToolbarTooltipDismissal(vditor)
       syncEditorModeToolbar(vditor)
       installWysiwygListCommands(vditor)
       if (!(window as any).__vmdDetails) {
@@ -756,6 +763,11 @@ function initVditor(msg) {
         ;(window as any).__vmdAlerts = initWysiwygAlerts()
       } else {
         ;(window as any).__vmdAlerts.rebind?.()
+      }
+      if (!(window as any).__vmdCodeBlocks) {
+        ;(window as any).__vmdCodeBlocks = initWysiwygCodeBlocks()
+      } else {
+        ;(window as any).__vmdCodeBlocks.rebind?.()
       }
       // Unknown values were already rejected by the host, so this only has to
       // cover the case of an older host that sends no value at all.

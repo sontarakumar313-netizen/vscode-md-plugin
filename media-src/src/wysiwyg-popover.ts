@@ -1,12 +1,20 @@
+import { cancelPendingVditorWysiwygToolbar } from './vditor-adapter'
+
 let pendingPopoverTarget: HTMLElement | null = null
 let activePopoverPosition: {
   popover: HTMLElement
   target: HTMLElement
 } | null = null
+let activeCustomPopover: {
+  popover: HTMLElement
+  target: HTMLElement | null
+  editorRoot: HTMLElement | null
+} | null = null
 let popoverPositionListenersInstalled = false
 let popoverPositionQueued = false
 let activeDetailsTitleFinish: (() => void) | null = null
 const POPOVER_POSITIONING_CLASS = 'vmd-url-popover--positioning'
+const PERSISTENT_POPOVER_CLASS = 'vmd-url-popover--persistent'
 const DETAILS_TITLE_POPOVER_CLASS = 'vmd-details-title-popover'
 
 interface DetailsTitlePopoverOptions {
@@ -22,6 +30,99 @@ interface DetailsTitlePopoverOptions {
 /** Records a click target before Vditor constructs its shared popover. */
 export function setWysiwygPopoverTarget(target: HTMLElement): void {
   pendingPopoverTarget = target
+}
+
+function popoverLabel(
+  key: 'close' | 'copied' | 'copy',
+  fallback: string
+): string {
+  const i18n = (window as Window & { VditorI18n?: unknown }).VditorI18n
+  if (!i18n || typeof i18n !== 'object') return fallback
+  const value = (i18n as Record<string, unknown>)[key]
+  return typeof value === 'string' && value.trim() ? value : fallback
+}
+
+function cancelDelayedNativePopoverRefresh(): void {
+  const active = activeCustomPopover
+  if (active) cancelPendingVditorWysiwygToolbar(active.popover)
+}
+
+function deactivateCustomPopover(): typeof activeCustomPopover {
+  const active = activeCustomPopover
+  if (!active) return null
+  active.editorRoot?.removeEventListener(
+    'click',
+    cancelDelayedNativePopoverRefresh
+  )
+  active.editorRoot?.removeEventListener(
+    'keyup',
+    cancelDelayedNativePopoverRefresh
+  )
+  document.removeEventListener('keydown', handlePersistentPopoverKeydown, true)
+  active.popover.classList.remove(PERSISTENT_POPOVER_CLASS)
+  activeCustomPopover = null
+  return active
+}
+
+function restorePopoverFocus(
+  target: HTMLElement | null,
+  editorRoot: HTMLElement | null
+): void {
+  if (target?.isConnected) {
+    target.focus({ preventScroll: true })
+    if (document.activeElement === target) return
+  }
+  editorRoot?.focus({ preventScroll: true })
+}
+
+export function closeActiveWysiwygPopover(restoreFocus = false): void {
+  const active = deactivateCustomPopover()
+  if (active) {
+    active.popover.style.display = 'none'
+    active.popover.classList.remove(POPOVER_POSITIONING_CLASS)
+    if (activePopoverPosition?.popover === active.popover) {
+      activePopoverPosition = null
+    }
+    if (pendingPopoverTarget === active.target) pendingPopoverTarget = null
+  }
+  finishDetailsTitlePopover()
+  if (active && restoreFocus) {
+    restorePopoverFocus(active.target, active.editorRoot)
+  }
+}
+
+function closePopover(popover: HTMLElement): void {
+  if (activeCustomPopover?.popover !== popover) return
+  closeActiveWysiwygPopover(true)
+}
+
+function handlePersistentPopoverKeydown(event: KeyboardEvent): void {
+  if (
+    event.key !== 'Escape' ||
+    event.isComposing ||
+    event.keyCode === 229 ||
+    !activeCustomPopover
+  ) {
+    return
+  }
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  closeActiveWysiwygPopover(true)
+}
+
+function activateCustomPopover(
+  popover: HTMLElement,
+  target: HTMLElement | null
+): void {
+  deactivateCustomPopover()
+  const editorRoot = popover.parentElement?.querySelector<HTMLElement>(
+    ':scope > .vditor-reset'
+  ) ?? null
+  activeCustomPopover = { popover, target, editorRoot }
+  popover.classList.add(PERSISTENT_POPOVER_CLASS)
+  editorRoot?.addEventListener('click', cancelDelayedNativePopoverRefresh)
+  editorRoot?.addEventListener('keyup', cancelDelayedNativePopoverRefresh)
+  document.addEventListener('keydown', handlePersistentPopoverKeydown, true)
 }
 
 /** Copies text without assuming that the Webview exposes Clipboard API access. */
@@ -58,9 +159,8 @@ function addUrlCopyButton(
   urlWrap: HTMLElement,
   urlInput: HTMLInputElement
 ): HTMLButtonElement {
-  const i18n = (window as any).VditorI18n || {}
-  const copyLabel = i18n.copy || 'Copy URL'
-  const copiedLabel = i18n.copied || 'Copied'
+  const copyLabel = popoverLabel('copy', 'Copy URL')
+  const copiedLabel = popoverLabel('copied', 'Copied')
   const failedLabel = 'Copy failed'
   const button = document.createElement('button')
   button.type = 'button'
@@ -81,6 +181,25 @@ function addUrlCopyButton(
   popover.classList.add('vmd-url-popover')
   urlWrap.classList.add('vmd-url-popover__url')
   urlInput.classList.add('vmd-url-popover__url-input')
+  return button
+}
+
+function addPopoverCloseButton(
+  popover: HTMLElement,
+  after: HTMLElement
+): HTMLButtonElement {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className =
+    'vditor-icon vditor-tooltipped vditor-tooltipped__n vmd-popover-close'
+  button.setAttribute('aria-label', popoverLabel('close', 'Close'))
+  button.textContent = '×'
+  button.addEventListener('click', (event) => {
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    closePopover(popover)
+  })
+  after.insertAdjacentElement('afterend', button)
   return button
 }
 
@@ -197,21 +316,15 @@ function redirectHiddenLinkFocus(
   }, 0)
 }
 
-function installLinkPopoverTabOrder(
-  urlInput: HTMLInputElement,
-  copyButton: HTMLButtonElement
-): void {
-  urlInput.onkeydown = (event) => {
-    if (event.key !== 'Tab') return
-    event.preventDefault()
-    event.stopPropagation()
-    if (!event.shiftKey) copyButton.focus()
-  }
-  copyButton.addEventListener('keydown', (event) => {
-    if (event.key !== 'Tab' || !event.shiftKey) return
-    event.preventDefault()
-    event.stopPropagation()
-    urlInput.focus()
+function installPopoverTabOrder(elements: HTMLElement[]): void {
+  elements.forEach((element, index) => {
+    element.addEventListener('keydown', (event) => {
+      if (event.key !== 'Tab') return
+      event.preventDefault()
+      event.stopPropagation()
+      const offset = event.shiftKey ? elements.length - 1 : 1
+      elements[(index + offset) % elements.length]?.focus()
+    })
   })
 }
 
@@ -232,12 +345,14 @@ export function showDetailsTitlePopover({
   onBlur,
 }: DetailsTitlePopoverOptions): HTMLInputElement {
   finishDetailsTitlePopover()
+  deactivateCustomPopover()
   activePopoverPosition = null
   popover.replaceChildren()
   popover.classList.remove(
     'vmd-url-popover--image',
     'vmd-wysiwyg-popover--empty',
-    POPOVER_POSITIONING_CLASS
+    POPOVER_POSITIONING_CLASS,
+    PERSISTENT_POPOVER_CLASS
   )
   popover.classList.add('vmd-url-popover', DETAILS_TITLE_POPOVER_CLASS)
   delete popover.dataset.vmdPosition
@@ -272,18 +387,17 @@ export function showDetailsTitlePopover({
     if (event.key === 'Enter') {
       event.preventDefault()
       input.blur()
-    } else if (event.key === 'Escape') {
-      event.preventDefault()
-      popover.style.display = 'none'
-      target.focus()
     }
     event.stopPropagation()
   })
   inputWrap.appendChild(input)
   popover.appendChild(inputWrap)
+  const closeButton = addPopoverCloseButton(popover, inputWrap)
+  installPopoverTabOrder([input, closeButton])
 
   positionAboveTarget(popover, target)
   popover.style.display = 'block'
+  activateCustomPopover(popover, target)
   input.focus()
   input.select()
   return input
@@ -298,12 +412,14 @@ export function customizeWysiwygPopover(
   popover: HTMLElement
 ): void {
   finishDetailsTitlePopover()
+  deactivateCustomPopover()
   // Vditor reuses one popover element for every context.
   popover.classList.remove(
     'vmd-url-popover',
     'vmd-url-popover--image',
     DETAILS_TITLE_POPOVER_CLASS,
-    POPOVER_POSITIONING_CLASS
+    POPOVER_POSITIONING_CLASS,
+    PERSISTENT_POPOVER_CLASS
   )
   delete popover.dataset.vmdPosition
   activePopoverPosition = null
@@ -313,7 +429,20 @@ export function customizeWysiwygPopover(
     )
     .forEach((action) => action.remove())
 
-  if (type === 'heading') {
+  if (type === 'code-block') {
+    const selection = window.getSelection()
+    const container = selection?.rangeCount
+      ? selection.getRangeAt(0).startContainer
+      : null
+    const element = container instanceof Element
+      ? container
+      : container?.parentElement
+    if (element?.closest('.vmd-code-block--ordinary')) {
+      // Ordinary blocks expose language through their persistent local menu.
+      // Rich-render blocks retain Vditor's native language/source popover.
+      popover.replaceChildren()
+    }
+  } else if (type === 'heading') {
     popover
       .querySelector<HTMLInputElement>('input[placeholder^="ID"]')
       ?.parentElement?.remove()
@@ -333,10 +462,12 @@ export function customizeWysiwygPopover(
     hideField(fields[2])
     if (fields[1] && urlInput) {
       const copyButton = addUrlCopyButton(popover, fields[1], urlInput)
-      installLinkPopoverTabOrder(urlInput, copyButton)
+      const closeButton = addPopoverCloseButton(popover, copyButton)
+      installPopoverTabOrder([urlInput, copyButton, closeButton])
       const target = getPopoverTarget(type)
       redirectHiddenLinkFocus(urlInput, target)
       positionAboveTarget(popover, target)
+      activateCustomPopover(popover, target)
     }
   } else if (type === 'image') {
     // Preserve the alt input object for Vditor's update closure while removing
@@ -347,9 +478,18 @@ export function customizeWysiwygPopover(
     const urlInput = fields[0]?.querySelector<HTMLInputElement>('input')
     hideField(fields[1])
     fields[2]?.classList.add('vmd-url-popover__title')
+    const titleInput = fields[2]?.querySelector<HTMLInputElement>('input')
     if (fields[0] && urlInput) {
-      addUrlCopyButton(popover, fields[0], urlInput)
-      positionAboveTarget(popover, getPopoverTarget(type))
+      const copyButton = addUrlCopyButton(popover, fields[0], urlInput)
+      const closeButton = addPopoverCloseButton(popover, copyButton)
+      installPopoverTabOrder(
+        titleInput
+          ? [urlInput, copyButton, closeButton, titleInput]
+          : [urlInput, copyButton, closeButton]
+      )
+      const target = getPopoverTarget(type)
+      positionAboveTarget(popover, target)
+      activateCustomPopover(popover, target)
     }
     popover.classList.add('vmd-url-popover--image')
   }

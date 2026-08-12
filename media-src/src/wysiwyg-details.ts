@@ -4,6 +4,7 @@ import {
 } from './vditor-adapter'
 import { t } from './lang'
 import {
+  closeActiveWysiwygPopover,
   finishDetailsTitlePopover,
   showDetailsTitlePopover,
 } from './wysiwyg-popover'
@@ -259,7 +260,7 @@ export function initWysiwygDetails() {
   }
 
   function hideSharedPopover(): void {
-    finishDetailsTitlePopover()
+    closeActiveWysiwygPopover()
     const popover = getSharedPopover()
     if (popover) popover.style.display = 'none'
   }

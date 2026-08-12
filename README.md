@@ -54,6 +54,7 @@ VS Code 中只注册一个 **Markdown Interactor Editor**。请使用编辑器�
 - 表格插入，以及行、列、对齐和删除等右键操作；
 - 图片、音频、本地文件链接和可折叠 `<details>` 内容；
 - KaTeX 数学公式，仅支持 `$...$` 和 `$$...$$`；
+- 普通代码块支持高亮预览、原位纯文本编辑及本地语言菜单；
 - GitHub Alerts，支持 Note、Tip、Important、Warning 和 Caution；
 - Mermaid、Graphviz、ECharts 和 abc.js 等 Vditor 扩展语法；
 - 一键复制原始 Markdown 或渲染后的 HTML。

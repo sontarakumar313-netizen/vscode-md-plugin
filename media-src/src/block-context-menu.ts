@@ -5,7 +5,7 @@ import {
 } from './vditor-adapter'
 import { t } from './lang'
 import { findInnermostDetailsBlocks } from './wysiwyg-details'
-import { finishDetailsTitlePopover } from './wysiwyg-popover'
+import { closeActiveWysiwygPopover } from './wysiwyg-popover'
 
 const MENU_ID = 'vmd-block-context-menu'
 const DIRECT_BLOCK_SELECTOR = [
@@ -198,7 +198,7 @@ function deleteBlock(target: DeletableBlock): void {
     focusTarget = { element: paragraph, atStart: true }
   }
 
-  finishDetailsTitlePopover()
+  closeActiveWysiwygPopover()
   const popover = internal.wysiwyg?.popover
   if (popover instanceof HTMLElement) popover.style.display = 'none'
 

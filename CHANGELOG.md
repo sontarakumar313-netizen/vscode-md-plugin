@@ -9,14 +9,18 @@ All notable changes to Markdown Interactor will be documented in this file.
   mode is remembered, while unsupported saved modes fall back to visual editing.
 - Replaced the physically stripped Vditor and Lute forks with the pinned official
   package runtime while continuing to hide the unused editor mode in the UI.
-- Restored Vditor's click-to-open source editing for ordinary code blocks and
-  removed the custom direct-edit mirror and language selector.
+- Ordinary code blocks now switch in place between highlighted viewing and
+  plain-text editing, with an Alert-style local language menu; Mermaid and other
+  rich-render code blocks retain Vditor's native preview/source behavior.
 - Removed the obsolete NW.js cut workaround plus the jQuery, jquery-confirm,
   Lodash, and date-fns runtime dependencies.
 - Removed the custom find/replace implementation and delegated `Ctrl/Cmd+F` to
   VS Code's built-in Webview Find Widget.
 - Made the custom link URL popover open immediately instead of waiting for
   Vditor's contextual-toolbar debounce.
+- Kept link, image, and details-title editing popovers open until their close
+  button or Escape is used.
+- Restored Vditor's original hover/focus tooltips for the top toolbar controls.
 - Limited Extension Host type checking to `src/`, preventing ignored reference
   source trees from being pulled into the extension build, and declared pnpm's
   dependency build policy so frozen installs remain reproducible.

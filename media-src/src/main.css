@@ -60,15 +60,6 @@ body,
 .vditor-wysiwyg .vditor-reset {
   overflow-anchor: none;
 }
-/* A clicked toolbar control stays hovered/focused while its dropdown opens.
-   Suppress Vditor's high-z-index pseudo tooltip until pointer leave/re-entry. */
-.vditor-toolbar
-  .vditor-tooltipped.vmd-toolbar-tooltip--suppressed::before,
-.vditor-toolbar
-  .vditor-tooltipped.vmd-toolbar-tooltip--suppressed::after {
-  display: none !important;
-}
-
 .vmd-confirm-dialog {
   width: min(360px, calc(100vw - 32px));
   padding: 16px;
@@ -120,6 +111,11 @@ body,
   );
   animation: none;
 }
+/* Vditor hides its shared contextual panel during delayed toolbar refreshes.
+   Editing popovers remain open until their close button or Escape is used. */
+.vditor-wysiwyg > .vmd-url-popover.vmd-url-popover--persistent {
+  display: block !important;
+}
 /* Vditor writes a provisional position after the customization callback.
    Keep that intermediate state out of the first paint; the class is removed in
    the same task once the final above-target coordinates have been measured. */
@@ -131,7 +127,7 @@ body,
 }
 .vmd-url-popover__url {
   display: inline-flex;
-  width: calc(100% - 27px);
+  width: calc(100% - 50px);
   vertical-align: middle;
 }
 .vmd-url-popover__url-input {
@@ -139,12 +135,17 @@ body,
   width: 100% !important;
   min-width: 0;
 }
-.vmd-popover-copy-url {
+.vmd-popover-copy-url,
+.vmd-popover-close {
   float: none !important;
   display: inline-flex;
   vertical-align: middle;
   align-items: center;
   justify-content: center;
+}
+.vmd-popover-close {
+  font-size: 18px;
+  line-height: 1;
 }
 .vmd-url-popover__title {
   display: flex;
@@ -265,7 +266,7 @@ body,
   height: 16px;
 }
 .vditor-wysiwyg > .vmd-details-title-popover .vmd-url-popover__url {
-  width: 100%;
+  width: calc(100% - 27px);
 }
 
 /* ── Details open-content border ───────────────────────────────────────────
@@ -273,6 +274,14 @@ body,
    vmd-details-content--open/first/last so a grouped border can be drawn
    around them collectively, mirroring the list-region border style. */
 .vditor-wysiwyg .vditor-reset .vmd-details-content--open {
+  box-sizing: border-box;
+  width: 100%;
+  /* Vditor gives paragraphs, lists, quotes, headings, and tables different
+     outer margins. Those margins sit outside each block's side borders and
+     make one details boundary look like several disconnected fragments. Keep
+     spacing inside the boundary instead, and give every block the same box. */
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
   border-left: 1px solid
     var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.55));
   border-right: 1px solid
@@ -280,6 +289,20 @@ body,
   /* Match the body text with the summary text after its disclosure arrow. */
   padding-left: calc(1.25em - 1px);
   padding-right: 0.6em;
+}
+.vditor-wysiwyg
+  .vditor-reset
+  .vmd-details-content--open:not(.vmd-details-content--last) {
+  padding-bottom: 1em;
+}
+/* CSS table boxes ignore their own block padding in Chromium. Move that
+   internal gap to the following block while keeping the two side borders
+   geometrically adjacent. */
+.vditor-wysiwyg
+  .vditor-reset
+  table.vmd-details-content--open:not(.vmd-details-content--last)
+  + .vmd-details-content--open {
+  padding-top: 1em;
 }
 .vditor-wysiwyg .vditor-reset .vmd-details-content--first {
   border-top: 1px solid
@@ -418,6 +441,140 @@ body,
 }
 .vditor-wysiwyg .vditor-reset :is(ul, ol)[data-block="0"]:not(li *):focus-within {
   outline-color: var(--vscode-focusBorder, var(--vscode-editorWidget-border, #007fd4));
+}
+
+/* Ordinary WYSIWYG code blocks show one highlighted surface while idle. Their
+   existing Vditor source replaces that surface in place during editing; rich
+   renderers such as Mermaid never receive these classes or controls. */
+.vditor-wysiwyg .vditor-reset .vmd-code-block--ordinary > .vditor-wysiwyg__preview {
+  overflow: hidden;
+  border-radius: 5px;
+}
+.vditor-wysiwyg .vditor-reset .vmd-code-block--ordinary > .vditor-wysiwyg__preview > code {
+  border-radius: 0 0 5px 5px;
+}
+.vditor-wysiwyg .vditor-reset .vmd-code-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  padding: 3px 8px;
+  box-sizing: border-box;
+  border-bottom: 1px solid
+    var(--vscode-editorWidget-border, var(--border-color, rgba(127, 127, 127, 0.35)));
+  color: var(--vscode-descriptionForeground, var(--second-color));
+  background: var(
+    --vmd-code-block-background,
+    var(--vmd-content-code-background, rgba(127, 127, 127, 0.08))
+  );
+  font: 11px/1.4 var(--vscode-editor-font-family, monospace);
+  user-select: none;
+}
+.vditor-wysiwyg .vditor-reset .vmd-code-language-button {
+  min-width: 0;
+  padding: 1px 4px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  appearance: none;
+}
+.vditor-wysiwyg .vditor-reset .vmd-code-language-button::after {
+  margin-left: 5px;
+  content: '▾';
+  font-size: 9px;
+}
+.vditor-wysiwyg .vditor-reset .vmd-code-language-button:hover,
+.vditor-wysiwyg .vditor-reset .vmd-code-language-button:focus-visible {
+  border-color: var(--vscode-focusBorder, #007fd4);
+  outline: none;
+}
+.vditor-wysiwyg .vditor-reset .vmd-code-toolbar > .vditor-copy {
+  position: static !important;
+  display: flex !important;
+  flex: 0 0 auto;
+  align-items: center;
+}
+.vditor-wysiwyg .vditor-reset .vmd-code-toolbar > .vditor-copy > span {
+  position: static !important;
+  display: flex;
+  align-items: center;
+}
+.vditor-wysiwyg .vditor-reset .vmd-code-block--editing {
+  display: flex !important;
+  flex-direction: column;
+}
+.vditor-wysiwyg .vditor-reset .vmd-code-block--editing > .vditor-wysiwyg__preview {
+  order: 1;
+  margin: 1em 0 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+.vditor-wysiwyg .vditor-reset .vmd-code-block--editing > .vditor-wysiwyg__preview {
+  margin-bottom: 0 !important;
+  border-radius: 5px 5px 0 0;
+}
+.vditor-wysiwyg .vditor-reset .vmd-code-block--editing > .vditor-wysiwyg__preview > code,
+.vditor-wysiwyg .vditor-reset .vmd-code-block--editing > .vditor-wysiwyg__preview > span {
+  display: none !important;
+}
+.vditor-wysiwyg .vditor-reset .vmd-code-block--editing > .vditor-wysiwyg__pre {
+  order: 2;
+  margin-top: 0 !important;
+  margin-bottom: 1em !important;
+}
+.vditor-wysiwyg .vditor-reset .vmd-code-block--editing > .vditor-wysiwyg__pre > code {
+  border-radius: 0 0 5px 5px;
+}
+
+#vmd-code-language-menu {
+  position: fixed;
+  z-index: 10001;
+  display: none;
+  min-width: 180px;
+  max-height: min(420px, calc(100vh - 16px));
+  padding: 4px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  border: 1px solid var(--vscode-menu-border, var(--border-color));
+  border-radius: 5px;
+  color: var(--vscode-menu-foreground, var(--toolbar-icon-color));
+  background: var(--vscode-menu-background, var(--panel-background-color));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  font: 13px/1.4 var(--vscode-font-family, sans-serif);
+  user-select: none;
+}
+#vmd-code-language-menu button {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 28px 4px 8px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 3px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+#vmd-code-language-menu button:hover,
+#vmd-code-language-menu button:focus-visible {
+  color: var(--vscode-menu-selectionForeground, #fff);
+  background: var(--vscode-menu-selectionBackground, #04395e);
+  outline: none;
+}
+#vmd-code-language-menu .vmd-code-language-menu__current::after {
+  position: absolute;
+  right: 9px;
+  content: '✓';
 }
 
 /* GitHub Alerts remain ordinary blockquotes in Markdown. The controller hides

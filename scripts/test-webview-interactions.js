@@ -154,7 +154,12 @@ function testPage() {
       document.querySelector(
         '.vditor-toolbar [data-type="vmd-mode-' + mode + '"]'
       ).click();
-      await wait(() => window.vditor.vditor.currentMode === mode);
+      await wait(() => window.vditor.vditor.currentMode === mode).catch(() => {
+        throw new Error(
+          'toolbar mode switch timed out: expected=' + mode +
+            ', actual=' + window.vditor.vditor.currentMode
+        );
+      });
       await pause(80);
       const savedModes = window.__vmdMessages.filter(
         (message) => message.command === 'save-options'
@@ -181,6 +186,7 @@ function testPage() {
     const lines = (...values) => values.join(String.fromCharCode(10));
     const removedModeName = ['i', 'r'].join('');
 
+    let testCheckpoint = 'startup';
     (async () => {
       try {
         await wait(() => window.__vmdMessages.some((message) => message.command === 'ready'));
@@ -246,11 +252,14 @@ function testPage() {
         );
         const modePanel = modeControl.parentElement.querySelector('.vditor-hint');
         expect(modePanel?.style.display === 'block', 'clicking the mode control did not open its menu');
+        modeControl.classList.add('vditor-tooltipped--hover');
         expect(
-          modeControl.classList.contains('vmd-toolbar-tooltip--suppressed') &&
-            getComputedStyle(modeControl, '::after').display === 'none',
-          'the open mode menu did not suppress its toolbar tooltip'
+          modeControl.classList.contains('vditor-tooltipped') &&
+            !!modeControl.getAttribute('aria-label') &&
+            getComputedStyle(modeControl, '::after').display !== 'none',
+          'the original Vditor toolbar tooltip was not available on hover/focus'
         );
+        modeControl.classList.remove('vditor-tooltipped--hover');
         modeControl.click();
         expect(modePanel.style.display === 'none', 'clicking the mode control again did not close its menu');
         const initialBaselines = window.__vmdMessages.filter((message) => message.command === 'editor-baseline');
@@ -360,45 +369,67 @@ function testPage() {
           cancelable: true,
         }));
         expect(getComputedStyle(mathSource).display === 'none', 'formula source did not auto-close outside');
-        const codeBlock = root().querySelector(
+        let codeBlock = root().querySelector(
           '.vditor-wysiwyg__block[data-type="code-block"]'
         );
-        const codeSource = codeBlock.querySelector(':scope > .vditor-wysiwyg__pre');
-        const codePreview = codeBlock.querySelector(':scope > .vditor-wysiwyg__preview');
+        let codeSource = codeBlock.querySelector(':scope > .vditor-wysiwyg__pre');
+        let codePreview = codeBlock.querySelector(':scope > .vditor-wysiwyg__preview');
+        let codePreviewCode = codePreview.querySelector(':scope > code');
+        let codeLanguageButton = codeBlock.querySelector('.vmd-code-language-button');
         expect(
-          !codeBlock.classList.contains('vmd-code-inline-edit') &&
-            !codeBlock.querySelector('.vmd-code-lang-wrap'),
-          'the removed direct-edit code surface or language control was still installed'
+          codeBlock.classList.contains('vmd-code-block--ordinary') &&
+            codeLanguageButton?.textContent.includes('js') &&
+            codeBlock.querySelector('.vmd-code-toolbar .vditor-copy'),
+          'the ordinary code block did not receive its persistent language/copy bar: ' +
+            codeBlock.outerHTML.slice(0, 2000)
         );
         expect(
-          getComputedStyle(codeSource).display === 'none',
-          'the ordinary code source was visible before opening it'
+          getComputedStyle(codeSource).display === 'none' &&
+            getComputedStyle(codePreviewCode).display !== 'none',
+          'the idle ordinary code block did not show exactly its highlighted preview'
         );
-        expect(
-          parseFloat(getComputedStyle(codePreview).borderTopWidth) === 0,
-          'the code divider was visible before opening the source'
-        );
-        codePreview.click();
+
+        codeLanguageButton.click();
         await pause();
-        const sourceStyle = getComputedStyle(codeSource);
-        const previewStyle = getComputedStyle(codePreview);
-        expect(
-          sourceStyle.display !== 'none',
-          'clicking the ordinary code preview did not reveal its native source editor'
+        let codeLanguageMenu = document.getElementById('vmd-code-language-menu');
+        const codeLanguageItems = Array.from(
+          codeLanguageMenu.querySelectorAll('button[data-code-language]')
         );
         expect(
-          parseFloat(sourceStyle.marginBottom) === 0,
-          "the expanded code source kept Vditor's negative bottom margin"
+          getComputedStyle(codeLanguageMenu).display !== 'none' &&
+            codeLanguageMenu.querySelector('.vmd-code-language-menu__current')?.dataset.codeLanguage === 'js' &&
+            codeLanguageItems.some((item) => item.dataset.codeLanguage === '') &&
+            codeLanguageItems.some((item) => item.dataset.codeLanguage === 'python') &&
+            !codeLanguageItems.some((item) => item.dataset.codeLanguage === 'mermaid'),
+          'the local code-language menu did not retain the custom current language or exclude rich renderers'
         );
+        document.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }));
         expect(
-          parseFloat(previewStyle.borderTopWidth) === 1 &&
-            previewStyle.borderTopStyle === 'solid' &&
-            parseFloat(previewStyle.paddingTop) > 0 &&
-            parseFloat(previewStyle.paddingTop) <= 8 &&
-            parseFloat(previewStyle.marginTop) > 0 &&
-            parseFloat(previewStyle.marginTop) <= 8,
-          'the native code source and preview divider is not compact and one pixel wide'
+          getComputedStyle(codeLanguageMenu).display === 'none' &&
+            window.vditor.getValue().includes(markerFence + 'js\\nconst a = 1;'),
+          'Escape did not close the code-language menu without changing Markdown'
         );
+        codeLanguageButton.click();
+        await pause();
+        codeLanguageMenu.querySelector('button[data-code-language="python"]').click();
+        await pause(100);
+        expect(
+          window.vditor.getValue().includes(markerFence + 'python\\nconst a = 1;') &&
+            codeSource.querySelector('code').classList.contains('language-python') &&
+            getComputedStyle(codeLanguageMenu).display === 'none',
+          'selecting a local code language did not update the fenced Markdown'
+        );
+        window.vditor.vditor.undo.undo(window.vditor.vditor);
+        await pause(100);
+        expect(
+          window.vditor.getValue().includes(markerFence + 'js\\nconst a = 1;'),
+          'the local code-language change could not be undone'
+        );
+
         // Guard against over-hiding: heading labels are a different rule and stay.
         const heading = root().querySelector('h1');
         expect(heading, 'the heading fixture did not render');
@@ -407,8 +438,21 @@ function testPage() {
           'hiding the block markers also removed the heading level label'
         );
 
+        await setMarkdown(markerFence + 'math\\nx^2\\n' + markerFence);
+        await pause(80);
+        const richCodeBlock = root().querySelector(
+          '.vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        const richCodeSource = richCodeBlock.querySelector(':scope > .vditor-wysiwyg__pre');
+        expect(
+          !richCodeBlock.classList.contains('vmd-code-block--ordinary') &&
+            !richCodeBlock.querySelector('.vmd-code-toolbar') &&
+            getComputedStyle(richCodeSource).display === 'none',
+          'a rich-render code block incorrectly received the ordinary in-place editor'
+        );
+
         // Plain link clicks edit the raw href; only Ctrl/Cmd+click follows it.
-        await setMarkdown('[visible **link**](relative/path.md?x=1#part "old title")');
+        await setMarkdown('before [visible **link**](relative/path.md?x=1#part "old title") after');
         let renderedLink = root().querySelector('a');
         const renderedStrong = renderedLink.querySelector('strong');
         const linkText = textNode(renderedStrong);
@@ -502,6 +546,12 @@ function testPage() {
           'editing the link URL popover did not update Markdown'
         );
         const linkCopyButton = urlPopover.querySelector('.vmd-popover-copy-url');
+        const linkCloseButton = urlPopover.querySelector('.vmd-popover-close');
+        expect(
+          linkCloseButton?.getAttribute('aria-label') &&
+            urlPopover.classList.contains('vmd-url-popover--persistent'),
+          'the persistent link popover did not expose an accessible close button'
+        );
         linkUrlInput.focus();
         linkUrlInput.dispatchEvent(new KeyboardEvent('keydown', {
           key: 'Tab',
@@ -509,6 +559,19 @@ function testPage() {
           cancelable: true,
         }));
         expect(document.activeElement === linkCopyButton, 'Tab did not reach the visible link copy button');
+        linkCopyButton.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Tab',
+          bubbles: true,
+          cancelable: true,
+        }));
+        expect(document.activeElement === linkCloseButton, 'Tab did not reach the visible link close button');
+        linkCloseButton.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Tab',
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }));
+        expect(document.activeElement === linkCopyButton, 'Shift+Tab did not return from close to copy');
         linkCopyButton.dispatchEvent(new KeyboardEvent('keydown', {
           key: 'Tab',
           shiftKey: true,
@@ -521,6 +584,49 @@ function testPage() {
         expect(
           window.__vmdClipboardText === 'docs/edited.md?from=popover#target',
           'the link URL copy button did not copy the current edited href'
+        );
+
+        const linkParagraph = root().querySelector('p');
+        const outsideLinkText = textNode(linkParagraph);
+        select(outsideLinkText, 1, outsideLinkText, 1);
+        linkParagraph.dispatchEvent(new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause(260);
+        expect(
+          urlPopover.style.display === 'block' &&
+            urlPopover.classList.contains('vmd-url-popover--persistent') &&
+            linkUrlInput.isConnected,
+          'clicking outside replaced or dismissed the persistent link popover'
+        );
+        const linkEscape = new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        });
+        document.dispatchEvent(linkEscape);
+        expect(
+          linkEscape.defaultPrevented &&
+            urlPopover.style.display === 'none' &&
+            !urlPopover.classList.contains('vmd-url-popover--persistent'),
+          'Escape did not close only the active link popover'
+        );
+
+        renderedLink = root().querySelector('a');
+        const reopenedLinkText = textNode(renderedLink.querySelector('strong'));
+        select(reopenedLinkText, 1, reopenedLinkText, 1);
+        renderedLink.querySelector('strong').dispatchEvent(new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+        }));
+        await Promise.resolve();
+        urlPopover = document.querySelector('.vditor-wysiwyg > .vmd-url-popover');
+        urlPopover.querySelector('.vmd-popover-close').click();
+        expect(
+          urlPopover.style.display === 'none' &&
+            !urlPopover.classList.contains('vmd-url-popover--persistent'),
+          'the link close button did not dismiss the persistent popover'
         );
         renderedLink = root().querySelector('a');
         expect(getComputedStyle(renderedLink).cursor === 'text', 'an unmodified link did not use the text cursor');
@@ -593,7 +699,7 @@ function testPage() {
 
         // Image popovers share the wide URL editor/copy action, hide alt text,
         // and retain title editing without discarding the existing alt value.
-        await setMarkdown('![kept alt](assets/a-very-long-image-file-name.png "Old title")');
+        await setMarkdown('before ![kept alt](assets/a-very-long-image-file-name.png "Old title") after');
         const renderedImage = root().querySelector('img');
         renderedImage.dispatchEvent(new MouseEvent('click', {
           bubbles: true,
@@ -634,11 +740,57 @@ function testPage() {
           window.vditor.getValue().includes('![kept alt](assets/edited-image.png "Changed title")'),
           'editing image URL/title lost the hidden alt text or failed to update Markdown'
         );
-        urlPopover.querySelector('.vmd-popover-copy-url').click();
+        const imageCopyButton = urlPopover.querySelector('.vmd-popover-copy-url');
+        const imageCloseButton = urlPopover.querySelector('.vmd-popover-close');
+        expect(
+          imageCloseButton?.getAttribute('aria-label') &&
+            urlPopover.classList.contains('vmd-url-popover--persistent'),
+          'the persistent image popover did not expose an accessible close button'
+        );
+        imageUrlInput.focus();
+        imageUrlInput.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Tab',
+          bubbles: true,
+          cancelable: true,
+        }));
+        expect(document.activeElement === imageCopyButton, 'Tab did not reach the image copy button');
+        imageCopyButton.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Tab',
+          bubbles: true,
+          cancelable: true,
+        }));
+        expect(document.activeElement === imageCloseButton, 'Tab did not reach the image close button');
+        imageCloseButton.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Tab',
+          bubbles: true,
+          cancelable: true,
+        }));
+        expect(document.activeElement === imageTitleInput, 'Tab did not reach the image title input');
+        imageCopyButton.click();
         await pause();
         expect(
           window.__vmdClipboardText === 'assets/edited-image.png',
           'the image URL copy button did not copy the current source path'
+        );
+        const imageParagraph = root().querySelector('img').closest('p');
+        const outsideImageText = textNode(imageParagraph);
+        select(outsideImageText, 1, outsideImageText, 1);
+        imageParagraph.dispatchEvent(new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause(260);
+        expect(
+          urlPopover.style.display === 'block' &&
+            urlPopover.classList.contains('vmd-url-popover--persistent') &&
+            imageUrlInput.isConnected,
+          'clicking outside replaced or dismissed the persistent image popover'
+        );
+        imageCloseButton.click();
+        expect(
+          urlPopover.style.display === 'none' &&
+            !urlPopover.classList.contains('vmd-url-popover--persistent'),
+          'the image close button did not dismiss the persistent popover'
         );
 
         await setMarkdown('[![linked alt](assets/linked.png "Image title")](target.md)');
@@ -1260,7 +1412,26 @@ function testPage() {
             detailsTitleInput?.value === 'Title',
           'the title edit button toggled details or did not open the shared custom popover'
         );
+        const detailsCloseButton = detailsTitlePopover.querySelector('.vmd-popover-close');
+        expect(
+          detailsCloseButton?.getAttribute('aria-label') &&
+            detailsTitlePopover.classList.contains('vmd-url-popover--persistent'),
+          'the persistent details title popover did not expose an accessible close button'
+        );
         detailsTitleInput.focus();
+        detailsTitleInput.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Tab',
+          bubbles: true,
+          cancelable: true,
+        }));
+        expect(document.activeElement === detailsCloseButton, 'Tab did not reach the details close button');
+        detailsCloseButton.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Tab',
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }));
+        expect(document.activeElement === detailsTitleInput, 'Shift+Tab did not return to the details title input');
         const imeConfirmEvent = new KeyboardEvent('keydown', {
           key: 'Enter',
           bubbles: true,
@@ -1304,6 +1475,46 @@ function testPage() {
           'details editing controls leaked into Markdown'
         );
         expect(!/<details\\s+[^>]*\\bopen/.test(window.vditor.getValue()), 'opening details changed the Markdown source');
+
+        const detailsOutsideBlock = root().lastElementChild;
+        const detailsOutsideText = textNode(detailsOutsideBlock);
+        select(detailsOutsideText, 1, detailsOutsideText, 1);
+        detailsOutsideBlock.dispatchEvent(new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause(260);
+        expect(
+          detailsTitlePopover.style.display === 'block' &&
+            detailsTitlePopover.classList.contains('vmd-url-popover--persistent') &&
+            detailsTitleInput.isConnected,
+          'clicking outside replaced or dismissed the persistent details title popover'
+        );
+        detailsCloseButton.click();
+        expect(
+          detailsTitlePopover.style.display === 'none' &&
+            !detailsTitlePopover.classList.contains('vmd-url-popover--persistent'),
+          'the details close button did not dismiss the persistent popover'
+        );
+
+        const renamedTitleButton = detailsOpener.querySelector('.vmd-details-title-button');
+        renamedTitleButton.click();
+        await Promise.resolve();
+        const reopenedDetailsPopover = document.querySelector(
+          '.vditor-wysiwyg > .vmd-details-title-popover'
+        );
+        const detailsEscape = new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        });
+        document.dispatchEvent(detailsEscape);
+        expect(
+          detailsEscape.defaultPrevented &&
+            reopenedDetailsPopover.style.display === 'none' &&
+            !reopenedDetailsPopover.classList.contains('vmd-url-popover--persistent'),
+          'Escape did not close the persistent details title popover'
+        );
 
         const renamedToggle = renamedDetailsSummary.querySelector('.vmd-details-toggle');
         renamedToggle.click();
@@ -1354,6 +1565,13 @@ function testPage() {
         );
         richTitleInput.blur();
         await pause();
+        const richTitlePopover = document.querySelector('.vmd-details-title-popover');
+        expect(
+          richTitlePopover.style.display === 'block' &&
+            richTitlePopover.classList.contains('vmd-url-popover--persistent'),
+          'blurring an unchanged details title unexpectedly closed its popover'
+        );
+        richTitlePopover.querySelector('.vmd-popover-close').click();
         expect(
           window.vditor.getValue().includes('<summary><strong>Rich title</strong></summary>'),
           'opening and closing the title popover flattened an unchanged rich summary'
@@ -1382,6 +1600,54 @@ function testPage() {
           'opening the outer details did not reveal the nested opener and closer');
         expect(hidden(nested[2]),
           'opening the outer details also revealed content the inner details still hides');
+
+        await setMarkdown(
+          '<details>\\n<summary>Continuous border</summary>\\n\\nparagraph body' +
+            '\\n\\n- first list item\\n- second list item\\n\\n> quote body' +
+            '\\n\\n| A | B |\\n| --- | --- |\\n| one | two |' +
+            '\\n\\ntail paragraph\\n\\n</details>'
+        );
+        const borderOpener = root().querySelector('.vmd-details-opener');
+        borderOpener.querySelector('summary').click();
+        await pause(80);
+        const borderedBlocks = Array.from(
+          root().querySelectorAll(':scope > .vmd-details-content--open')
+        );
+        expect(
+          borderedBlocks.length === 5,
+          'the mixed details fixture did not expose all five content blocks'
+        );
+        const borderRects = borderedBlocks.map((block) =>
+          block.getBoundingClientRect()
+        );
+        for (let index = 0; index < borderedBlocks.length; index += 1) {
+          const style = getComputedStyle(borderedBlocks[index]);
+          expect(
+            style.boxSizing === 'border-box' &&
+              Number.parseFloat(style.marginTop) === 0 &&
+              Number.parseFloat(style.marginBottom) === 0,
+            'details content blocks do not share one margin-free border box'
+          );
+          expect(
+            Math.abs(borderRects[index].left - borderRects[0].left) <= 0.5 &&
+              Math.abs(borderRects[index].right - borderRects[0].right) <= 0.5,
+            'details borders are not horizontally aligned at block ' + index
+          );
+          if (index > 0) {
+            expect(
+              Math.abs(borderRects[index].top - borderRects[index - 1].bottom) <= 0.5,
+              'details border is discontinuous between blocks ' +
+                (index - 1) + ' and ' + index
+            );
+          }
+        }
+        expect(
+          Number.parseFloat(getComputedStyle(borderedBlocks[0]).borderTopWidth) === 1 &&
+            Number.parseFloat(
+              getComputedStyle(borderedBlocks[borderedBlocks.length - 1]).borderBottomWidth
+            ) === 1,
+          'the continuous details boundary lost its top or bottom edge'
+        );
 
         // Reproduce an actual blank WYSIWYG line through Vditor's Enter path.
         // Clicking Alert there must replace the empty source line, not the
@@ -1689,19 +1955,29 @@ function testPage() {
         );
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
-        // Quote and GitHub Alert controls transform the caret line in place.
-        // They must not insert a separate template for non-empty content or lose
-        // the caret when Vditor projects the changed Markdown back into the DOM.
-        const plainQuoteButton = document.querySelector(
-          '.vditor-toolbar [data-type="vmd-quote-plain"]'
+        // Restore Vditor's original, standalone quote command and icon. GitHub
+        // Alert remains an independent control with its own source transforms.
+        const nativeQuoteButton = document.querySelector(
+          '.vditor-toolbar [data-type="quote"]'
         );
         const alertButton = document.querySelector(
           '.vditor-toolbar [data-type="vmd-alert"]'
         );
-        expect(plainQuoteButton && alertButton, 'the standalone Quote/Alert buttons are missing');
+        expect(nativeQuoteButton && alertButton, 'the standalone Quote/Alert buttons are missing');
         expect(
-          plainQuoteButton.parentElement?.nextElementSibling === alertButton.parentElement,
-          'the standalone Alert button is not immediately after the plain Quote button'
+          !document.querySelector('.vditor-toolbar [data-type="vmd-quote-plain"]'),
+          'the simplified custom Quote button is still rendered'
+        );
+        const nativeQuoteUse = nativeQuoteButton.querySelector('svg use');
+        expect(
+          nativeQuoteUse &&
+            (nativeQuoteUse.getAttribute('href') || nativeQuoteUse.getAttribute('xlink:href')) ===
+              '#vditor-icon-quote',
+          "the Quote button did not restore Vditor's original icon"
+        );
+        expect(
+          nativeQuoteButton.parentElement?.nextElementSibling === alertButton.parentElement,
+          'the standalone Alert button is not immediately after the native Quote button'
         );
         expect(
           !document.querySelector(
@@ -1723,22 +1999,24 @@ function testPage() {
         await setMarkdown('before quote\\n\\ncurrent quote line\\n\\nafter quote');
         let currentQuoteText = textNode(root().querySelectorAll(':scope > p')[1]);
         select(currentQuoteText, 7, currentQuoteText, 7);
-        plainQuoteButton.click();
+        nativeQuoteButton.click();
         await pause(80);
         expect(
           currentQuoteValue() === 'before quote\\n\\n> current quote line\\n\\nafter quote',
-          'plain quote inserted a separate template instead of toggling the caret line: ' +
+          "Vditor's native Quote command did not quote the caret block: " +
             JSON.stringify(window.vditor.getValue())
         );
         expect(
-          caretBlockquote()?.textContent.includes('current quote line'),
-          'plain quote projection lost the caret from the transformed line'
+          nativeQuoteButton.classList.contains('vditor-menu--current') &&
+            caretBlockquote()?.textContent.includes('current quote line'),
+          'the native Quote command did not retain its active state and caret'
         );
-        plainQuoteButton.click();
+        nativeQuoteButton.click();
         await pause(80);
         expect(
-          currentQuoteValue() === 'before quote\\n\\ncurrent quote line\\n\\nafter quote',
-          'clicking the active plain quote did not toggle it off: ' +
+          currentQuoteValue() === 'before quote\\n\\ncurrent quote line\\n\\nafter quote' &&
+            !nativeQuoteButton.classList.contains('vditor-menu--current'),
+          'clicking the active native Quote command did not remove the quote: ' +
             JSON.stringify(window.vditor.getValue())
         );
 
@@ -1765,25 +2043,29 @@ function testPage() {
           caretBlockquote()?.classList.contains('vmd-alert--tip'),
           'switching the Alert type lost the body caret'
         );
-        plainQuoteButton.click();
+        alertButton.click();
         await pause(80);
         expect(
-          currentQuoteValue() === 'before quote\\n\\n> current quote line\\n\\nafter quote',
-          'GitHub Alert did not switch to a plain quote in place: ' +
+          currentQuoteValue() === 'before quote\\n\\ncurrent quote line\\n\\nafter quote',
+          'the independent Alert button did not remove the active Alert: ' +
             JSON.stringify(window.vditor.getValue())
         );
+
+        await setMarkdown('before quote\\n\\n> current quote line\\n\\nafter quote');
+        currentQuoteText = textNode(root().querySelector(':scope > blockquote p'));
+        select(currentQuoteText, 7, currentQuoteText, 7);
         alertButton.click();
         await pause(80);
         expect(
           currentQuoteValue() === 'before quote\\n\\n> [!NOTE]\\n> current quote line\\n\\nafter quote',
-          'the Alert button did not convert a plain quote to Note in place'
+          'the Alert button did not convert an existing plain quote to Note in place'
         );
         await selectAlertType(caretBlockquote(), 'WARNING');
         alertButton.click();
         await pause(80);
         expect(
           currentQuoteValue() === 'before quote\\n\\ncurrent quote line\\n\\nafter quote',
-          'the unified Alert button did not remove an active non-Note Alert'
+          'the independent Alert button did not remove an active non-Note Alert'
         );
 
         await setMarkdown('> [!NOTE]\\n> first duplicate alert\\n\\n> [!NOTE]\\n> second duplicate alert');
@@ -1941,6 +2223,74 @@ function testPage() {
         document.querySelector('.vditor-toolbar [data-type="math-block"]').click();
         await pause();
         expect(window.vditor.getValue().includes('$$\\nblock formula\\n$$'), 'formula-block toolbar did not wrap the selected text');
+
+        const detailsSelectionButton = document.querySelector(
+          '.vditor-toolbar [data-type="details"]'
+        );
+
+        // A structural selection expands partial endpoints to complete blocks.
+        // Touching one list item deliberately includes the complete list.
+        await setMarkdown(
+          'before mixed details\\n\\npartial paragraph body\\n\\n' +
+            '- first list body\\n- second list body\\n\\nafter mixed details'
+        );
+        const mixedParagraph = root().querySelectorAll(':scope > p')[1];
+        const mixedListItems = root().querySelectorAll(':scope > ul > li');
+        const mixedStart = textNode(mixedParagraph);
+        const mixedEnd = textNode(mixedListItems[1]);
+        select(mixedStart, 8, mixedEnd, 6);
+        detailsSelectionButton.click();
+        await pause(80);
+        const mixedDetailsValue = window.vditor.getValue().replace(/\\n+$/, '');
+        expect(
+          mixedDetailsValue.startsWith('before mixed details\\n\\n<details>') &&
+            mixedDetailsValue.includes(
+              '\\n\\npartial paragraph body\\n\\n- first list body\\n- second list body' +
+                '\\n\\n</details>\\n\\nafter mixed details'
+            ),
+          'a partial paragraph/list selection did not fold complete blocks: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
+
+        await setMarkdown(
+          'before single list\\n\\n- keep first item\\n- touched second item' +
+            '\\n\\nafter single list'
+        );
+        const touchedListText = textNode(
+          root().querySelectorAll(':scope > ul > li')[1]
+        );
+        select(touchedListText, 3, touchedListText, 9);
+        detailsSelectionButton.click();
+        await pause(80);
+        const singleListDetailsValue = window.vditor.getValue().replace(/\\n+$/, '');
+        expect(
+          singleListDetailsValue.startsWith('before single list\\n\\n<details>') &&
+            singleListDetailsValue.includes(
+              '\\n\\n- keep first item\\n- touched second item' +
+                '\\n\\n</details>\\n\\nafter single list'
+            ),
+          'touching one list item did not fold the complete list: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
+
+        await setMarkdown(
+          'before table details\\n\\n| A | B |\\n| --- | --- |\\n| one | two |' +
+            '\\n\\nafter table details'
+        );
+        const touchedTableCell = textNode(root().querySelector('tbody td'));
+        select(touchedTableCell, 0, touchedTableCell, 1);
+        detailsSelectionButton.click();
+        await pause(80);
+        const tableDetailsValue = window.vditor.getValue().replace(/\\n+$/, '');
+        expect(
+          tableDetailsValue.startsWith('before table details\\n\\n<details>') &&
+            tableDetailsValue.includes('| A') &&
+            tableDetailsValue.includes('| one') &&
+            tableDetailsValue.includes('| --- | --- |') &&
+            tableDetailsValue.endsWith('</details>\\n\\nafter table details'),
+          'touching one table cell did not fold the complete table: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
 
         await setMarkdown('collapsible body');
         const detailsText = textNode(root().querySelector(':scope > p'));
@@ -2109,11 +2459,39 @@ function testPage() {
           }
           throw new Error('Expected Split View text: ' + value);
         };
+
+        await setMarkdown(
+          'SV before details\\n\\nSV paragraph outside\\n\\n' +
+            '- SV first list item\\n- SV touched list item\\n\\nSV after details'
+        );
+        const svTouchedListText = findSvText('SV touched list item');
+        const svTouchedOffset = svTouchedListText.data.indexOf('touched');
+        select(
+          svTouchedListText,
+          svTouchedOffset,
+          svTouchedListText,
+          svTouchedOffset + 4
+        );
+        document.querySelector('.vditor-toolbar [data-type="details"]').click();
+        await pause(80);
+        const svDetailsValue = window.vditor.getValue().replace(/\\n+$/, '');
+        expect(
+          svDetailsValue.startsWith(
+            'SV before details\\n\\nSV paragraph outside\\n\\n<details>'
+          ) &&
+            svDetailsValue.includes(
+              '\\n\\n- SV first list item\\n- SV touched list item\\n\\n</details>'
+            ) &&
+            svDetailsValue.endsWith('SV after details'),
+          'Split View did not fold the complete list touched by a partial selection: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
+
         await setMarkdown('SV before\\nSV current\\nSV after');
         let svCurrent = findSvText('SV current');
         let svCurrentOffset = svCurrent.data.indexOf('SV current') + 3;
         select(svCurrent, svCurrentOffset, svCurrent, svCurrentOffset);
-        plainQuoteButton.click();
+        nativeQuoteButton.click();
         await pause(80);
         expect(
           svQuoteValue() === 'SV before\\n\\n> SV current\\n> SV after',
@@ -2607,7 +2985,103 @@ function testPage() {
           'a stale-generation host update replaced the reinitialized editor'
         );
 
+        // Run direct code input after toolbar-selection fixtures so Vditor's
+        // native input history cannot affect their deliberately synthetic focus.
+        testCheckpoint = 'ordinary code direct editing';
+        await setMarkdown(markerFence + 'js\\nconst a = 1;\\n' + markerFence);
+        await pause(120);
+        codeBlock = root().querySelector(
+          '.vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        codeSource = codeBlock.querySelector(':scope > .vditor-wysiwyg__pre');
+        codePreview = codeBlock.querySelector(':scope > .vditor-wysiwyg__preview');
+        codePreviewCode = codePreview.querySelector(':scope > code');
+        const codeTopBeforeEdit = codePreview.getBoundingClientRect().top;
+        codePreviewCode.click();
+        await pause();
+        expect(
+          codeBlock.classList.contains('vmd-code-block--editing') &&
+            Math.abs(codePreview.getBoundingClientRect().top - codeTopBeforeEdit) <= 1 &&
+            getComputedStyle(codeSource).display !== 'none' &&
+            getComputedStyle(codePreviewCode).display === 'none' &&
+            getComputedStyle(codeBlock.querySelector('.vmd-code-toolbar')).display === 'flex',
+          'clicking highlighted code did not replace it in place with one plain editable surface'
+        );
+        expect(
+          parseFloat(getComputedStyle(codePreview).borderTopWidth) === 0 &&
+            window.vditor.vditor.wysiwyg.popover.style.display !== 'block',
+          'ordinary code editing still exposed the old source/preview divider or native language input'
+        );
+
+        let sourceCode = codeSource.querySelector(':scope > code');
+        select(sourceCode, 0, sourceCode, sourceCode.childNodes.length);
+        expect(
+          document.execCommand('insertText', false, 'const edited = 2;'),
+          'the browser did not accept direct input in the plain code surface'
+        );
+        await pause(120);
+        codeBlock = root().querySelector(
+          '.vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        codeSource = codeBlock.querySelector(':scope > .vditor-wysiwyg__pre');
+        codePreview = codeBlock.querySelector(':scope > .vditor-wysiwyg__preview');
+        codePreviewCode = codePreview.querySelector(':scope > code');
+        expect(
+          window.vditor.getValue().includes('const edited = 2;') &&
+            codeBlock.classList.contains('vmd-code-block--editing') &&
+            getComputedStyle(codeSource).display !== 'none' &&
+            getComputedStyle(codePreviewCode).display === 'none',
+          'direct plain-code input was not synchronized or left the in-place editor'
+        );
+
+        codeLanguageButton = codeBlock.querySelector('.vmd-code-language-button');
+        codeLanguageButton.click();
+        await pause();
+        codeLanguageMenu = document.getElementById('vmd-code-language-menu');
+        codeLanguageMenu.querySelector('button[data-code-language="typescript"]').click();
+        await pause(100);
+        const codeSelectionAfterLanguage = window.getSelection();
+        expect(
+          window.vditor.getValue().includes(markerFence + 'typescript\\nconst edited = 2;') &&
+            codeBlock.classList.contains('vmd-code-block--editing') &&
+            codeSelectionAfterLanguage?.rangeCount &&
+            codeSource.contains(codeSelectionAfterLanguage.getRangeAt(0).startContainer),
+          'switching language while editing lost the code body, caret, or edit mode'
+        );
+        const directCopyButton = codeBlock.querySelector(
+          '.vmd-code-toolbar .vditor-copy .vditor-tooltipped'
+        );
+        directCopyButton.click();
+        await pause();
+        expect(
+          window.__vmdClipboardText === 'const edited = 2;',
+          'the in-place code copy action did not use the latest edited content'
+        );
+
+        sourceCode = codeSource.querySelector(':scope > code');
+        const sourceSelectionText = textNode(sourceCode);
+        select(sourceSelectionText, 3, sourceSelectionText, 3);
+        sourceCode.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause();
+        expect(
+          !codeBlock.classList.contains('vmd-code-block--editing') &&
+            getComputedStyle(codeSource).display === 'none' &&
+            getComputedStyle(codePreviewCode).display !== 'none' &&
+            codePreviewCode.textContent.includes('const edited = 2;'),
+          'Escape did not return the ordinary code block to one highlighted preview'
+        );
+        expect(
+          !window.vditor.getValue().includes('vmd-code-'),
+          'the code editing controls leaked into Markdown'
+        );
+
+        testCheckpoint = 'mode switch after ordinary code editing';
         await switchMode('sv');
+        testCheckpoint = 'split scroll fixture after ordinary code editing';
         const splitMarkdown = Array.from({ length: 72 }, (_, index) =>
           '## Section ' + index + '\\n\\n' +
           'Long split-view paragraph ' + index + ' '.repeat(18) + '\\n\\n' +
@@ -2648,7 +3122,7 @@ function testPage() {
       } catch (error) {
         document.body.dataset.vmdTest = 'failed';
         const message = error?.stack || (error?.message ? error.message : String(error));
-        result.textContent = 'failed: ' + message +
+        result.textContent = 'failed [' + testCheckpoint + ']: ' + message +
           (window.__vmdRuntimeError ? ' | runtime: ' + window.__vmdRuntimeError : '');
       }
     })();
@@ -2720,7 +3194,7 @@ async function main() {
         '--no-first-run',
         '--no-default-browser-check',
         `--user-data-dir=${profile}`,
-        '--virtual-time-budget=16000',
+        '--virtual-time-budget=18000',
         '--dump-dom',
         `http://127.0.0.1:${port}/`,
       ],

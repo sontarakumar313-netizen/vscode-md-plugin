@@ -3,7 +3,7 @@
   "displayName": "Markdown Interactor",
   "icon": "media/logo.png",
   "description": "An interactive WYSIWYG Markdown editor with live rendering, diagrams, math, and custom themes.",
-  "version": "0.1.15",
+  "version": "0.1.17",
   "publisher": "sontarakumar313-netizen",
   "author": {
     "name": "sontarakumar313-netizen",

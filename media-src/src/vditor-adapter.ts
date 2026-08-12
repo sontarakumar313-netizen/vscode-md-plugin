@@ -12,6 +12,7 @@ import { setSelectionFocus } from 'vditor/src/ts/util/selection'
 import { setEditMode } from 'vditor/src/ts/toolbar/EditMode'
 import { afterRenderEvent as commitWysiwygAfterRender } from 'vditor/src/ts/wysiwyg/afterRenderEvent'
 import { renderDomByMd } from 'vditor/src/ts/wysiwyg/renderDomByMd'
+import { processCodeRender } from 'vditor/src/ts/util/processCode'
 import {
   genAPopover,
   highlightToolbarWYSIWYG,
@@ -34,6 +35,21 @@ export function getVditorInternals(editor: any = window.vditor): any | null {
 export function getVditorMode(editor: any = window.vditor): VditorMode | null {
   const mode = getVditorInternals(editor)?.currentMode || editor?.getCurrentMode?.()
   return mode === 'wysiwyg' || mode === 'sv' ? mode : null
+}
+
+/** Cancels Vditor's delayed contextual-toolbar refresh for the active panel. */
+export function cancelPendingVditorWysiwygToolbar(
+  popover: HTMLElement
+): void {
+  const internal = getVditorInternals()
+  if (
+    !internal ||
+    internal.currentMode !== 'wysiwyg' ||
+    internal.wysiwyg?.popover !== popover
+  ) {
+    return
+  }
+  window.clearTimeout(internal.wysiwyg.hlToolbarTimeoutId)
 }
 
 /** Switches between the two supported modes without exposing Vditor shortcuts. */
@@ -156,6 +172,26 @@ export function commitVditorWysiwygDomEdit(internal: any): void {
     enableHint: false,
     enableInput: true,
   })
+}
+
+/** Rebuilds one ordinary code preview from its serializer-owned source node. */
+export function refreshVditorWysiwygCodePreview(
+  internal: Parameters<typeof processCodeRender>[1] | null,
+  source: HTMLElement,
+  preview: HTMLElement
+): boolean {
+  if (
+    !internal ||
+    internal.currentMode !== 'wysiwyg' ||
+    !internal.wysiwyg?.element?.contains(source) ||
+    source.nextElementSibling !== preview
+  ) {
+    return false
+  }
+  preview.innerHTML = source.innerHTML
+  preview.setAttribute('data-render', '2')
+  processCodeRender(preview, internal)
+  return true
 }
 
 export const vditorTableActions = {
