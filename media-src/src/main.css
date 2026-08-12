@@ -678,3 +678,52 @@ body,
 .vditor-wysiwyg div.vditor-wysiwyg__block::before {
   display: none;
 }
+
+/* ── Inline-edit mode for regular (non-special) WYSIWYG code blocks ─────────
+   Non-special code blocks are always directly editable — no click-to-open
+   required. The source <pre> is kept permanently visible via CSS (overriding
+   Vditor's inline display:none), and flexbox on the block container swaps the
+   visual order so the language bar (from the preview div) appears above the
+   editable source even though the DOM has source-before-preview order.
+   Special-language blocks (mermaid, math, …) are unaffected.              */
+
+/* Flex column so children can be visually reordered with `order`. */
+.vditor-wysiwyg .vditor-reset .vmd-code-inline-edit {
+  display: flex !important;
+  flex-direction: column !important;
+}
+/* Source <pre>: display:block !important overrides Vditor's inline
+   display:none style, making the code always editable. Visual order 2 puts
+   it below the language bar. */
+.vditor-wysiwyg .vditor-reset .vmd-code-inline-edit > .vditor-wysiwyg__pre {
+  display: block !important;
+  order: 2;
+  margin-bottom: 0 !important;
+}
+/* Preview div: visual order 1 puts it above the source code. Suppress the
+   source/preview divider border that the existing rule would otherwise add. */
+.vditor-wysiwyg .vditor-reset .vmd-code-inline-edit > .vditor-wysiwyg__preview {
+  order: 1;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  border-top: none !important;
+}
+/* Strip the preview <pre> box — only .vmd-code-lang-wrap inside it should
+   be visible; the rendered highlighted code is hidden. */
+.vditor-wysiwyg .vditor-reset .vmd-code-inline-edit > .vditor-wysiwyg__preview > pre {
+  padding: 0 !important;
+  margin: 0 !important;
+  background: none !important;
+  border: none !important;
+}
+/* Hide the rendered code element and Vditor's ZWSP helper span. */
+.vditor-wysiwyg .vditor-reset .vmd-code-inline-edit > .vditor-wysiwyg__preview > pre > code,
+.vditor-wysiwyg .vditor-reset .vmd-code-inline-edit > .vditor-wysiwyg__preview > pre > span {
+  display: none !important;
+}
+/* The lang wrap uses negative margins to bleed to the pre's padding edges.
+   With padding:0 on the pre in inline-edit mode, reset those margins — the
+   wrap's own border-bottom already serves as the code/bar separator. */
+.vditor-wysiwyg .vditor-reset .vmd-code-inline-edit > .vditor-wysiwyg__preview > pre > .vmd-code-lang-wrap {
+  margin: 0 !important;
+}

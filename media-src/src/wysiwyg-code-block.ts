@@ -119,6 +119,18 @@ function decorateCodeBlock(previewDiv: HTMLElement): void {
   const lang = getLangFromClass(codeEl.className)
   if (SPECIAL_LANGS.has(lang)) return
 
+  const block = previewDiv.closest<HTMLElement>('.vditor-wysiwyg__block')
+  if (!block) return
+
+  // Enable inline-edit mode: CSS forces the source <pre> always visible and
+  // visually reorders it below the language bar from the preview div.
+  block.classList.add('vmd-code-inline-edit')
+
+  // The hidden source <code> element whose class drives serialization.
+  const sourceCode = block.querySelector<HTMLElement>(
+    ':scope > .vditor-wysiwyg__pre code'
+  )
+
   const existingWrap = preEl.querySelector<HTMLElement>(`:scope > .${LANG_WRAP_CLASS}`)
   const copyDiv = preEl.querySelector<HTMLElement>(':scope > .vditor-copy')
 
@@ -132,14 +144,6 @@ function decorateCodeBlock(previewDiv: HTMLElement): void {
 
   // Can't set up the bar without the copy button yet — observer will retry.
   if (!copyDiv) return
-
-  const block = previewDiv.closest<HTMLElement>('.vditor-wysiwyg__block')
-  if (!block) return
-
-  // The hidden source <code> element whose class drives serialization.
-  const sourceCode = block.querySelector<HTMLElement>(
-    ':scope > .vditor-wysiwyg__pre code'
-  )
 
   // Build the language select.
   const allLangs: string[] = []
@@ -167,6 +171,14 @@ function decorateCodeBlock(previewDiv: HTMLElement): void {
 
   // Capture textarea reference while copy button is still inside <pre>.
   const textarea = copyDiv.querySelector<HTMLTextAreaElement>('textarea')
+
+  // Keep the copy button's textarea in sync with the editable source text.
+  // (The source may have been modified since codeRender last set the textarea.)
+  if (textarea && sourceCode) {
+    copyDiv.addEventListener('mousedown', () => {
+      textarea.value = sourceCode.textContent || ''
+    })
+  }
 
   // Prevent mousedown from reaching Vditor and moving the caret.
   select.addEventListener('mousedown', (e) => e.stopPropagation())

@@ -612,6 +612,7 @@ function initVditor(msg) {
     preview: {
       math: {
         inlineDigit: true,
+        engine: "MathJax",
       }
     }
   })

@@ -708,6 +708,6 @@ export const toolbar = [
 	if (typeof it === 'string') {
 		it = { name: it }
 	}
-	it.tipPosition = it.tipPosition || 's'
+	it.tipPosition = it.tipPosition || 'n'
 	return it
 })

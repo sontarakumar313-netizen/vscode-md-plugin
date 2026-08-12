@@ -103,8 +103,7 @@ Markdown Interactor 是一个基于 [Vditor](https://github.com/Vanessa219/vdito
 需要 [Node.js](https://nodejs.org/) 20 或更高版本，以及 [pnpm](https://pnpm.io/)。
 
 ```bash
-pnpm install
-pnpm build
+npm version 0.1.13 --no-git-tag-version && npm run build && npx --yes @vscode/vsce package
 ```
 
 构建完成后，在 VS Code 中按 `F5` 启动 Extension Development Host。

@@ -124,6 +124,10 @@ function scrollToHeadingAnchor(fragment: string): boolean {
 
 /**
  * Sends raw Markdown link targets to the extension host for opening.
+ *
+ * In WYSIWYG mode a plain click lets Vditor show its link-edit popover;
+ * Ctrl/Meta+click opens the link in the host.  In all other modes every
+ * click opens the link (preserving the pre-WYSIWYG-popover behaviour).
  */
 export function fixLinkClick() {
   const openLink = (url: string) => {
@@ -137,16 +141,23 @@ export function fixLinkClick() {
       const href = link?.getAttribute('href') || undefined
 
       if (!href) return
-      e.preventDefault()
-      e.stopImmediatePropagation()
+
+      // Heading anchors: scroll on any click, no modifier required.
       if (href.startsWith('#')) {
+        e.preventDefault()
+        e.stopImmediatePropagation()
         scrollToHeadingAnchor(href.slice(1))
         return
       }
+
+      // In WYSIWYG mode, a plain (un-modified) click lets Vditor handle it and
+      // show the link-edit popover.  Only Ctrl/Meta+click opens in the host.
+      if (getVditorMode() === 'wysiwyg' && !e.ctrlKey && !e.metaKey) return
+
+      e.preventDefault()
+      e.stopImmediatePropagation()
       openLink(href)
     },
-    // Intercept before Vditor's own click handler calls window.open(). Handling the
-    // event in the bubbling phase lets both paths post the same open-link message.
     true
   )
   window.open = (url: string, ...args: any[]) => {
