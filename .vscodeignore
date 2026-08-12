@@ -7,7 +7,7 @@ test/
 media-src
 patches
 vendor
-00-*
+/00-styles/**
 00-docs/**
 00-refs/**
 00-refs-code/**

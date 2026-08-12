@@ -132,6 +132,7 @@ function createController({
     },
     panel: { webview },
     uri: document.uri,
+    mode: 'wysiwyg',
     isDisposed: () => false,
     getSnapshot,
     syncToDocument,
@@ -659,6 +660,46 @@ async function testCanonicalBaselineReconcilesEditorEdit() {
   assert.strictEqual(controller.editorBaseline.content, local)
   assert.strictEqual(controller.editorBaseline.origin, current.content)
   assert.strictEqual(controller.editorBaseline.provenance, 'derived')
+  controller.dispose()
+}
+
+async function testBlankGapQuotePreservesOriginFormatting() {
+  const origin = 'first\n\n\n\nsecond\n'
+  const baseline = 'first\n\nsecond\n'
+  const local = 'first\n\n> Quote content\n\nsecond\n'
+  let current = { content: origin, version: 1 }
+  const writes = []
+  const posted = []
+  const { controller, receive } = createController({
+    getSnapshot: async () => current,
+    syncToDocument: async (content) => {
+      writes.push(content)
+      current = { content, version: current.version + 1 }
+      return { version: current.version, getText: () => current.content }
+    },
+    postMessage: async (message) => {
+      posted.push(message)
+      return true
+    },
+  })
+  controller.rememberSnapshot(current)
+  reportBaseline(controller, receive, baseline, 1)
+  receive({ command: 'edit', content: local, seq: 1, baseVersion: 1 })
+  await waitFor(
+    () => posted.some((message) => message.command === 'edit-ack'),
+    'blank-gap quote edit was not acknowledged'
+  )
+
+  assert.deepStrictEqual(
+    writes,
+    ['first\n\n\n\n> Quote content\n\nsecond\n'],
+    'inserting a quote in a canonicalised blank gap removed original blank lines'
+  )
+  assert.strictEqual(
+    current.content.replace('> Quote content\n\n', ''),
+    origin,
+    'removing the inserted quote did not recover the original formatting'
+  )
   controller.dispose()
 }
 
@@ -1627,7 +1668,7 @@ async function testStaleHostSnapshotIsDiscardedAfterNewEditorEdit() {
   )
 }
 
-async function testSavedEditorModeIsValidated() {
+async function testSavedEditorModeIsIgnored() {
   const saved = []
   const { receive } = createController({
     getSnapshot: async () => ({ content: '', version: 1 }),
@@ -1640,21 +1681,14 @@ async function testSavedEditorModeIsValidated() {
 
   receive({
     command: 'save-options',
-    options: { mode: ['i', 'r'].join(''), retained: true },
-  })
-  await nextTurn()
-  await nextTurn()
-  assert.deepStrictEqual(saved, [], 'an unsupported editor mode was persisted')
-
-  receive({
-    command: 'save-options',
     options: { mode: 'sv', retained: true },
   })
-  await waitFor(() => saved.length === 1, 'the supported editor mode was not persisted')
+  await nextTurn()
+  await nextTurn()
   assert.deepStrictEqual(
     saved,
-    [{ mode: 'sv' }],
-    'saved editor options were not restricted to the supported mode field'
+    [],
+    'an obsolete webview mode message changed persisted editor state'
   )
 }
 
@@ -1691,7 +1725,7 @@ async function testConcurrentHostUpdatesAreCoalesced() {
 Promise.resolve()
   .then(testUploadValidation)
   .then(testResourceScopedSafetySettings)
-  .then(testSavedEditorModeIsValidated)
+  .then(testSavedEditorModeIsIgnored)
   .then(testCrlfEditUsesCanonicalLfAndMinimalWrite)
   .then(testOverlappingExternalEditPrefersEditorHunk)
   .then(testMissingMergeBaseFallsBackToEditor)
@@ -1699,6 +1733,7 @@ Promise.resolve()
   .then(testPreAcknowledgementEditUsesEditorSourceAsBase)
   .then(testPreAckCanonicalEditUsesEffectiveBaseline)
   .then(testCanonicalBaselineReconcilesEditorEdit)
+  .then(testBlankGapQuotePreservesOriginFormatting)
   .then(testSaveWithoutEditPreservesOriginFormatting)
   .then(testCanonicalAndExternalMergesStayLayered)
   .then(testNormalizeFormattingRetainsConcurrentExternalEdit)

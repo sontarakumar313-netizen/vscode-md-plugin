@@ -9,7 +9,6 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "useDefineForClassFields": false,
-    "types": ["node"],
     "noEmit": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,

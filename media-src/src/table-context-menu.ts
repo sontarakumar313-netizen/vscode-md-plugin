@@ -24,9 +24,7 @@ interface MenuState {
   range: Range | null
 }
 
-interface ContextMenuApi {
-  hide(): void
-}
+let hideContextMenu: (() => void) | null = null
 
 function icon(name: string): string {
   return `<svg aria-hidden="true"><use xlink:href="#vditor-icon-${name}"></use></svg>`
@@ -148,11 +146,8 @@ function deleteTable(
  * every action targets that row/column even when the editor selection is stale.
  */
 export function initTableContextMenu(): void {
-  const existing = (window as any).__vmdTableContextMenu as
-    | ContextMenuApi
-    | undefined
-  if (existing) {
-    existing.hide()
+  if (hideContextMenu) {
+    hideContextMenu()
     return
   }
 
@@ -297,5 +292,5 @@ export function initTableContextMenu(): void {
   window.addEventListener('resize', hide)
   window.addEventListener('blur', hide)
 
-  ;(window as any).__vmdTableContextMenu = { hide } as ContextMenuApi
+  hideContextMenu = hide
 }

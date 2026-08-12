@@ -3,7 +3,7 @@
   "displayName": "Markdown Interactor",
   "icon": "media/logo.png",
   "description": "An interactive WYSIWYG Markdown editor with live rendering, diagrams, math, and custom themes.",
-  "version": "0.1.13",
+  "version": "0.1.12",
   "publisher": "sontarakumar313-netizen",
   "author": {
     "name": "sontarakumar313-netizen",
@@ -39,7 +39,8 @@
   "activationEvents": [
     "onCommand:markdown-interactor.openEditor",
     "onCommand:markdown-interactor.generateWorkspaceStyle",
-    "onCustomEditor:markdown-interactor.customEditor"
+    "onCustomEditor:markdown-interactor.customEditor",
+    "onCustomEditor:markdown-interactor.splitEditor"
   ],
   "main": "out/extension.js",
   "contributes": {
@@ -74,16 +75,23 @@
     "customEditors": [
       {
         "viewType": "markdown-interactor.customEditor",
-        "displayName": "Markdown Interactor",
+        "displayName": "Markdown Interactor: WYSIWYG",
         "selector": [
           {
-            "filenamePattern": "*.md"
-          },
-          {
-            "filenamePattern": "*.markdown"
+            "filenamePattern": "*.{md,markdown}"
           }
         ],
         "priority": "default"
+      },
+      {
+        "viewType": "markdown-interactor.splitEditor",
+        "displayName": "Markdown Interactor: Split View",
+        "selector": [
+          {
+            "filenamePattern": "*.{md,markdown}"
+          }
+        ],
+        "priority": "option"
       }
     ],
     "configuration": {
@@ -141,7 +149,7 @@
     "watch": "npm run build && concurrently --kill-others --raw \"tsc --watch -p . --preserveWatchOutput\" \"node scripts/build-media.mjs --watch\"",
     "start": "npm run watch",
     "build": "npm run build:extension && npm run build:webview",
-    "build:extension": "tsc -p .",
+    "build:extension": "node -e \"require('fs').rmSync('out', { recursive: true, force: true })\" && tsc -p .",
     "build:webview": "npm run typecheck:webview && node scripts/build-media.mjs && npm run test:vditor-runtime",
     "typecheck": "tsc -p . --noEmit && npm run typecheck:webview",
     "typecheck:webview": "tsc -p media-src/tsconfig.json --noEmit",
@@ -151,6 +159,7 @@
     "test:upload-timestamp": "node scripts/test-upload-timestamp.js",
     "test:sv-code-indent": "node scripts/test-sv-code-indent.js",
     "test:front-matter": "node scripts/test-front-matter.js",
+    "test:quote-format": "node scripts/test-quote-format.js",
     "test:vditor-options": "node scripts/test-vditor-options.js",
     "test:vditor-runtime": "node scripts/test-vditor-runtime.js",
     "test:session": "node scripts/test-host-update-policy.js",
@@ -159,7 +168,7 @@
     "test:link-handler": "node scripts/test-link-handler.js",
     "test:webview-controller": "node scripts/test-webview-controller.js",
     "test:webview-interactions": "npm run build:webview && node scripts/test-webview-interactions.js",
-    "test": "npm run test:sync && npm run test:lute-reflow && npm run test:math && npm run test:upload-timestamp && npm run test:sv-code-indent && npm run test:front-matter && npm run test:vditor-options && npm run test:session && npm run test:custom-editor-startup && npm run test:single-custom-editor && npm run test:link-handler && npm run test:webview-controller && npm run test:webview-interactions",
+    "test": "npm run test:sync && npm run test:lute-reflow && npm run test:math && npm run test:upload-timestamp && npm run test:sv-code-indent && npm run test:front-matter && npm run test:quote-format && npm run test:vditor-options && npm run test:session && npm run test:custom-editor-startup && npm run test:single-custom-editor && npm run test:link-handler && npm run test:webview-controller && npm run test:webview-interactions",
     "pub": "npm run build && npm version patch && vsce package && vsce publish && git push origin main --tags"
   },
   "devDependencies": {

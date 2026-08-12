@@ -2,6 +2,11 @@ import {
   commitVditorWysiwygDomEdit,
   getVditorInternals,
 } from './vditor-adapter'
+import { t } from './lang'
+import {
+  finishDetailsTitlePopover,
+  showDetailsTitlePopover,
+} from './wysiwyg-popover'
 
 interface DetailsGroup {
   opener: HTMLElement
@@ -11,7 +16,7 @@ interface DetailsGroup {
 
 const DETAILS_SUMMARY_CLASS = 'vmd-details-summary'
 const DETAILS_TOGGLE_CLASS = 'vmd-details-toggle'
-const TITLE_EDIT_CLASS = 'vmd-details-title-edit'
+const TITLE_BUTTON_CLASS = 'vmd-details-title-button'
 const SUMMARY_COMMIT_DEBOUNCE_MS = 300
 
 function getWysiwygRoot(): HTMLElement | null {
@@ -40,10 +45,6 @@ function countDetailsCloseTags(source: string): number {
     : 0
 }
 
-function sourceStartsOpen(source: string): boolean {
-  return /^<details\s+[^>]*\bopen(?:\s|=|>|$)/i.test(source)
-}
-
 function getPreviewDetails(opener: HTMLElement): HTMLDetailsElement | null {
   return opener.querySelector<HTMLDetailsElement>(
     ':scope > .vditor-wysiwyg__preview details'
@@ -51,10 +52,13 @@ function getPreviewDetails(opener: HTMLElement): HTMLDetailsElement | null {
 }
 
 function escapeHtmlText(value: string): string {
+  // Vditor decodes one entity layer when it serializes this hidden HTML-block
+  // source. Encode that layer as well so the resulting Markdown still contains
+  // safe HTML entities rather than turning title text into markup.
   return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+    .replace(/&/g, '&amp;amp;')
+    .replace(/</g, '&amp;lt;')
+    .replace(/>/g, '&amp;gt;')
 }
 
 /** Title text from <summary>, excluding the toggle arrow span and ZWSPs. */
@@ -62,7 +66,11 @@ function getSummaryTitleText(summary: HTMLElement): string {
   return Array.from(summary.childNodes)
     .filter(
       (n) =>
-        !(n instanceof HTMLElement && n.classList.contains(DETAILS_TOGGLE_CLASS))
+        !(
+          n instanceof HTMLElement &&
+          (n.classList.contains(DETAILS_TOGGLE_CLASS) ||
+            n.classList.contains(TITLE_BUTTON_CLASS))
+        )
     )
     .map((n) => n.textContent || '')
     .join('')
@@ -76,7 +84,7 @@ export function initWysiwygDetails() {
   let boundRoot: HTMLElement | null = null
   let observer: MutationObserver | null = null
   let summaryCommitTimer: number | null = null
-  let pendingSummaryCommit: { opener: HTMLElement } | null = null
+  let summaryCommitPending = false
   const queuedRoots = new WeakSet<HTMLElement>()
 
   function refresh(targetRoot: HTMLElement): void {
@@ -104,7 +112,9 @@ export function initWysiwygDetails() {
         const group: DetailsGroup = {
           opener: child,
           contents: [],
-          open: openState.get(child) ?? sourceStartsOpen(source),
+          open:
+            openState.get(child) ??
+            (getPreviewDetails(child)?.hasAttribute('open') || false),
         }
         groups.push(group)
         stack.push(group)
@@ -172,19 +182,70 @@ export function initWysiwygDetails() {
     return { summary, opener }
   }
 
-  /** Returns the title-edit div + opener block if the event targets the edit area. */
-  function getTitleEditTarget(event: Event): {
-    titleEdit: HTMLElement
+  function getTitleButtonTarget(event: Event): {
+    button: HTMLButtonElement
     opener: HTMLElement
   } | null {
     const target = event.target instanceof Element ? event.target : null
-    const titleEdit = target?.closest<HTMLElement>(`.${TITLE_EDIT_CLASS}`)
-    const opener = titleEdit?.closest<HTMLElement>('.vmd-details-opener')
-    if (!titleEdit || !opener || !root?.contains(opener)) return null
-    return { titleEdit, opener }
+    const button = target?.closest<HTMLButtonElement>(`.${TITLE_BUTTON_CLASS}`)
+    const opener = button?.closest<HTMLElement>('.vmd-details-opener')
+    if (!button || !opener || !root?.contains(opener)) return null
+    return { button, opener }
+  }
+
+  function getSharedPopover(): HTMLElement | null {
+    const popover = getVditorInternals()?.wysiwyg?.popover
+    return popover instanceof HTMLElement ? popover : null
+  }
+
+  function hideSharedPopover(): void {
+    finishDetailsTitlePopover()
+    const popover = getSharedPopover()
+    if (popover) popover.style.display = 'none'
   }
 
   function onRootClick(event: Event): void {
+    const titleButtonTarget = getTitleButtonTarget(event)
+    if (titleButtonTarget) {
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      if (summaryCommitPending) flushSummaryCommit()
+      const summary = getPreviewDetails(titleButtonTarget.opener)
+        ?.querySelector<HTMLElement>(':scope > summary')
+      const popover = getSharedPopover()
+      if (!summary || !popover) return
+      const initialTitle = getSummaryTitleText(summary)
+      showDetailsTitlePopover({
+        popover,
+        target: titleButtonTarget.button,
+        value: initialTitle,
+        label: t('editDetailsTitle'),
+        onInput: (value, inputEvent) => {
+          if (inputEvent.isComposing) return
+          if (syncTitleToSource(titleButtonTarget.opener, value)) {
+            setVisibleSummaryTitle(titleButtonTarget.opener, value)
+            scheduleTitleCommit()
+          }
+        },
+        onCompositionEnd: (value) => {
+          if (syncTitleToSource(titleButtonTarget.opener, value)) {
+            setVisibleSummaryTitle(titleButtonTarget.opener, value)
+            scheduleTitleCommit()
+          }
+        },
+        onBlur: (value) => {
+          if (
+            value !== initialTitle &&
+            syncTitleToSource(titleButtonTarget.opener, value)
+          ) {
+            setVisibleSummaryTitle(titleButtonTarget.opener, value)
+          }
+          flushSummaryCommit()
+        },
+      })
+      return
+    }
+
     const detailsTarget = getSummaryTarget(event)
     if (!detailsTarget) return
 
@@ -192,8 +253,8 @@ export function initWysiwygDetails() {
     event.stopImmediatePropagation()
 
     const { opener } = detailsTarget
-    // Flush pending title edits before toggling so they are not lost.
-    if (pendingSummaryCommit) flushSummaryCommit(false)
+    if (summaryCommitPending) flushSummaryCommit()
+    hideSharedPopover()
 
     const preview = getPreviewDetails(opener)
     if (!preview || !root) return
@@ -201,74 +262,23 @@ export function initWysiwygDetails() {
     queueRefresh(root)
   }
 
-  function flushSummaryCommit(restoreCaret: boolean): void {
+  function flushSummaryCommit(): void {
     if (summaryCommitTimer !== null) window.clearTimeout(summaryCommitTimer)
     summaryCommitTimer = null
-    const pending = pendingSummaryCommit
-    pendingSummaryCommit = null
-    if (!pending) return
+    if (!summaryCommitPending) return
+    summaryCommitPending = false
     const internal = getVditorInternals()
     if (!internal || internal.currentMode !== 'wysiwyg') return
     commitVditorWysiwygDomEdit(internal)
-    // Browser preserves the caret in a contenteditable div naturally; no manual
-    // restoration needed for the title-edit box.
-    void restoreCaret
   }
 
-  function scheduleTitleCommit(opener: HTMLElement): void {
-    pendingSummaryCommit = { opener }
+  function scheduleTitleCommit(): void {
+    summaryCommitPending = true
     if (summaryCommitTimer !== null) window.clearTimeout(summaryCommitTimer)
     summaryCommitTimer = window.setTimeout(
-      () => flushSummaryCommit(false),
+      flushSummaryCommit,
       SUMMARY_COMMIT_DEBOUNCE_MS
     )
-  }
-
-  function commitTitleEdit(event: Event): void {
-    const target = getTitleEditTarget(event)
-    if (!target) return
-    event.stopImmediatePropagation()
-    if (!syncTitleToSource(target.opener, target.titleEdit)) return
-    scheduleTitleCommit(target.opener)
-  }
-
-  function onRootCompositionEnd(event: Event): void {
-    const target = getTitleEditTarget(event)
-    if (!target) return
-    const internal = getVditorInternals()
-    if (internal?.wysiwyg) internal.wysiwyg.composingLock = false
-    event.stopImmediatePropagation()
-    if (syncTitleToSource(target.opener, target.titleEdit)) {
-      scheduleTitleCommit(target.opener)
-    }
-  }
-
-  function onTitleEditBlur(event: FocusEvent): void {
-    const target = getTitleEditTarget(event)
-    if (!target || summaryCommitTimer === null) return
-    syncTitleToSource(target.opener, target.titleEdit)
-    flushSummaryCommit(false)
-  }
-
-  function onRootKeydown(event: KeyboardEvent): void {
-    if (!getTitleEditTarget(event)) return
-    // Keep title single-line.
-    if (event.key === 'Enter') event.preventDefault()
-    const isPrimary = event.ctrlKey || event.metaKey
-    if (isPrimary && !event.altKey) {
-      const key = event.key.toLowerCase()
-      if (key === 'z' || key === 'y') {
-        event.stopImmediatePropagation()
-        return
-      }
-    }
-    if (!event.ctrlKey && !event.metaKey && !event.altKey) {
-      event.stopImmediatePropagation()
-    }
-  }
-
-  function onRootKeyup(event: KeyboardEvent): void {
-    if (getTitleEditTarget(event)) event.stopImmediatePropagation()
   }
 
   function unbindRoots(): void {
@@ -276,16 +286,13 @@ export function initWysiwygDetails() {
     observer = null
     if (boundRoot) {
       boundRoot.removeEventListener('click', onRootClick, true)
-      boundRoot.removeEventListener('input', commitTitleEdit, true)
-      boundRoot.removeEventListener('compositionend', onRootCompositionEnd, true)
-      boundRoot.removeEventListener('blur', onTitleEditBlur, true)
-      boundRoot.removeEventListener('keydown', onRootKeydown, true)
-      boundRoot.removeEventListener('keyup', onRootKeyup, true)
       boundRoot = null
     }
   }
 
   function rebind(): void {
+    finishDetailsTitlePopover()
+    if (summaryCommitPending) flushSummaryCommit()
     const nextRoot = getWysiwygRoot()
     if (nextRoot === root && boundRoot === nextRoot) {
       if (root) queueRefresh(root)
@@ -293,17 +300,12 @@ export function initWysiwygDetails() {
     }
     if (summaryCommitTimer !== null) window.clearTimeout(summaryCommitTimer)
     summaryCommitTimer = null
-    pendingSummaryCommit = null
+    summaryCommitPending = false
     unbindRoots()
     root = nextRoot
     if (root) {
       const observedRoot = root
       observedRoot.addEventListener('click', onRootClick, true)
-      observedRoot.addEventListener('input', commitTitleEdit, true)
-      observedRoot.addEventListener('compositionend', onRootCompositionEnd, true)
-      observedRoot.addEventListener('blur', onTitleEditBlur, true)
-      observedRoot.addEventListener('keydown', onRootKeydown, true)
-      observedRoot.addEventListener('keyup', onRootKeyup, true)
       boundRoot = observedRoot
 
       observer = new MutationObserver(() => queueRefresh(observedRoot))
@@ -317,31 +319,18 @@ export function initWysiwygDetails() {
   }
 
   rebind()
-  return {
-    rebind,
-    dispose() {
-      if (summaryCommitTimer !== null) window.clearTimeout(summaryCommitTimer)
-      summaryCommitTimer = null
-      pendingSummaryCommit = null
-      unbindRoots()
-      root = null
-    },
-  }
+  return { rebind }
 }
 
-/**
- * Sets up the <summary> element (non-editable, with toggle arrow) and manages
- * the title-edit box that appears below it when the details block is open.
- */
-function prepareSummaryDisplay(opener: HTMLElement, isOpen: boolean): void {
+/** Adds read-only disclosure controls without exposing the HTML source. */
+function prepareSummaryDisplay(opener: HTMLElement, _isOpen: boolean): void {
   const details = getPreviewDetails(opener)
   if (!details) return
   const summary = details.querySelector<HTMLElement>(':scope > summary')
   if (!summary) return
 
-  // Summary is read-only — cursor cannot be placed inside it.
   summary.classList.add(DETAILS_SUMMARY_CLASS)
-  summary.removeAttribute('contenteditable')
+  summary.setAttribute('contenteditable', 'false')
 
   let toggle = summary.querySelector<HTMLElement>(
     `:scope > .${DETAILS_TOGGLE_CLASS}`
@@ -354,40 +343,52 @@ function prepareSummaryDisplay(opener: HTMLElement, isOpen: boolean): void {
     summary.prepend(toggle)
   }
 
-  // Title-edit box: injected when open, removed when closed.
-  const existingEdit = details.querySelector<HTMLElement>(
-    `:scope > .${TITLE_EDIT_CLASS}`
+  let titleButton = summary.querySelector<HTMLButtonElement>(
+    `:scope > .${TITLE_BUTTON_CLASS}`
   )
-  if (isOpen) {
-    if (!existingEdit) {
-      const titleEdit = document.createElement('div')
-      titleEdit.className = TITLE_EDIT_CLASS
-      titleEdit.setAttribute('contenteditable', 'true')
-      titleEdit.textContent = getSummaryTitleText(summary)
-      summary.insertAdjacentElement('afterend', titleEdit)
-    }
+  if (!titleButton) {
+    titleButton = document.createElement('button')
+    titleButton.type = 'button'
+    titleButton.className = TITLE_BUTTON_CLASS
+    titleButton.setAttribute('contenteditable', 'false')
+    titleButton.setAttribute('aria-label', t('editDetailsTitle'))
+    titleButton.innerHTML =
+      '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.7 1.8a1.4 1.4 0 0 1 2 2l-8.4 8.4-3 .6.6-3 8.8-8zM10.8 3l2.2 2.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    summary.append(titleButton)
   } else {
-    existingEdit?.remove()
+    titleButton.setAttribute('aria-label', t('editDetailsTitle'))
   }
 }
 
-/**
- * Reads the title from the edit box and writes it into the hidden HTML source.
- * Returns true when the source actually changed.
- */
-function syncTitleToSource(
-  opener: HTMLElement,
-  titleEdit: HTMLElement
-): boolean {
+function setVisibleSummaryTitle(opener: HTMLElement, value: string): void {
+  const summary = getPreviewDetails(opener)
+    ?.querySelector<HTMLElement>(':scope > summary')
+  if (!summary) return
+  const titleButton = summary.querySelector<HTMLElement>(
+    `:scope > .${TITLE_BUTTON_CLASS}`
+  )
+  Array.from(summary.childNodes).forEach((node) => {
+    const isControl =
+      node instanceof HTMLElement &&
+      (node.classList.contains(DETAILS_TOGGLE_CLASS) ||
+        node.classList.contains(TITLE_BUTTON_CLASS))
+    if (!isControl) node.remove()
+  })
+  summary.insertBefore(
+    document.createTextNode(value.replace(/​/g, '')),
+    titleButton
+  )
+}
+
+/** Writes a plain-text title into the hidden HTML source. */
+function syncTitleToSource(opener: HTMLElement, value: string): boolean {
   const code = getHtmlBlockCode(opener)
   if (!code) return false
   const source = code.textContent || ''
-  const title = escapeHtmlText(
-    titleEdit.textContent?.replace(/​/g, '') || ''
-  )
+  const title = escapeHtmlText(value.replace(/​/g, ''))
   const nextSource = source.replace(
     /(<summary(?:\s[^>]*)?>)[\s\S]*?(<\/summary\s*>)/i,
-    `$1${title}$2`
+    (_match, opening: string, closing: string) => `${opening}${title}${closing}`
   )
   if (nextSource === source) return false
   code.textContent = nextSource

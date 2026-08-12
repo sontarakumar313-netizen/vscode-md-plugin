@@ -3,19 +3,17 @@ import {
   getVditorInternals,
   getVditorMode,
   refreshVditorWysiwygToolbar,
+  showVditorWysiwygLinkPopover,
 } from './vditor-adapter'
 import { setWysiwygPopoverTarget } from './wysiwyg-popover'
 window.vscode =
   (window as any).acquireVsCodeApi && (window as any).acquireVsCodeApi()
-;(window as any).global = window
-
 declare global {
   export const vditor: Vditor
   export const vscode: any
   interface Window {
     vditor: Vditor
     vscode: any
-    global: Window
   }
 }
 
@@ -84,33 +82,6 @@ export const fileToBase64 = async (file) => {
     reader.readAsDataURL(file)
   })
 }
-// 只保存 Vditor 编辑模式。分屏预览由 SV 编辑模式固定启用，不再持久化
-// preview 配置，避免旧版的预览选项重新生效。
-export function saveVditorOptions() {
-  const mode = getVditorMode()
-  if (!mode) return
-  const vditorOptions = { mode }
-  vscode.postMessage({
-    command: 'save-options',
-    options: vditorOptions,
-  })
-}
-const optionButtons = new WeakSet<HTMLElement>()
-
-// toolbar 点击时保存配置
-export function handleToolbarClick(): void {
-  const buttons = document.querySelectorAll<HTMLElement>(
-    '.vditor-toolbar .vditor-panel--left button, .vditor-toolbar .vditor-panel--arrow button'
-  )
-  buttons.forEach((button) => {
-    if (optionButtons.has(button)) return
-    button.addEventListener('click', () => {
-      setTimeout(saveVditorOptions, 500)
-    })
-    optionButtons.add(button)
-  })
-}
-
 /**
  * Approximates the GitHub-style heading slug so in-page `#anchor` links (e.g. a Table
  * of Contents) can be matched against the rendered heading text.
@@ -231,12 +202,15 @@ export function fixLinkClick() {
       }
 
       if (isWysiwyg) {
-        refreshVditorWysiwygToolbar(getVditorInternals())
+        const internal = getVditorInternals()
+        if (!showVditorWysiwygLinkPopover(internal, link)) {
+          refreshVditorWysiwygToolbar(internal)
+        }
       }
     },
     true
   )
-  window.open = (url: string, ...args: any[]) => {
+  window.open = (url: string) => {
     openLink(url)
     return window
   }

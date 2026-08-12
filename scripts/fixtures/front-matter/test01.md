@@ -11,7 +11,7 @@ priority: 1
 ## 操作
 
 1. 在 VS Code 内置 Markdown Preview 中打开本文。
-2. 在 Markdown Interactor 中分别打开 IR、WYSIWYG 和 Split View。
+2. 在 Markdown Interactor 中分别打开 WYSIWYG 和 Split View。
 3. 对比 `title`、`description`、`status`、`draft` 和 `priority`。
 4. 保存一次，再重新打开。
 
@@ -23,7 +23,6 @@ priority: 1
 - 保存和重新打开后内容仍然存在。
 
 - [ ] VS Code 通过
-- [ ] IR 通过
 - [ ] WYSIWYG 通过
 - [ ] Split View 通过
 

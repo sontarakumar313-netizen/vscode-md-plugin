@@ -346,14 +346,46 @@ assert.strictEqual(
   'original formatting',
   'an unchanged editor projection must return the document origin'
 )
+const blankGapOrigin = 'first\n\n\n\nsecond\n'
+const blankGapQuote = '> Quote content\n\n'
+const reconciledBlankGap = reconcileCanonicalisedEdit(
+  blankGapOrigin,
+  'first\n\nsecond\n',
+  `first\n\n${blankGapQuote}second\n`
+)
+assert.strictEqual(
+  reconciledBlankGap,
+  `first\n\n\n\n${blankGapQuote}second\n`,
+  'inserting a quote in a canonicalised blank gap must retain its original blank lines'
+)
+assert.strictEqual(
+  reconciledBlankGap.replace(blankGapQuote, ''),
+  blankGapOrigin,
+  'removing the inserted quote must recover the original blank-line formatting'
+)
+assert.strictEqual(
+  reconcileCanonicalisedEdit('first\nsecond', 'firstsecond', 'first local second'),
+  'first local second',
+  'an ordinary same-position line-break collision must remain editor-preferred'
+)
+assert.strictEqual(
+  reconcileCanonicalisedEdit('text\n', 'text', 'text local'),
+  'text local',
+  'an ordinary trailing newline must not relocate an end-of-document edit'
+)
+assert.strictEqual(
+  reconcileCanonicalisedEdit('\ntext', 'text', 'local text'),
+  'local text',
+  'an ordinary leading newline must not relocate a start-of-document edit'
+)
 assert.strictEqual(
   reconcileCanonicalisedEdit(
-    'first\n\n\n\nsecond\n',
-    'first\n\nsecond\n',
-    'first\n\ninserted\n\nsecond\n'
+    'text\n\n\n',
+    'text\n',
+    'text\n\n> Quote content\n'
   ),
-  'first\n\ninserted\n\nsecond\n',
-  'an edit inside a canonicalised region must remain editor-preferred'
+  'text\n\n\n\n> Quote content\n',
+  'a repeated trailing blank run must survive an end-of-document insertion'
 )
 
 console.log('text synchronization tests passed')

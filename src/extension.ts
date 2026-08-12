@@ -58,7 +58,17 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.window.registerCustomEditorProvider(
       MarkdownEditorProvider.viewType,
-      new MarkdownEditorProvider(context),
+      new MarkdownEditorProvider(context, 'wysiwyg'),
+      {
+        webviewOptions: {
+          retainContextWhenHidden: true,
+        },
+        supportsMultipleEditorsPerDocument: false,
+      }
+    ),
+    vscode.window.registerCustomEditorProvider(
+      MarkdownEditorProvider.splitViewType,
+      new MarkdownEditorProvider(context, 'sv'),
       {
         webviewOptions: {
           retainContextWhenHidden: true,

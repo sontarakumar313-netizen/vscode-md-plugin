@@ -13,15 +13,6 @@ import {
 export const KeyVditorOptions = 'vditor.options'
 
 export type VditorMode = 'wysiwyg' | 'sv'
-export const DEFAULT_VDITOR_MODE: VditorMode = 'wysiwyg'
-
-export function isVditorMode(value: unknown): value is VditorMode {
-  return value === 'wysiwyg' || value === 'sv'
-}
-
-export function normalizeVditorMode(value: unknown): VditorMode {
-  return isVditorMode(value) ? value : DEFAULT_VDITOR_MODE
-}
 
 export type WebviewTheme = 'dark' | 'light'
 
@@ -58,7 +49,7 @@ interface EditorBaselineMessage {
 
 export type WebviewMessage =
   | { command: 'ready' }
-  | { command: 'save-options'; options: any }
+  | { command: 'save-options'; options: unknown }
   | { command: 'scroll'; top?: number }
   | { command: 'info'; content: string }
   | { command: 'error'; content: string }
@@ -80,6 +71,7 @@ export interface MarkdownWebviewHost {
   readonly context: vscode.ExtensionContext
   readonly panel: vscode.WebviewPanel
   readonly uri: vscode.Uri
+  readonly mode: VditorMode
   isDisposed(): boolean
   getSnapshot(): Promise<MarkdownDocumentSnapshot>
   syncToDocument(content: string): Promise<vscode.TextDocument | undefined>
@@ -391,26 +383,18 @@ export function getWebviewTheme(): WebviewTheme {
  * Split preview is fixed by the webview whenever SV edit mode is selected.
  */
 export function getVditorOptions(
-  context: vscode.ExtensionContext,
-  uri?: vscode.Uri
+  _context: vscode.ExtensionContext,
+  uri: vscode.Uri | undefined,
+  mode: VditorMode
 ): any {
   const config = vscode.workspace.getConfiguration('markdown-interactor', uri)
-  const savedOptions = context.globalState.get<any>(KeyVditorOptions) || {}
-  const {
-    theme: _theme,
-    preview: _preview,
-    mode: savedMode,
-    // Dropped for the same reason as theme and preview: this is the extension's
-    // own setting, not one of Vditor's, so a value left in saved editor state
-    // must not be able to reach the webview unvalidated.
-    frontMatterDisplay: _frontMatterDisplay,
-    ...editorOptions
-  } = savedOptions
 
   return {
     useVscodeThemeColor: config.get<boolean>('useVscodeThemeColor'),
-    ...editorOptions,
-    mode: normalizeVditorMode(savedMode),
+    // The selected VS Code Custom Editor is authoritative. Keep the old saved
+    // mode untouched in global state for downgrade compatibility, but never use
+    // it to change this fixed editor type.
+    mode,
     frontMatterDisplay: getFrontMatterDisplay(config),
   }
 }
@@ -775,7 +759,11 @@ export class MarkdownWebviewController implements vscode.Disposable {
     try {
       await this.update({
         type: 'init',
-        options: getVditorOptions(this.host.context, this.host.uri),
+        options: getVditorOptions(
+          this.host.context,
+          this.host.uri,
+          this.host.mode
+        ),
         theme: getWebviewTheme(),
         workspaceStyleCss: this.workspaceStyle.css,
         workspaceStylePath: this.workspaceStyle.path,
@@ -1301,20 +1289,10 @@ export class MarkdownWebviewController implements vscode.Disposable {
         case 'ready':
           await this.initialize()
           break
-        case 'save-options': {
-          const mode =
-            message.options && typeof message.options === 'object'
-              ? message.options.mode
-              : undefined
-          if (!isVditorMode(mode)) {
-            console.warn(
-              '[markdown-interactor] ignored an unsupported saved editor mode.'
-            )
-            break
-          }
-          await this.host.context.globalState.update(KeyVditorOptions, { mode })
+        case 'save-options':
+          // Compatibility with an older webview that may still post its mode
+          // during an extension reload. Fixed editor types never persist it.
           break
-        }
         case 'scroll':
           this.host.saveScrollPosition(message.top || 0)
           break
@@ -1350,7 +1328,6 @@ export class MarkdownWebviewController implements vscode.Disposable {
             const result = await this.queueEdit(message)
             if (result.error || result.ignored) return
           }
-          await this.host.context.globalState.update(KeyVditorOptions, {})
           await this.initialize()
           if (!this.disposed && !this.host.isDisposed()) {
             vscode.window.showInformationMessage(

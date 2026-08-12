@@ -5,22 +5,16 @@ import './preload'
 // when remote scripts are blocked by the webview CSP or the user is offline.
 import 'vditor/dist/js/icons/ant.js'
 
-import {
-  fileToBase64,
-  fixLinkClick,
-  handleToolbarClick,
-  saveVditorOptions,
-} from './utils'
+import { fileToBase64, fixLinkClick } from './utils'
 
 import Vditor from 'vditor'
 import 'vditor/dist/index.css'
 import { captureCaretAnchor, restoreCaretAnchor } from './caret-anchor'
 import { lang } from './lang'
 import {
-  installEditorModeShortcuts,
+  installEditorModeShortcutGuard,
   installToolbarSelectionPreserver,
   installToolbarTooltipDismissal,
-  syncEditorModeToolbar,
   toolbar,
 } from './toolbar'
 import { initTableContextMenu } from './table-context-menu'
@@ -86,9 +80,6 @@ function localVditorAsset(file: string): string {
  * relaxing the CSP.
  */
 function installCodeCopyHandler(): void {
-  if ((window as any).__vmdCodeCopyHandlerInstalled) return
-  ;(window as any).__vmdCodeCopyHandlerInstalled = true
-
   const setCopyLabel = (button: HTMLElement, copied: boolean) => {
     const i18n = (window as any).VditorI18n || {}
     button.setAttribute(
@@ -148,21 +139,9 @@ function installCodeCopyHandler(): void {
 }
 
 installStructuredTabPolicy()
-installEditorModeShortcuts()
+installEditorModeShortcutGuard()
 installCodeCopyHandler()
 installWysiwygSourcePanelAutoClose()
-
-// Set to true only for local debugging of scroll-position persistence; verbose and
-// not meant to ship enabled (this would spam the console for every scroll event).
-const VMD_SCROLL_DEBUG = false
-function scrollLog(...args: any[]) {
-  if (!VMD_SCROLL_DEBUG) return
-  console.log('[vmd-scroll]', ...args)
-}
-
-function getScrollEl(): HTMLElement | null {
-  return getScrollElement()
-}
 
 // Reports the current scroll position to the extension host so it can be restored
 // later. This matters because the extension host disposes and recreates the whole
@@ -182,42 +161,35 @@ const vmdRestoreState: { activeCancel: (() => void) | null; lastApplied: number 
 }
 
 function trackScrollPosition() {
-  if ((window as any).__vmdScrollTracked) return
-  ;(window as any).__vmdScrollTracked = true
-
   document.addEventListener(
     'scroll',
     () => {
-      const el = getScrollEl()
+      const el = getScrollElement()
       if (!el) return
       if (vmdRestoreState.activeCancel) {
         if (el.scrollTop === vmdRestoreState.lastApplied) {
           // Our own restore just set this value; not a real user scroll.
           return
         }
-        scrollLog('scroll during restore diverged to', el.scrollTop, '- treating as user input, cancelling restore')
         vmdRestoreState.activeCancel()
       }
       // Send synchronously on every scroll event, with no debounce/rAF buffering:
       // switching to a different file disposes this webview entirely (it is not
       // merely hidden), so any deferred reporting risks losing the very last
       // position if the switch happens before the timer/frame callback fires.
-      scrollLog('reporting scroll', el.scrollTop, 'on', el.className)
       vscode.postMessage({ command: 'scroll', top: el.scrollTop })
     },
     true
   )
 }
 
+trackScrollPosition()
+
 function restoreScrollPosition(scrollTop: number) {
-  scrollLog('restoreScrollPosition called with', scrollTop)
   vmdRestoreState.activeCancel?.()
   if (!scrollTop) return
-  const el = getScrollEl()
-  if (!el) {
-    scrollLog('no scroll element found, aborting restore')
-    return
-  }
+  const el = getScrollElement()
+  if (!el) return
   let userScrolled = false
   let done = false
 
@@ -243,10 +215,10 @@ function restoreScrollPosition(scrollTop: number) {
   const cancel = () => {
     if (userScrolled) return
     userScrolled = true
-    finish('cancelled - user input')
+    finish()
   }
 
-  const finish = (reason: string) => {
+  const finish = () => {
     if (done) return
     done = true
     clearInterval(pollTimer)
@@ -254,7 +226,6 @@ function restoreScrollPosition(scrollTop: number) {
       vmdRestoreState.activeCancel = null
       vmdRestoreState.lastApplied = null
     }
-    scrollLog('restore finished:', reason, 'elapsed', Date.now() - startedAt, 'ms')
   }
 
   // Register with the coordinator BEFORE the first apply(), so trackScrollPosition
@@ -264,7 +235,7 @@ function restoreScrollPosition(scrollTop: number) {
 
   const pollTimer = setInterval(() => {
     if (userScrolled) {
-      finish('user scrolled')
+      finish()
       return
     }
     const now = Date.now()
@@ -273,12 +244,11 @@ function restoreScrollPosition(scrollTop: number) {
       lastHeight = h
       lastChangedAt = now
       apply()
-      scrollLog('height changed to', h, 're-applied scrollTop', scrollTop, '-> actual', el.scrollTop)
     }
     if (now - lastChangedAt >= SETTLE_AFTER_MS) {
-      finish('settled')
+      finish()
     } else if (now - startedAt >= HARD_CAP_MS) {
-      finish('hard cap reached')
+      finish()
     }
   }, POLL_MS)
 }
@@ -417,7 +387,7 @@ function applyDocumentContent(
     (activeElement === editorRoot || editorRoot.contains(activeElement))
       ? captureCaretAnchor(vditor)
       : null
-  const scrollTop = getScrollEl()?.scrollTop || 0
+  const scrollTop = getScrollElement()?.scrollTop || 0
   vditor.setValue(content)
   if (caretAnchor) restoreCaretAnchor(caretAnchor, vditor)
   restoreScrollPosition(scrollTop)
@@ -747,10 +717,8 @@ function initVditor(msg) {
         acknowledgedDocumentVersion,
         initializationGeneration
       )
-      handleToolbarClick()
       installToolbarSelectionPreserver(vditor)
       installToolbarTooltipDismissal(vditor)
-      syncEditorModeToolbar(vditor)
       installWysiwygListCommands(vditor)
       if (!(window as any).__vmdDetails) {
         ;(window as any).__vmdDetails = initWysiwygDetails()
@@ -781,7 +749,6 @@ function initVditor(msg) {
       } else {
         ;(window as any).__vmdSplitScrollSync.rebind?.(vditor)
       }
-      trackScrollPosition()
       restoreScrollPosition(msg.scrollTop)
       // Reveal the editor (see main.css) only once Vditor's own DOM/CSS has fully
       // settled and the saved scroll position has already been applied, so the very
@@ -872,6 +839,7 @@ function handleEditAcknowledgement(msg: any): void {
 }
 
 function initializeFromMessage(msg) {
+  const fixedMode = msg.options?.mode === 'sv' ? 'sv' : 'wysiwyg'
   const incomingGeneration = Number(msg.editorGeneration)
   editorGeneration = Number.isInteger(incomingGeneration)
     ? incomingGeneration
@@ -905,8 +873,11 @@ function initializeFromMessage(msg) {
   } catch (error) {
     // reset options when error
     console.error(error)
-    initVditor({ content: msg.content, theme: msg.theme })
-    saveVditorOptions()
+    initVditor({
+      content: msg.content,
+      theme: msg.theme,
+      options: { mode: fixedMode },
+    })
   }
   console.log('initVditor')
 }

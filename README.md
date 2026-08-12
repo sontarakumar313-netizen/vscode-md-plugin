@@ -24,7 +24,7 @@
 
 ## 简介
 
-* [ ] Markdown Interactor 是一个基于 [Vditor](https://github.com/Vanessa219/vditor) 的 VS Code Markdown 编辑器。它在 Webview 中提供丰富的可视化编辑能力，同时始终以 VS Code `TextDocument` 作为文档数据源，因此文件保存、撤销、自动保存和外部修改仍由 VS Code 管理。
+Markdown Interactor 是一个基于 [Vditor](https://github.com/Vanessa219/vditor) 的 VS Code Markdown 编辑器。它在 Webview 中提供丰富的可视化编辑能力，同时始终以 VS Code `TextDocument` 作为文档数据源，因此文件保存、撤销、自动保存和外部修改仍由 VS Code 管理。
 
 适合以下场景：
 
@@ -45,7 +45,7 @@
 | **可视化编辑（WYSIWYG）**   | 默认模式，以接近最终排版的方式直接编辑文档。               |
 | **源码分屏（Split View）**  | 左侧编辑 Markdown 源码，右侧同步预览，并支持双向滚动联动。 |
 
-编辑模式会自动记忆，并可通过顶部工具栏随时切换。模式快捷键为 `Ctrl/Cmd+Alt+7`（可视化编辑）和 `Ctrl/Cmd+Alt+9`（源码分屏）。
+两种模式作为 VS Code 原生 **Open With...** 中的独立编辑器提供：默认的 **Markdown Interactor: WYSIWYG** 和可选的 **Markdown Interactor: Split View**。请使用编辑器标题栏中的编辑器类型切换入口选择模式；Webview 工具栏不再切换模式。
 
 ### Markdown 与写作能力
 
@@ -66,8 +66,6 @@
 - 长文档滚动位置恢复；
 - 中、英、日、韩界面文本适配，缺失文本自动回退到英文。
 
-
-> 三大帝国
 
 ### 稳定的文档同步
 
@@ -105,7 +103,8 @@
 需要 [Node.js](https://nodejs.org/) 20 或更高版本，以及 [pnpm](https://pnpm.io/)。
 
 ```bash
-npm version 0.1.13 --no-git-tag-version && npm run build && npx --yes @vscode/vsce package
+pnpm install
+pnpm build
 ```
 
 构建完成后，在 VS Code 中按 `F5` 启动 Extension Development Host。
@@ -117,7 +116,7 @@ npm version 0.1.13 --no-git-tag-version && npm run build && npx --yes @vscode/vs
 - 在命令面板运行 **Markdown Interactor: Open with Markdown Interactor**；
 - 在资源管理器中右键 Markdown 文件并选择 **Open with Markdown Interactor**；
 - 在 Markdown 编辑器标签页的右键菜单中选择同名命令；
-- 选择 **Open With... → Markdown Interactor**；
+- 选择 **Open With... → Markdown Interactor: WYSIWYG** 或 **Markdown Interactor: Split View**；
 - 在 **Configure Default Editor...** 中将其设为 Markdown 默认编辑器；
 - Windows / Linux 按 `Ctrl+Shift+Alt+M`，macOS 按 `Cmd+Shift+Alt+M`。
 
@@ -148,6 +147,7 @@ npm version 0.1.13 --no-git-tag-version && npm run build && npx --yes @vscode/vs
 | `markdown-interactor.maxUploadSizeMB`     | `10`     | 每个上传文件的大小上限，允许范围为 1 至 100 MB。               |
 | `markdown-interactor.allowRemoteMedia`    | `true`   | 是否允许加载 Markdown 中的 HTTPS 图片和媒体。                  |
 | `markdown-interactor.useVscodeThemeColor` | `true`   | 是否在编辑器中使用当前 VS Code 主题色。                        |
+| `markdown-interactor.frontMatterDisplay`  | `table`  | Front Matter 的可视化显示方式：表格、代码块或隐藏。             |
 
 关闭 `allowRemoteMedia` 只会阻止文档里引用的远程图片、视频和音频，不会阻止远程字体、
 样式表和脚本，编辑器自身需要加载后者。
@@ -180,7 +180,7 @@ npm version 0.1.13 --no-git-tag-version && npm run build && npx --yes @vscode/vs
 
 扩展只读取当前 Markdown 文件所属工作区中的 `.vscode/markdown-interactor.css`，不会向父目录继续查找。样式文件不会自动监听，修改后需要手动重新加载。
 
-[`00-styles/`](00-styles/) 中还提供三套可直接使用的工作区主题和一个自定义模板，具体说明见 [`00-styles/README.md`](00-styles/README.md)。
+[`00-styles/`](00-styles/) 中还提供三套可直接使用的工作区主题，具体说明见 [`00-styles/README.md`](00-styles/README.md)。
 
 ## 开发
 
@@ -219,8 +219,3 @@ Markdown Interactor 基于 [zaaack/vscode-markdown-editor](https://github.com/za
 ## 许可证
 
 本项目基于 [MIT License](https://github.com/sontarakumar313-netizen/vscode-md-plugin/blob/main/LICENSE) 开源。
-
-<details>
-<summary>这是一个标题</summary>
-这是被折叠的内容
-</details>

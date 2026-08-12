@@ -428,7 +428,7 @@ body {
   accent-color: var(--ember-accent);
 }
 
-/* ── Source markers and line numbers ───────────────────────────────────── */
+/* ── Source markers ───────────────────────────────────────────────────── */
 #app.vditor .vditor-sv__marker {
   color: var(--ember-faint);
   font-family: var(--ember-mono);
@@ -437,47 +437,6 @@ body {
 #app.vditor .vditor-sv {
   color: #dbd3c8;
   font-family: var(--ember-mono);
-}
-
-#vmd-line-number-gutter {
-  background: rgba(22, 21, 19, 0.94);
-  border-right-color: var(--ember-border);
-}
-
-#vmd-line-number-gutter .vmd-line-number {
-  color: #70675d;
-  font-family: var(--ember-mono);
-}
-
-/* ── Search ────────────────────────────────────────────────────────────── */
-#vmd-search-bar {
-  color: var(--ember-text);
-  background: #26221e;
-  border-color: #4a4138;
-  box-shadow: var(--ember-shadow);
-}
-
-#vmd-search-input {
-  color: var(--ember-text);
-  background: #151310;
-  border-color: #4a4138;
-  caret-color: var(--ember-accent);
-}
-
-#vmd-search-input:focus {
-  border-color: var(--ember-accent);
-  box-shadow: 0 0 0 2px rgba(230, 161, 92, 0.12);
-}
-
-#vmd-search-count {
-  color: var(--ember-muted);
-}
-
-#vmd-search-bar button:hover,
-#vmd-search-case-label:hover {
-  color: #ffd09c;
-  background: var(--ember-accent-soft);
-  border-color: rgba(230, 161, 92, 0.3);
 }
 
 /* ── Scrollbars ────────────────────────────────────────────────────────── */

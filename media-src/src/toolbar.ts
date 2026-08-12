@@ -1,22 +1,26 @@
 import {
-	captureCaretAnchor,
 	countTextOccurrences,
 	findTextOccurrence,
 	getEditorSelectionContext,
 	getVisibleTextBefore,
 	getVisibleTextBeforeElement,
 	preserveEditorSelectionForToolbar,
-	restoreCaretAnchor,
 } from './caret-anchor'
-import type { EditorSelectionContext } from './caret-anchor'
 import { t } from './lang'
-import { confirm, saveVditorOptions } from './utils'
-import { getScrollElement } from './scroll-target'
+import {
+	captureEditorLineAnchor,
+	createSourceViewAnchor,
+	resolveCaretLine,
+	restoreEditorLineAnchor,
+	restoreSourceViewAnchor,
+} from './quote-caret'
+import { toggleQuoteAt } from './quote-format'
+import type { QuoteSourceChange, QuoteType } from './quote-format'
+import { confirm } from './utils'
 import {
 	getVditorEditorElement,
-	getVditorMode,
+	setVditorMarkdown,
 } from './vditor-adapter'
-import type { VditorMode } from './vditor-adapter'
 
 const outlineIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 1v22M4 6h1.2M4 11h1.2M4 16h1.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>'
 // These follow MathType's Word toolbar idea: inline math sits in a text line,
@@ -25,9 +29,7 @@ const outlineIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"
 const mathBlockIcon = '<svg class="vmd-math-toolbar-icon vmd-math-toolbar-icon--display" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 1.5h22M1 22.5h22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M13 4H5l5 8-5 8h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 6h7M16 12h5M16 18h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
 const mathInlineIcon = '<svg class="vmd-math-toolbar-icon vmd-math-toolbar-icon--inline" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M1 6h2M1 18h2M21 6h2M21 18h2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13 2H5l5 10-5 10h8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 6h7M16 12h5M16 18h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
 const detailsIcon = '<svg class="vmd-details-toolbar-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4 6h10M4 12h10M4 18h10M17 8l5 4-5 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-const alertIcon = '<svg class="vmd-alert-toolbar-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 1 23 23H1L12 1Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 8v6M12 18h.01" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
 const quoteIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M3 5v14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><path d="M7 7h14M7 12h11M7 17h12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>'
-const editingModeIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 18.5h3.5L18 9l-3-3-9.5 9.5L5 18.5zm8.5-11 3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 
 // insertMD writes raw Markdown, so a `$` inside the selection would close the
 // math delimiter early and turn `a$b` into the broken `$a$b$`. Normalize every
@@ -57,184 +59,61 @@ function toDetailsBlock(selected: string): string {
 	}\n\n</details>`
 }
 
-function toAlertBlock(selected: string, type: string): string {
-	const body = selected.trim() || t('alertContent')
-	const quotedBody = body
-		.split(/\r?\n/)
-		.map((line) => `> ${line}`)
-		.join('\n')
-	return `> [!${type}]\n${quotedBody}`
-}
+// ── Unified quote / GitHub-alert toggling ────────────────────────────────────
 
-function insertAlert(editor: any, type: string): void {
-	insertBlock(editor, (selected) => toAlertBlock(selected, type))
+function applyQuoteSourceChange(
+	editor: any,
+	change: QuoteSourceChange,
+	context: ReturnType<typeof getEditorSelectionContext>,
+	renderedOffset: number
+): void {
+	if (!context) return
+	const previousAnchor = captureEditorLineAnchor(context)
+	const anchor = previousAnchor
+		? {
+			...previousAnchor,
+			text: change.targetText,
+			offset: change.targetText
+				? Math.min(renderedOffset, change.targetText.length)
+				: 0,
+		}
+		: null
+	const sourceViewAnchor = createSourceViewAnchor(
+		change.content,
+		change.targetText,
+		change.targetSourceOffset,
+		renderedOffset
+	)
+
+	setVditorMarkdown(editor, change.content)
+	if (context.mode === 'sv') {
+		restoreSourceViewAnchor(editor, sourceViewAnchor)
+	} else if (anchor) {
+		restoreEditorLineAnchor(editor, anchor)
+	}
 	;(window as any).__vmdCommitProgrammaticEdit?.()
 }
 
-// ── Unified quote / GitHub-alert toggling ────────────────────────────────────
-
-type AlertType = 'NOTE' | 'TIP' | 'IMPORTANT' | 'WARNING' | 'CAUTION'
-type QuoteType = AlertType | null // null = plain blockquote
-
-interface QuoteBlock {
-	/** Offset of the first character on the first '>' line. */
-	lineStart: number
-	/** Offset just past the end of the block (may point to char after '\n'). */
-	lineEnd: number
-	type: QuoteType
-}
-
 /**
- * Find the contiguous blockquote block in `source` that contains `offset`.
- * Returns null when the line at `offset` does not start with '>'.
- */
-function findQuoteBlockAt(source: string, offset: number): QuoteBlock | null {
-	const safeOff = Math.min(Math.max(0, offset), source.length)
-	const lineStart = source.lastIndexOf('\n', safeOff - 1) + 1
-	const lineNl = source.indexOf('\n', lineStart)
-	const lineEnd = lineNl >= 0 ? lineNl : source.length
-	if (!source.slice(lineStart, lineEnd).startsWith('>')) return null
-
-	// Walk backward to find the first '>' line of this block.
-	let blockStart = lineStart
-	while (blockStart > 0) {
-		const prevNl = blockStart - 1
-		const prevLineStart = source.lastIndexOf('\n', prevNl - 1) + 1
-		if (!source.slice(prevLineStart, prevNl).startsWith('>')) break
-		blockStart = prevLineStart
-	}
-
-	// Walk forward to find the last '>' line.
-	let pos = blockStart
-	while (pos < source.length) {
-		const nl = source.indexOf('\n', pos)
-		const end = nl >= 0 ? nl : source.length
-		if (!source.slice(pos, end).startsWith('>')) break
-		pos = nl >= 0 ? nl + 1 : source.length
-	}
-
-	const firstNl = source.indexOf('\n', blockStart)
-	const firstLine = source.slice(blockStart, firstNl >= 0 ? firstNl : source.length)
-	const alertMatch = /^>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/.exec(firstLine)
-	return {
-		lineStart: blockStart,
-		lineEnd: pos,
-		type: alertMatch ? (alertMatch[1] as AlertType) : null,
-	}
-}
-
-/** Detect the blockquote block the current caret is in, or return null. */
-function getCaretQuoteBlock(
-	source: string,
-	context: EditorSelectionContext | null
-): QuoteBlock | null {
-	if (!context) return null
-
-	if (context.mode === 'sv') {
-		const visibleBefore = getVisibleTextBefore(context)
-		if (!source.startsWith(visibleBefore)) return null
-		return findQuoteBlockAt(source, visibleBefore.length)
-	}
-
-	// WYSIWYG: locate the nearest blockquote ancestor.
-	const node =
-		context.range.startContainer.nodeType === Node.ELEMENT_NODE
-			? (context.range.startContainer as Element)
-			: context.range.startContainer.parentElement
-	const blockquote = node?.closest('blockquote')
-	if (!blockquote) return null
-
-	// Alert type marker is a unique, reliable anchor.
-	const domType = (blockquote.getAttribute('data-vmd-alert') || null) as QuoteType
-	if (domType) {
-		const marker = `> [!${domType}]`
-		let searchFrom = 0
-		while (searchFrom < source.length) {
-			const idx = source.indexOf(marker, searchFrom)
-			if (idx < 0) break
-			if (idx === 0 || source[idx - 1] === '\n') {
-				return findQuoteBlockAt(source, idx)
-			}
-			searchFrom = idx + 1
-		}
-	}
-
-	// Fallback: use visible text before the blockquote element.
-	const before = getVisibleTextBeforeElement(context, blockquote as HTMLElement)
-	if (source.startsWith(before)) return findQuoteBlockAt(source, before.length)
-	return null
-}
-
-/** Strip '> ' prefixes (and the alert marker line) from an existing block. */
-function unwrapQuote(source: string, block: QuoteBlock): string {
-	const raw = source.slice(block.lineStart, block.lineEnd)
-	const trailingNl = raw.endsWith('\n')
-	const lines = (trailingNl ? raw.slice(0, -1) : raw).split('\n')
-	const stripped = lines
-		.filter((_, i) => !(i === 0 && block.type !== null))
-		.map((l) => (l.startsWith('> ') ? l.slice(2) : l.startsWith('>') ? l.slice(1) : l))
-	return (
-		source.slice(0, block.lineStart) +
-		stripped.join('\n') +
-		(trailingNl ? '\n' : '') +
-		source.slice(block.lineEnd)
-	)
-}
-
-/** Change the alert type of (or add/remove an alert marker from) a blockquote. */
-function reTypeQuote(source: string, block: QuoteBlock, newType: QuoteType): string {
-	const raw = source.slice(block.lineStart, block.lineEnd)
-	const trailingNl = raw.endsWith('\n')
-	const lines = (trailingNl ? raw.slice(0, -1) : raw).split('\n')
-	let newLines: string[]
-	if (block.type !== null && newType !== null) {
-		newLines = [`> [!${newType}]`, ...lines.slice(1)]
-	} else if (block.type !== null && newType === null) {
-		newLines = lines.slice(1)
-	} else {
-		// plain → alert: prepend marker
-		newLines = [`> [!${newType}]`, ...lines]
-	}
-	return (
-		source.slice(0, block.lineStart) +
-		newLines.join('\n') +
-		(trailingNl ? '\n' : '') +
-		source.slice(block.lineEnd)
-	)
-}
-
-/**
- * Unified quote / GitHub-alert toolbar action with toggle semantics.
- *
- *  - Same type already active  → unwrap (toggle off)
- *  - Different type active     → convert the block type in place
- *  - Not in a blockquote       → insert a new block at the caret
+ * Toggles the caret line, or converts the containing quote block in place.
+ * A localized template is used only when the resolved caret line is empty.
  */
 function toggleQuoteOrAlert(editor: any, type: QuoteType): void {
 	const source = String(editor.getValue?.() || '')
 	const context = getEditorSelectionContext(editor)
-	const block = getCaretQuoteBlock(source, context)
+	if (!context) return
+	const caret = resolveCaretLine(source, context)
+	if (!caret) return
 
-	if (block) {
-		if (block.type === type) {
-			editor.setValue(unwrapQuote(source, block))
-		} else {
-			editor.setValue(reTypeQuote(source, block, type))
-		}
-		;(window as any).__vmdCommitProgrammaticEdit?.()
-		return
-	}
-
-	// Not in a blockquote — insert a new one at the caret.
-	if (type === null) {
-		insertBlock(editor, (selected) => {
-			const body = selected.trim() || t('quoteContent')
-			return body.split('\n').map((l) => `> ${l}`).join('\n')
-		})
-	} else {
-		insertAlert(editor, type)
-	}
-	;(window as any).__vmdCommitProgrammaticEdit?.()
+	const templateBody = type === null ? t('quoteContent') : t('alertContent')
+	const change = toggleQuoteAt(
+		source,
+		caret.line.start,
+		type,
+		templateBody,
+		caret.renderedText
+	)
+	applyQuoteSourceChange(editor, change, context, caret.renderedOffset)
 }
 
 function expandMarkdownSelection(
@@ -475,89 +354,12 @@ async function copyToClipboard(content: string, label: string): Promise<void> {
 	}
 }
 
-const MODE_BUTTONS: Array<{ name: string; mode: VditorMode }> = [
-	{ name: 'vmd-mode-wysiwyg', mode: 'wysiwyg' },
-	{ name: 'vmd-mode-sv', mode: 'sv' },
-]
-
-export function syncEditorModeToolbar(editor: any = window.vditor): void {
-	const current = getVditorMode(editor)
-	for (const { name, mode } of MODE_BUTTONS) {
-		const button = document.querySelector<HTMLElement>(
-			`.vditor-toolbar [data-type="${name}"]`
-		)
-		if (!button) continue
-		const active = current === mode
-		button.classList.toggle('vditor-menu--current', active)
-		button.setAttribute('aria-pressed', String(active))
-	}
-}
-
-function refreshModeDependentFeatures(): void {
-	;(window as any).__vmdDetails?.rebind?.()
-	;(window as any).__vmdAlerts?.rebind?.()
-	;(window as any).__vmdFrontMatter?.rebind?.()
-	;(window as any).__vmdSplitScrollSync?.rebind?.(window.vditor)
-}
-
-let forwardingModeShortcut = false
-
-function selectEditorMode(mode: VditorMode): void {
-	const editor = window.vditor
-	if (!editor) return
-	if (getVditorMode(editor) !== mode) {
-		const editorElement = getVditorEditorElement(editor)
-		if (!editorElement) return
-
-		// Capture position before the mode switch; Vditor rebuilds the DOM
-		// and resets scroll on every mode change.
-		const savedScroll = getScrollElement()?.scrollTop ?? -1
-		const caretAnchor = captureCaretAnchor(editor)
-
-		const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
-		forwardingModeShortcut = true
-		try {
-			// Vditor has no public mode setter. Forward only its two supported
-			// built-in mode shortcuts through the active editor element instead of
-			// importing the private three-mode toolbar implementation.
-			editorElement.dispatchEvent(new KeyboardEvent('keydown', {
-				key: mode === 'wysiwyg' ? '7' : '9',
-				code: mode === 'wysiwyg' ? 'Digit7' : 'Digit9',
-				ctrlKey: !isMac,
-				metaKey: isMac,
-				altKey: true,
-				bubbles: true,
-				cancelable: true,
-			}))
-		} finally {
-			forwardingModeShortcut = false
-		}
-
-		// Vditor rebuilds the content pane asynchronously; wait two animation
-		// frames so the new DOM is fully laid out before restoring.
-		requestAnimationFrame(() => {
-			requestAnimationFrame(() => {
-				const newScrollEl = getScrollElement()
-				if (newScrollEl && savedScroll >= 0) {
-					newScrollEl.scrollTop = savedScroll
-				}
-				restoreCaretAnchor(caretAnchor, editor)
-			})
-		})
-	}
-	syncEditorModeToolbar(editor)
-	queueMicrotask(() => {
-		refreshModeDependentFeatures()
-		saveVditorOptions()
-	})
-}
-
-/** Owns the only supported mode shortcuts and consumes the removed middle one. */
-export function installEditorModeShortcuts(): void {
-	if ((window as any).__vmdEditorModeShortcuts) return
+/** Prevents Vditor's private mode shortcuts from changing a fixed editor type. */
+export function installEditorModeShortcutGuard(): void {
+	if ((window as any).__vmdEditorModeShortcutGuardInstalled) return
+	;(window as any).__vmdEditorModeShortcutGuardInstalled = true
 
 	const onKeydown = (event: KeyboardEvent) => {
-		if (forwardingModeShortcut) return
 		const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
 		const primary = isMac
 			? event.metaKey && !event.ctrlKey
@@ -582,20 +384,9 @@ export function installEditorModeShortcuts(): void {
 
 		event.preventDefault()
 		event.stopImmediatePropagation()
-		if (event.code === 'Digit7') {
-			selectEditorMode('wysiwyg')
-		} else if (event.code === 'Digit9') {
-			selectEditorMode('sv')
-		}
 	}
 
 	document.addEventListener('keydown', onKeydown, true)
-	;(window as any).__vmdEditorModeShortcuts = {
-		dispose() {
-			document.removeEventListener('keydown', onKeydown, true)
-			delete (window as any).__vmdEditorModeShortcuts
-		},
-	}
 }
 
 export const toolbar = [
@@ -699,28 +490,6 @@ export const toolbar = [
 	'upload',
 	'table',
 	'|',
-	{
-		name: 'vmd-edit-mode',
-		tipPosition: 'e',
-		tip: t('editingMode'),
-		icon: editingModeIcon,
-		toolbar: [
-			{
-				name: 'vmd-mode-wysiwyg',
-				icon: t('wysiwygMode'),
-				click() {
-					selectEditorMode('wysiwyg')
-				},
-			},
-			{
-				name: 'vmd-mode-sv',
-				icon: t('splitViewMode'),
-				click() {
-					selectEditorMode('sv')
-				},
-			},
-		],
-	},
 	{
 		name: 'more',
 		tipPosition: 'e',

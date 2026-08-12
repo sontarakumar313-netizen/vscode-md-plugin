@@ -5,6 +5,19 @@ let activePopoverPosition: {
 } | null = null
 let popoverPositionListenersInstalled = false
 let popoverPositionQueued = false
+let activeDetailsTitleFinish: (() => void) | null = null
+const POPOVER_POSITIONING_CLASS = 'vmd-url-popover--positioning'
+const DETAILS_TITLE_POPOVER_CLASS = 'vmd-details-title-popover'
+
+interface DetailsTitlePopoverOptions {
+  popover: HTMLElement
+  target: HTMLElement
+  value: string
+  label: string
+  onInput: (value: string, event: InputEvent) => void
+  onCompositionEnd: (value: string) => void
+  onBlur: (value: string) => void
+}
 
 /** Records a click target before Vditor constructs its shared popover. */
 export function setWysiwygPopoverTarget(target: HTMLElement): void {
@@ -80,7 +93,10 @@ function hideField(field: HTMLElement | undefined): void {
 function queueActivePopoverPosition(): void {
   if (popoverPositionQueued) return
   popoverPositionQueued = true
-  window.setTimeout(() => {
+  // Vditor applies its provisional position immediately after invoking the
+  // customization callback. Run at the end of the same task, before the next
+  // browser paint, so only the measured above-target position becomes visible.
+  queueMicrotask(() => {
     popoverPositionQueued = false
     const active = activePopoverPosition
     if (!active) return
@@ -90,11 +106,16 @@ function queueActivePopoverPosition(): void {
       !target.isConnected ||
       popover.style.display !== 'block'
     ) {
+      popover.classList.remove(POPOVER_POSITIONING_CLASS)
       activePopoverPosition = null
       return
     }
     const editor = popover.parentElement
-    if (!(editor instanceof HTMLElement)) return
+    if (!(editor instanceof HTMLElement)) {
+      popover.classList.remove(POPOVER_POSITIONING_CLASS)
+      activePopoverPosition = null
+      return
+    }
     const editorRect = editor.getBoundingClientRect()
     const targetRect = target.getBoundingClientRect()
     const gap = 6
@@ -113,8 +134,9 @@ function queueActivePopoverPosition(): void {
     // above-target coordinate even when it is negative.
     popover.style.top = `${targetTop - popover.offsetHeight - gap}px`
     popover.dataset.vmdPosition = 'above'
+    popover.classList.remove(POPOVER_POSITIONING_CLASS)
     if (pendingPopoverTarget === target) pendingPopoverTarget = null
-  }, 0)
+  })
 }
 
 function installPopoverPositionListeners(): void {
@@ -131,6 +153,7 @@ function positionAboveTarget(
   target: HTMLElement | null
 ): void {
   if (!target || !target.isConnected) return
+  popover.classList.add(POPOVER_POSITIONING_CLASS)
   activePopoverPosition = { popover, target }
   installPopoverPositionListeners()
   queueActivePopoverPosition()
@@ -154,7 +177,6 @@ function getPopoverTarget(type: string): HTMLElement | null {
 }
 
 function redirectHiddenLinkFocus(
-  popover: HTMLElement,
   urlInput: HTMLInputElement,
   target: HTMLElement | null
 ): void {
@@ -193,6 +215,80 @@ function installLinkPopoverTabOrder(
   })
 }
 
+export function finishDetailsTitlePopover(): void {
+  const finish = activeDetailsTitleFinish
+  activeDetailsTitleFinish = null
+  finish?.()
+}
+
+/** Opens a single-line details-title editor in Vditor's shared URL popover. */
+export function showDetailsTitlePopover({
+  popover,
+  target,
+  value,
+  label,
+  onInput,
+  onCompositionEnd,
+  onBlur,
+}: DetailsTitlePopoverOptions): HTMLInputElement {
+  finishDetailsTitlePopover()
+  activePopoverPosition = null
+  popover.replaceChildren()
+  popover.classList.remove(
+    'vmd-url-popover--image',
+    'vmd-wysiwyg-popover--empty',
+    POPOVER_POSITIONING_CLASS
+  )
+  popover.classList.add('vmd-url-popover', DETAILS_TITLE_POPOVER_CLASS)
+  delete popover.dataset.vmdPosition
+
+  const inputWrap = document.createElement('span')
+  inputWrap.className = 'vditor-tooltipped vditor-tooltipped__n vmd-url-popover__url'
+  inputWrap.setAttribute('aria-label', label)
+  const input = document.createElement('input')
+  input.className = 'vditor-input vmd-url-popover__url-input'
+  input.type = 'text'
+  input.value = value
+  input.placeholder = label
+  input.setAttribute('aria-label', label)
+  let finished = false
+  const finish = () => {
+    if (finished) return
+    finished = true
+    if (activeDetailsTitleFinish === finish) activeDetailsTitleFinish = null
+    onBlur(input.value)
+  }
+  activeDetailsTitleFinish = finish
+  input.addEventListener('input', (event) => {
+    if (event instanceof InputEvent) onInput(input.value, event)
+  })
+  input.addEventListener('compositionend', () => onCompositionEnd(input.value))
+  input.addEventListener('blur', finish)
+  input.addEventListener('keydown', (event) => {
+    if (event.isComposing || event.keyCode === 229) {
+      event.stopImmediatePropagation()
+      return
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      input.blur()
+    } else if (event.key === 'Escape') {
+      event.preventDefault()
+      popover.style.display = 'none'
+      target.focus()
+    }
+    event.stopPropagation()
+  })
+  inputWrap.appendChild(input)
+  popover.appendChild(inputWrap)
+
+  positionAboveTarget(popover, target)
+  popover.style.display = 'block'
+  input.focus()
+  input.select()
+  return input
+}
+
 /**
  * Removes unwanted native controls from Vditor's WYSIWYG popover. Table
  * actions are provided by the shared right-click menu instead.
@@ -201,8 +297,14 @@ export function customizeWysiwygPopover(
   type: string,
   popover: HTMLElement
 ): void {
+  finishDetailsTitlePopover()
   // Vditor reuses one popover element for every context.
-  popover.classList.remove('vmd-url-popover', 'vmd-url-popover--image')
+  popover.classList.remove(
+    'vmd-url-popover',
+    'vmd-url-popover--image',
+    DETAILS_TITLE_POPOVER_CLASS,
+    POPOVER_POSITIONING_CLASS
+  )
   delete popover.dataset.vmdPosition
   activePopoverPosition = null
   popover
@@ -233,7 +335,7 @@ export function customizeWysiwygPopover(
       const copyButton = addUrlCopyButton(popover, fields[1], urlInput)
       installLinkPopoverTabOrder(urlInput, copyButton)
       const target = getPopoverTarget(type)
-      redirectHiddenLinkFocus(popover, urlInput, target)
+      redirectHiddenLinkFocus(urlInput, target)
       positionAboveTarget(popover, target)
     }
   } else if (type === 'image') {

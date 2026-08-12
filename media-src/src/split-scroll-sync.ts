@@ -7,7 +7,6 @@ type Pane = 'source' | 'preview'
 
 export interface SplitScrollSync {
   rebind(editor?: any): void
-  dispose(): void
 }
 
 function maxScrollTop(element: HTMLElement): number {
@@ -272,27 +271,6 @@ export function initSplitScrollSync(editor: any = window.vditor): SplitScrollSyn
     }
   }
 
-  const dispose = (): void => {
-    if (syncFrame) cancelAnimationFrame(syncFrame)
-    if (syncTimer) clearTimeout(syncTimer)
-    if (reconcileFrame) cancelAnimationFrame(reconcileFrame)
-    if (reconcileTimer) clearTimeout(reconcileTimer)
-    if (expectedSourceClearFrame) cancelAnimationFrame(expectedSourceClearFrame)
-    if (expectedSourceClearTimer) clearTimeout(expectedSourceClearTimer)
-    if (expectedPreviewClearFrame) cancelAnimationFrame(expectedPreviewClearFrame)
-    if (expectedPreviewClearTimer) clearTimeout(expectedPreviewClearTimer)
-    syncFrame = 0
-    syncTimer = null
-    reconcileFrame = 0
-    reconcileTimer = null
-    expectedSourceClearFrame = 0
-    expectedSourceClearTimer = null
-    expectedPreviewClearFrame = 0
-    expectedPreviewClearTimer = null
-    teardown()
-    currentEditor = null
-  }
-
   rebind(editor)
-  return { rebind, dispose }
+  return { rebind }
 }

@@ -11,10 +11,6 @@ type SelectionMarkers = {
   end?: HTMLElement
 }
 
-function getInternal(vditor: any): any {
-  return getVditorInternals(vditor)
-}
-
 function getWysiwygEditor(internal: any): HTMLElement | null {
   return internal?.wysiwyg?.element || null
 }
@@ -342,7 +338,7 @@ function notifyVditorOfListChange(internal: any, editor: HTMLElement): void {
 }
 
 function applyListCommand(vditor: any, command: ListCommand): boolean {
-  const internal = getInternal(vditor)
+  const internal = getVditorInternals(vditor)
   const editor = getWysiwygEditor(internal)
   if (!editor || internal.currentMode !== 'wysiwyg') return false
 
@@ -431,7 +427,7 @@ export function handleRenderedListTab(vditor: any, event: KeyboardEvent): boolea
     return false
   }
 
-  const internal = getInternal(vditor)
+  const internal = getVditorInternals(vditor)
   if (internal?.currentMode !== 'wysiwyg') return false
 
   const editor = getWysiwygEditor(internal)
@@ -460,7 +456,7 @@ export function handleRenderedListTab(vditor: any, event: KeyboardEvent): boolea
 }
 
 export function installWysiwygListCommands(vditor: any): void {
-  const internal = getInternal(vditor)
+  const internal = getVditorInternals(vditor)
   if (!internal?.toolbar?.elements) return
 
   for (const command of ['list', 'ordered-list', 'check'] as ListCommand[]) {

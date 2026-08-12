@@ -1,9 +1,3 @@
-declare global {
-  interface Window {
-    __vmdSourcePanelAutoClose?: boolean
-  }
-}
-
 function getWysiwygRoot(): HTMLElement | null {
   return document.querySelector<HTMLElement>(
     '.vditor-wysiwyg .vditor-reset'
@@ -25,8 +19,6 @@ function closeOpenSourcePanels(): void {
 
 /** Closes a native code/formula source panel when the user clicks outside it. */
 export function installWysiwygSourcePanelAutoClose(): void {
-  if (window.__vmdSourcePanelAutoClose) return
-
   document.addEventListener(
     'mousedown',
     (event) => {
@@ -38,5 +30,4 @@ export function installWysiwygSourcePanelAutoClose(): void {
     },
     true
   )
-  window.__vmdSourcePanelAutoClose = true
 }

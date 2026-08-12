@@ -77,13 +77,6 @@ function getPreview(block: HTMLElement): HTMLElement | null {
   return block.querySelector<HTMLElement>(`:scope > .${PREVIEW_CLASS}`)
 }
 
-function isFrontMatterBlock(element: HTMLElement, root: HTMLElement): boolean {
-  // Front matter is only front matter at the very top of the document. A stray
-  // block elsewhere (Vditor can produce one while text is being typed) is left
-  // alone rather than rendered as a table in the middle of the body.
-  return element.matches(BLOCK_SELECTOR) && element === root.firstElementChild
-}
-
 function findBlock(root: HTMLElement): HTMLElement | null {
   const first = root.firstElementChild as HTMLElement | null
   return first && first.matches(BLOCK_SELECTOR) ? first : null
@@ -385,12 +378,6 @@ export function initWysiwygFrontMatter(display: FrontMatterDisplay = 'table') {
         }
       }
       queueRefresh()
-    },
-    dispose() {
-      const block = root ? findBlock(root) : null
-      if (block) showSource(block)
-      unbindRoot()
-      root = null
     },
   }
 }

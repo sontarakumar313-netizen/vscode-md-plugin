@@ -688,7 +688,8 @@ export function mergeThreeWayTextPreferringLocal(
   base: string,
   local: string,
   remote: string,
-  allowRemoteCorrespondingLineFallback = false
+  allowRemoteCorrespondingLineFallback = false,
+  preserveRemoteNewlineInsertions = false
 ): LocalPreferredMergeResult {
   if (local === remote) {
     return { kind: 'merged', content: local, discardedRemoteChanges: [] }
@@ -715,13 +716,36 @@ export function mergeThreeWayTextPreferringLocal(
     if (localChanges.some((localChange) => sameChange(localChange, remoteChange))) {
       continue
     }
-    if (
-      localChanges.some((localChange) =>
-        changesConflict(localChange, remoteChange)
-      )
-    ) {
-      discardedRemoteChanges.push(remoteChange)
-      continue
+    const conflictingLocalChanges = localChanges.filter((localChange) =>
+      changesConflict(localChange, remoteChange)
+    )
+    if (conflictingLocalChanges.length > 0) {
+      // Canonical Markdown collapses repeated blank separators. If the user
+      // inserts content at that exact projected gap, retain the origin's
+      // newline-only formatting before the local insertion. Keep this opt-in
+      // and restricted to a real blank-line boundary: concurrent same-position
+      // insertions and ordinary single line breaks remain ambiguous.
+      const isDocumentEdgeBlankRun =
+        (remoteChange.start === 0 || remoteChange.start === base.length) &&
+        remoteChange.text.length >= 2
+      const isBlankLineBoundary =
+        isDocumentEdgeBlankRun ||
+        base.slice(0, remoteChange.start).endsWith('\n\n') ||
+        base.slice(remoteChange.start).startsWith('\n\n')
+      const isPreservableNewlineInsertion =
+        preserveRemoteNewlineInsertions &&
+        isBlankLineBoundary &&
+        remoteChange.start === remoteChange.end &&
+        /^\n+$/.test(remoteChange.text) &&
+        conflictingLocalChanges.every(
+          (localChange) =>
+            localChange.start === localChange.end &&
+            localChange.start === remoteChange.start
+        )
+      if (!isPreservableNewlineInsertion) {
+        discardedRemoteChanges.push(remoteChange)
+        continue
+      }
     }
     combined.push({ ...remoteChange, source: 'remote' })
   }
@@ -763,6 +787,7 @@ export function reconcileCanonicalisedEdit(
     baseline,
     local,
     origin,
+    true,
     true
   ).content
 }

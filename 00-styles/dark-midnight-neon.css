@@ -439,7 +439,7 @@ body {
   accent-color: var(--midnight-cyan);
 }
 
-/* ── Source markers and line numbers ───────────────────────────────────── */
+/* ── Source markers ───────────────────────────────────────────────────── */
 #app.vditor .vditor-sv__marker {
   color: var(--midnight-faint);
   font-family: var(--midnight-mono);
@@ -448,47 +448,6 @@ body {
 #app.vditor .vditor-sv {
   font-family: var(--midnight-mono);
   color: #cdd9f2;
-}
-
-#vmd-line-number-gutter {
-  background: rgba(8, 13, 24, 0.92);
-  border-right-color: var(--midnight-border);
-}
-
-#vmd-line-number-gutter .vmd-line-number {
-  color: #536886;
-  font-family: var(--midnight-mono);
-}
-
-/* ── Search widget ─────────────────────────────────────────────────────── */
-#vmd-search-bar {
-  color: var(--midnight-text);
-  background: #111b2e;
-  border-color: #30415f;
-  box-shadow: var(--midnight-shadow);
-}
-
-#vmd-search-input {
-  color: var(--midnight-text);
-  background: #09111f;
-  border-color: #30415f;
-  caret-color: var(--midnight-cyan);
-}
-
-#vmd-search-input:focus {
-  border-color: var(--midnight-cyan);
-  box-shadow: 0 0 0 2px rgba(77, 232, 232, 0.12);
-}
-
-#vmd-search-count {
-  color: var(--midnight-muted);
-}
-
-#vmd-search-bar button:hover,
-#vmd-search-case-label:hover {
-  color: var(--midnight-cyan);
-  background: rgba(77, 232, 232, 0.08);
-  border-color: rgba(77, 232, 232, 0.28);
 }
 
 /* ── Scrollbars ────────────────────────────────────────────────────────── */

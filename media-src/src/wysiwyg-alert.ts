@@ -127,12 +127,5 @@ export function initWysiwygAlerts() {
   }
 
   rebind()
-  return {
-    rebind,
-    dispose() {
-      observer?.disconnect()
-      observer = null
-      root = null
-    },
-  }
+  return { rebind }
 }

@@ -197,17 +197,4 @@
   color: var(--toolbar-icon-hover-color);
 }
 
-/* Search bar supplied by this extension */
-#vmd-search-bar {
-  background: var(--vscode-editorWidget-background, var(--panel-background-color));
-  border-color: var(--vscode-editorWidget-border, var(--border-color));
-  color: var(--vscode-editorWidget-foreground, var(--textarea-text-color));
-}
-
-#vmd-search-input {
-  background: var(--vscode-input-background, var(--textarea-background-color));
-  color: var(--vscode-input-foreground, var(--textarea-text-color));
-  border-color: var(--vscode-input-border, var(--border-color));
-}
-
 /* Remove or edit the rules above to create your own theme. */

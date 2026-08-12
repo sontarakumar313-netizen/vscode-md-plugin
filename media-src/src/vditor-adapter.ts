@@ -10,7 +10,13 @@ import {
 } from 'vditor/src/ts/util/fixBrowserBehavior'
 import { setSelectionFocus } from 'vditor/src/ts/util/selection'
 import { afterRenderEvent as commitWysiwygAfterRender } from 'vditor/src/ts/wysiwyg/afterRenderEvent'
-import { highlightToolbarWYSIWYG } from 'vditor/src/ts/wysiwyg/highlightToolbarWYSIWYG'
+import { renderDomByMd } from 'vditor/src/ts/wysiwyg/renderDomByMd'
+import {
+  genAPopover,
+  highlightToolbarWYSIWYG,
+} from 'vditor/src/ts/wysiwyg/highlightToolbarWYSIWYG'
+
+type VditorInternals = Parameters<typeof genAPopover>[0]
 
 export type VditorMode = 'wysiwyg' | 'sv'
 
@@ -82,10 +88,46 @@ export function focusVditorRange(range: Range): void {
   setSelectionFocus(range)
 }
 
+/** Opens an existing link's popover without Vditor's 200 ms toolbar debounce. */
+export function showVditorWysiwygLinkPopover(
+  internal: VditorInternals | null,
+  link: HTMLElement
+): boolean {
+  if (
+    !internal ||
+    internal.currentMode !== 'wysiwyg' ||
+    !internal.wysiwyg.element.contains(link)
+  ) {
+    return false
+  }
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return false
+
+  window.clearTimeout(internal.wysiwyg.hlToolbarTimeoutId)
+  genAPopover(internal, link, selection.getRangeAt(0))
+  return true
+}
+
 /** Refreshes Vditor's native contextual popover for the current WYSIWYG caret. */
 export function refreshVditorWysiwygToolbar(internal: any): void {
   if (!internal || internal.currentMode !== 'wysiwyg') return
   highlightToolbarWYSIWYG(internal)
+}
+
+export function setVditorMarkdown(editor: any, markdown: string): void {
+  const internal = getVditorInternals(editor)
+  const mode = getVditorMode(editor)
+  if (!internal || !mode) return
+
+  if (mode === 'wysiwyg') {
+    renderDomByMd(internal, markdown, {
+      enableAddUndoStack: true,
+      enableHint: false,
+      enableInput: false,
+    })
+    return
+  }
+  editor.setValue(markdown)
 }
 
 /** Commits a DOM edit that intentionally bypasses Vditor's WYSIWYG input parser. */

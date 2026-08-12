@@ -120,6 +120,12 @@ body,
   );
   animation: none;
 }
+/* Vditor writes a provisional position after the customization callback.
+   Keep that intermediate state out of the first paint; the class is removed in
+   the same task once the final above-target coordinates have been measured. */
+.vditor-wysiwyg > .vmd-url-popover.vmd-url-popover--positioning {
+  visibility: hidden;
+}
 .vmd-url-popover__hidden-field {
   display: none !important;
 }
@@ -164,21 +170,38 @@ body,
 }
 
 /* Vditor represents HTML details as separate opening, body, and closing blocks
-   in WYSIWYG mode. The controller marks body blocks while a disclosure is
-   closed and hides the otherwise-empty closing block; the native selector also
-   covers details kept in one HTML block. */
-.vditor-wysiwyg .vditor-reset details:not([open]) > :not(summary),
-.vditor-wysiwyg .vditor-reset .vmd-details-content--hidden {
-  display: none !important;
-}
+   in WYSIWYG mode. Keep the raw HTML source hidden in every disclosure state;
+   the summary row and title popover are the only editing controls. */
+.vditor-wysiwyg
+  .vditor-reset
+  .vmd-details-opener
+  > pre:not(.vditor-wysiwyg__preview),
+.vditor-wysiwyg
+  .vditor-reset
+  details:not([open])
+  > :not(summary):not(.vmd-details-title-button),
+.vditor-wysiwyg .vditor-reset .vmd-details-content--hidden,
 .vditor-wysiwyg .vditor-reset .vmd-details-closer {
   display: none !important;
 }
+.vditor-wysiwyg
+  .vditor-reset
+  .vmd-details-opener
+  > .vditor-wysiwyg__preview
+  > details {
+  position: relative;
+}
 .vditor-wysiwyg .vditor-reset details > summary.vmd-details-summary {
   position: relative;
-  padding-left: 1.15em;
+  box-sizing: border-box;
+  min-height: 28px;
+  margin: 2px 0;
+  padding: 4px 34px 4px 1.25em;
   cursor: pointer;
   list-style: none;
+  color: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }
 .vditor-wysiwyg
   .vditor-reset
@@ -189,7 +212,7 @@ body,
 .vditor-wysiwyg .vditor-reset .vmd-details-toggle {
   position: absolute;
   top: 50%;
-  left: 0.15em;
+  left: 0.2em;
   width: 0;
   height: 0;
   border-top: 0.3em solid transparent;
@@ -199,7 +222,6 @@ body,
   user-select: none;
   transform: translateY(-50%);
   transform-origin: 35% 50%;
-  transition: transform 80ms ease-out;
 }
 .vditor-wysiwyg
   .vditor-reset
@@ -215,29 +237,35 @@ body,
   outline: 1px solid var(--vscode-focusBorder, var(--toolbar-icon-hover-color));
   outline-offset: 2px;
 }
-
-/* ── Details title-edit box ────────────────────────────────────────────────
-   Appears below the summary when the block is open. This is the only place
-   where the title text can be edited; the <summary> itself is non-editable. */
-.vditor-wysiwyg .vditor-reset .vmd-details-title-edit {
-  display: block;
-  margin: 0.2em 0 0.3em;
-  padding: 3px 8px;
-  border: 1px solid
-    var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.45));
+.vditor-wysiwyg .vditor-reset .vmd-details-title-button {
+  position: absolute;
+  z-index: 1;
+  top: 3px;
+  right: 3px;
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  padding: 4px;
+  border: 0;
   border-radius: 3px;
+  align-items: center;
+  justify-content: center;
+  color: var(--vscode-descriptionForeground, currentColor);
   background: transparent;
-  font-size: inherit;
-  font-family: inherit;
-  line-height: inherit;
-  color: inherit;
-  outline: none;
-  cursor: text;
-  white-space: pre-wrap;
-  word-break: break-word;
+  cursor: pointer;
 }
-.vditor-wysiwyg .vditor-reset .vmd-details-title-edit:focus {
-  border-color: var(--vscode-focusBorder, #007fd4);
+.vditor-wysiwyg .vditor-reset .vmd-details-title-button:hover,
+.vditor-wysiwyg .vditor-reset .vmd-details-title-button:focus-visible {
+  color: var(--vscode-foreground, currentColor);
+  background: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.15));
+  outline: 1px solid var(--vscode-focusBorder, #007fd4);
+}
+.vditor-wysiwyg .vditor-reset .vmd-details-title-button > svg {
+  width: 16px;
+  height: 16px;
+}
+.vditor-wysiwyg > .vmd-details-title-popover .vmd-url-popover__url {
+  width: 100%;
 }
 
 /* ── Details open-content border ───────────────────────────────────────────
@@ -563,8 +591,7 @@ body,
    surrounded by text-line fragments, while display math is separated by
    rules above and below the centered expression. */
 .vditor-toolbar .vmd-math-toolbar-icon,
-.vditor-toolbar .vmd-details-toolbar-icon,
-.vditor-toolbar .vmd-alert-toolbar-icon {
+.vditor-toolbar .vmd-details-toolbar-icon {
   color: currentColor;
   shape-rendering: geometricPrecision;
 }

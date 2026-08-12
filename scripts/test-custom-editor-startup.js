@@ -68,59 +68,59 @@ try {
 }
 
 const { MarkdownEditorProvider } = compiledModule.exports
-let receiveMessage
-const postedMessages = []
-const webview = {
-  cspSource: 'vscode-webview://test',
-  asWebviewUri(uri) {
-    return uri
-  },
-  onDidReceiveMessage(listener) {
-    receiveMessage = listener
-    return disposable()
-  },
-  postMessage(message) {
-    postedMessages.push(message)
-    return Promise.resolve(true)
-  },
-  set options(value) {
-    this._options = value
-  },
-  get options() {
-    return this._options
-  },
-  set html(value) {
-    this._html = value
-    assert.strictEqual(
-      typeof receiveMessage,
-      'function',
-      'the ready listener must exist before assigning webview HTML'
-    )
-    receiveMessage({ command: 'ready' })
-  },
-  get html() {
-    return this._html
-  },
-}
-
 const markdownUri = makeUri('C:/workspace/example.md')
 const document = {
   uri: markdownUri,
   version: 1,
   getText: () => '# Example',
 }
-const panel = {
-  webview,
-  onDidDispose: () => disposable(),
-  title: '',
-}
-const context = {
-  extensionUri: makeUri('C:/extension'),
-  globalState: { get: () => ({}) },
-}
 
-async function testInitialReadyMessage() {
-  const provider = new MarkdownEditorProvider(context)
+async function openEditor(mode, savedMode) {
+  let receiveMessage
+  const postedMessages = []
+  const webview = {
+    cspSource: 'vscode-webview://test',
+    asWebviewUri(uri) {
+      return uri
+    },
+    onDidReceiveMessage(listener) {
+      receiveMessage = listener
+      return disposable()
+    },
+    postMessage(message) {
+      postedMessages.push(message)
+      return Promise.resolve(true)
+    },
+    set options(value) {
+      this._options = value
+    },
+    get options() {
+      return this._options
+    },
+    set html(value) {
+      this._html = value
+      assert.strictEqual(
+        typeof receiveMessage,
+        'function',
+        'the ready listener must exist before assigning webview HTML'
+      )
+      receiveMessage({ command: 'ready' })
+    },
+    get html() {
+      return this._html
+    },
+  }
+  const panel = {
+    webview,
+    onDidDispose: () => disposable(),
+    title: '',
+  }
+  const context = {
+    extensionUri: makeUri('C:/extension'),
+    globalState: { get: () => ({ mode: savedMode }) },
+  }
+
+  const provider = new MarkdownEditorProvider(context, mode)
   await provider.resolveCustomTextEditor(document, panel, {})
   await new Promise((resolve) => setImmediate(resolve))
   await new Promise((resolve) => setImmediate(resolve))
@@ -143,11 +143,9 @@ async function testInitialReadyMessage() {
       editorGeneration: 1,
       scrollTop: 0,
       type: 'init',
-      // The stub configuration returns undefined for every key, so these are
-      // the host fallbacks for unset or hand-edited values.
       options: {
         useVscodeThemeColor: undefined,
-        mode: 'wysiwyg',
+        mode,
         frontMatterDisplay: 'table',
       },
       theme: 'light',
@@ -157,7 +155,12 @@ async function testInitialReadyMessage() {
   ])
 }
 
-testInitialReadyMessage()
+async function testInitialReadyMessages() {
+  await openEditor('wysiwyg', 'sv')
+  await openEditor('sv', 'wysiwyg')
+}
+
+testInitialReadyMessages()
   .then(() => console.log('custom editor startup tests passed'))
   .catch((error) => {
     console.error(error)

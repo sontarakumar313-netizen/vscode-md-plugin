@@ -65,9 +65,9 @@ try {
 
 const { getVditorOptions } = compiledModule.exports
 const context = { globalState: { get: () => undefined } }
-const optionsFor = (values) => {
+const optionsFor = (values, mode = 'wysiwyg') => {
   configValues = values
-  return getVditorOptions(context, undefined)
+  return getVditorOptions(context, undefined, mode)
 }
 
 for (const mode of ['table', 'codeBlock', 'hide']) {
@@ -105,51 +105,66 @@ configValues = { frontMatterDisplay: 'hide' }
 assert.strictEqual(
   getVditorOptions(
     { globalState: { get: () => ({ frontMatterDisplay: 'bogus' }) } },
-    undefined
+    undefined,
+    'wysiwyg'
   ).frontMatterDisplay,
   'hide',
   'a value left in saved editor state must not override the validated setting'
 )
 
-// Only the two supported editor modes may cross the host boundary.
+// The selected Custom Editor type is authoritative for every saved legacy value.
 configValues = { frontMatterDisplay: 'table' }
-for (const mode of ['wysiwyg', 'sv']) {
-  assert.strictEqual(
-    getVditorOptions(
-      { globalState: { get: () => ({ mode }) } },
-      undefined
-    ).mode,
-    mode,
-    `a supported saved editor mode must survive: ${mode}`
-  )
-}
 const removedMode = ['i', 'r'].join('')
-for (const mode of [removedMode, undefined, null, '', 'legacy-mode', 42, true, {}]) {
-  assert.strictEqual(
-    getVditorOptions(
-      { globalState: { get: () => ({ mode }) } },
-      undefined
-    ).mode,
-    'wysiwyg',
-    `an unsupported saved editor mode must fall back to WYSIWYG: ${JSON.stringify(
-      mode
-    )}`
-  )
+for (const savedMode of [
+  'wysiwyg',
+  'sv',
+  removedMode,
+  undefined,
+  null,
+  '',
+  'legacy-mode',
+  42,
+  true,
+  {},
+]) {
+  for (const fixedMode of ['wysiwyg', 'sv']) {
+    assert.strictEqual(
+      getVditorOptions(
+        { globalState: { get: () => ({ mode: savedMode }) } },
+        undefined,
+        fixedMode
+      ).mode,
+      fixedMode,
+      `fixed ${fixedMode} editor was overridden by saved mode: ${JSON.stringify(
+        savedMode
+      )}`
+    )
+  }
 }
 
 const withSaved = getVditorOptions(
-  { globalState: { get: () => ({ mode: 'sv', theme: 'dark', preview: {} }) } },
-  undefined
-)
-assert.strictEqual(
-  withSaved.theme,
+  {
+    globalState: {
+      get: () => ({
+        mode: 'sv',
+        theme: 'dark',
+        preview: {},
+        lang: 'de_DE',
+        hint: { emojiPath: 'https://example.invalid' },
+      }),
+    },
+  },
   undefined,
-  'the saved theme is still dropped, as it was before'
+  'wysiwyg'
 )
-assert.strictEqual(
-  withSaved.frontMatterDisplay,
-  'table',
-  'the validated setting is present alongside saved options'
+assert.deepStrictEqual(
+  withSaved,
+  {
+    useVscodeThemeColor: undefined,
+    mode: 'wysiwyg',
+    frontMatterDisplay: 'table',
+  },
+  'persisted Vditor state must not override the fixed editor or restore dropped options'
 )
 
 console.log('vditor options tests passed')

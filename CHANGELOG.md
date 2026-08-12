@@ -4,6 +4,9 @@ All notable changes to Markdown Interactor will be documented in this file.
 
 ## Unreleased
 
+- Exposed WYSIWYG and Split View as distinct native VS Code **Open With...**
+  editor choices, while retaining the existing editor identifier for WYSIWYG
+  compatibility and removing the Webview toolbar mode switch.
 - The editor UI provides visual editing and split source view only, rejects
   unsupported saved modes, and uses visual editing as the default.
 - Replaced the physically stripped Vditor and Lute forks with the pinned official
@@ -14,6 +17,8 @@ All notable changes to Markdown Interactor will be documented in this file.
   Lodash, and date-fns runtime dependencies.
 - Removed the custom find/replace implementation and delegated `Ctrl/Cmd+F` to
   VS Code's built-in Webview Find Widget.
+- Made the custom link URL popover open immediately instead of waiting for
+  Vditor's contextual-toolbar debounce.
 - Limited Extension Host type checking to `src/`, preventing ignored reference
   source trees from being pulled into the extension build, and declared pnpm's
   dependency build policy so frozen installs remain reproducible.
