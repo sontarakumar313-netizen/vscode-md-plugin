@@ -3,6 +3,7 @@ const Langs = {
     save: 'Save',
     copyMarkdown: 'Copy Markdown',
     copyHtml: 'Copy HTML',
+    copyFailed: 'Copy failed',
     toggleOutline: 'Toggle outline',
     editingMode: 'Editing mode',
     wysiwygMode: 'Visual editing',
@@ -42,6 +43,7 @@ const Langs = {
   },
   ja_JP: {
     save: '保存する',
+    copyFailed: 'コピーに失敗しました',
     toggleOutline: 'アウトラインの表示を切り替え',
     editingMode: '編集モード',
     wysiwygMode: 'ビジュアル編集',
@@ -77,6 +79,7 @@ const Langs = {
   },
   ko_KR: {
     save: '저장',
+    copyFailed: '복사하지 못했습니다',
     toggleOutline: '개요 표시 전환',
     editingMode: '편집 모드',
     wysiwygMode: '비주얼 편집',
@@ -114,6 +117,7 @@ const Langs = {
     save: '保存',
     copyMarkdown: '复制 Markdown',
     copyHtml: '复制 HTML',
+    copyFailed: '复制失败',
     toggleOutline: '切换目录显示',
     editingMode: '编辑模式',
     wysiwygMode: '可视化编辑',

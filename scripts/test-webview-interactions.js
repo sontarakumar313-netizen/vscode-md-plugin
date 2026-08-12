@@ -106,7 +106,11 @@ function testPage() {
       const deadline = Date.now() + timeout;
       const check = () => {
         if (predicate()) return resolve();
-        if (Date.now() >= deadline) return reject(new Error('Timed out waiting for editor state'));
+        if (Date.now() >= deadline) {
+          return reject(new Error(
+            'Timed out waiting for editor state at ' + testCheckpoint
+          ));
+        }
         setTimeout(check, 10);
       };
       check();
@@ -189,7 +193,9 @@ function testPage() {
     let testCheckpoint = 'startup';
     (async () => {
       try {
+        testCheckpoint = 'waiting for Webview ready';
         await wait(() => window.__vmdMessages.some((message) => message.command === 'ready'));
+        testCheckpoint = 'waiting for initial Vditor root';
         window.dispatchEvent(new MessageEvent('message', {
           data: {
             command: 'update',
@@ -212,7 +218,9 @@ function testPage() {
           },
         }));
         await wait(() => root());
+        testCheckpoint = 'waiting for initial editor baseline';
         await wait(() => window.__vmdMessages.some((message) => message.command === 'editor-baseline'));
+        testCheckpoint = 'startup';
         expect(
           window.vditor.vditor.currentMode === 'wysiwyg',
           'an unsupported initialization mode did not fall back to visual editing'
@@ -402,6 +410,24 @@ function testPage() {
             codeLanguageItems.some((item) => item.dataset.codeLanguage === 'python') &&
             !codeLanguageItems.some((item) => item.dataset.codeLanguage === 'mermaid'),
           'the local code-language menu did not retain the custom current language or exclude rich renderers'
+        );
+        const menuPointerDown = new PointerEvent('pointerdown', {
+          bubbles: true,
+          cancelable: true,
+        });
+        codeLanguageMenu.dispatchEvent(menuPointerDown);
+        expect(
+          !menuPointerDown.defaultPrevented,
+          'the code-language menu prevented native scrollbar dragging'
+        );
+        codeLanguageMenu.scrollTop = Math.min(
+          40,
+          Math.max(1, codeLanguageMenu.scrollHeight - codeLanguageMenu.clientHeight)
+        );
+        codeLanguageMenu.dispatchEvent(new Event('scroll'));
+        expect(
+          getComputedStyle(codeLanguageMenu).display !== 'none',
+          'scrolling the code-language menu closed it'
         );
         document.dispatchEvent(new KeyboardEvent('keydown', {
           key: 'Escape',
@@ -676,7 +702,9 @@ function testPage() {
         );
 
         await setMarkdown('insert link here');
+        testCheckpoint = 'waiting for link insertion fixture';
         await wait(() => root().querySelector(':scope > p'));
+        testCheckpoint = 'startup';
         const insertionText = textNode(root().querySelector(':scope > p'));
         select(insertionText, insertionText.textContent.length, insertionText, insertionText.textContent.length);
         root().dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
@@ -687,6 +715,7 @@ function testPage() {
           cancelable: true,
         }));
         linkToolbarButton.click();
+        testCheckpoint = 'waiting for empty link insertion popover';
         await wait(() => {
           const candidate = document.querySelector('.vditor-wysiwyg > .vmd-url-popover');
           return candidate?.style.display === 'block' &&
@@ -696,6 +725,7 @@ function testPage() {
           const candidate = document.querySelector('.vditor-wysiwyg > .vmd-url-popover');
           throw new Error('empty link insertion did not retain controls and redirect focus to URL: active=' + document.activeElement?.outerHTML?.slice(0, 160) + '; popover=' + candidate?.outerHTML?.slice(0, 400));
         });
+        testCheckpoint = 'startup';
 
         // Image popovers share the wide URL editor/copy action, hide alt text,
         // and retain title editing without discarding the existing alt value.
@@ -705,10 +735,12 @@ function testPage() {
           bubbles: true,
           cancelable: true,
         }));
+        testCheckpoint = 'waiting for image popover';
         await wait(() => {
           const candidate = document.querySelector('.vditor-wysiwyg > .vmd-url-popover--image');
           return candidate?.style.display === 'block';
         });
+        testCheckpoint = 'startup';
         urlPopover = document.querySelector('.vditor-wysiwyg > .vmd-url-popover--image');
         const imageUrlInput = urlPopover.querySelector('.vmd-url-popover__url-input');
         const imageTitleInput = urlPopover.querySelector('.vmd-url-popover__title input');
@@ -802,12 +834,14 @@ function testPage() {
           bubbles: true,
           cancelable: true,
         }));
+        testCheckpoint = 'waiting for linked image popover';
         await wait(() => {
           const candidate = document.querySelector('.vditor-wysiwyg > .vmd-url-popover--image');
           return candidate?.style.display === 'block';
         }).catch(() => {
           throw new Error('linked image popover timed out');
         });
+        testCheckpoint = 'startup';
         expect(
           window.__vmdMessages.filter((message) => message.command === 'open-link').length ===
             linkedOpenCount &&
@@ -1044,7 +1078,9 @@ function testPage() {
         ).length;
         const normalizeBeforeConfirmation = normalizeMessageCount();
         normalizeToolbarItem.click();
+        testCheckpoint = 'waiting for normalize cancel dialog';
         await wait(() => document.querySelector('.vmd-confirm-dialog[open]'));
+        testCheckpoint = 'startup';
         document.querySelector(
           '.vmd-confirm-dialog [data-action="cancel"]'
         ).click();
@@ -1056,11 +1092,15 @@ function testPage() {
         );
 
         normalizeToolbarItem.click();
+        testCheckpoint = 'waiting for normalize confirm dialog';
         await wait(() => document.querySelector('.vmd-confirm-dialog[open]'));
+        testCheckpoint = 'startup';
         document.querySelector(
           '.vmd-confirm-dialog [data-action="confirm"]'
         ).click();
+        testCheckpoint = 'waiting for normalize command';
         await wait(() => normalizeMessageCount() === normalizeBeforeConfirmation + 1);
+        testCheckpoint = 'startup';
         expect(
           normalizeMessageCount() === normalizeBeforeConfirmation + 1,
           'confirming normalization did not post exactly one command'
@@ -1603,6 +1643,7 @@ function testPage() {
 
         await setMarkdown(
           '<details>\\n<summary>Continuous border</summary>\\n\\nparagraph body' +
+            '\\n\\n### Heading inside details' +
             '\\n\\n- first list item\\n- second list item\\n\\n> quote body' +
             '\\n\\n| A | B |\\n| --- | --- |\\n| one | two |' +
             '\\n\\ntail paragraph\\n\\n</details>'
@@ -1614,8 +1655,8 @@ function testPage() {
           root().querySelectorAll(':scope > .vmd-details-content--open')
         );
         expect(
-          borderedBlocks.length === 5,
-          'the mixed details fixture did not expose all five content blocks'
+          borderedBlocks.length === 6,
+          'the mixed details fixture did not expose all six content blocks'
         );
         const borderRects = borderedBlocks.map((block) =>
           block.getBoundingClientRect()
@@ -1647,6 +1688,40 @@ function testPage() {
               getComputedStyle(borderedBlocks[borderedBlocks.length - 1]).borderBottomWidth
             ) === 1,
           'the continuous details boundary lost its top or bottom edge'
+        );
+        const virtualHeading = borderedBlocks.find(
+          (block) => block.tagName === 'H3'
+        );
+        const virtualHeadingStyle = getComputedStyle(virtualHeading);
+        const virtualHeadingMarker = getComputedStyle(
+          virtualHeading,
+          '::before'
+        );
+        expect(
+          virtualHeadingMarker.content.replace(/["']/g, '') === 'H3' &&
+            Number.parseFloat(virtualHeadingStyle.paddingLeft) +
+              Number.parseFloat(virtualHeadingMarker.marginLeft) >= -0.5,
+          'the H3 level marker crosses the virtual details boundary'
+        );
+        expect(
+          Math.abs(
+            Number.parseFloat(virtualHeadingStyle.paddingLeft) -
+              Number.parseFloat(getComputedStyle(borderedBlocks[0]).paddingLeft)
+          ) <= 0.5,
+          'heading text does not use the details virtual-document gutter'
+        );
+        const virtualList = borderedBlocks.find(
+          (block) => block.tagName === 'UL'
+        );
+        const virtualListRect = virtualList.getBoundingClientRect();
+        const virtualListStyle = getComputedStyle(virtualList);
+        const outlineExtent =
+          Number.parseFloat(virtualListStyle.outlineWidth) +
+          Number.parseFloat(virtualListStyle.outlineOffset);
+        expect(
+          virtualListRect.left - outlineExtent >= borderRects[0].left - 0.5 &&
+            virtualListRect.right + outlineExtent <= borderRects[0].right + 0.5,
+          'the list outline exceeds the details virtual-document boundary'
         );
 
         // Reproduce an actual blank WYSIWYG line through Vditor's Enter path.
@@ -2375,7 +2450,11 @@ function testPage() {
         codeCopyIcon.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
         await pause();
         expect(window.__vmdCodeCopyAttempts === copyAttemptsBefore + 1, 'code block copy did not invoke the clipboard command');
-        expect(codeCopyButton.getAttribute('aria-label') === (window.VditorI18n.copied || 'Copied'), 'code block copy did not report success');
+        expect(
+          codeCopyButton.getAttribute('aria-label') === (window.VditorI18n.copied || 'Copied') &&
+            codeCopyButton.classList.contains('vditor-tooltipped--hover'),
+          'code block copy did not show visible success feedback'
+        );
 
         await setMarkdown('toolbar-only mode target');
         const shortcutParagraph = root().querySelector(':scope > p');
@@ -2717,10 +2796,14 @@ function testPage() {
           bodyHeading.childNodes.length
         );
         document.dispatchEvent(new Event('selectionchange'));
-        await pause(160);
         const fmBlock = () => root().querySelector('.vditor-wysiwyg__block[data-type="yaml-front-matter"]');
+        testCheckpoint = 'waiting for front matter block';
+        await wait(() => fmBlock());
         expect(fmBlock(), 'front matter did not render as a yaml-front-matter block');
         const fmTable = () => fmBlock().querySelector('table.vmd-front-matter');
+        testCheckpoint = 'waiting for front matter table';
+        await wait(() => fmTable());
+        testCheckpoint = 'startup';
         expect(
           fmTable(),
           'front matter did not render as a table: ' + fmBlock().outerHTML.slice(0, 1200)
@@ -2797,7 +2880,6 @@ function testPage() {
         select(bodyTextNode, bodyTextNode.textContent.length, bodyTextNode, bodyTextNode.textContent.length);
         bodyTextNode.textContent = bodyTextNode.textContent + ' Edited.';
         root().dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: '.' }));
-        await pause(220);
         const afterBodyEdit = window.vditor.getValue();
         expect(
           afterBodyEdit.indexOf(lines('---', 'title: Front Matter')) === 0,
@@ -2813,8 +2895,14 @@ function testPage() {
         );
 
         // Clicking the table swaps in the source so it can be edited as a code
-        // area, and the caret lands inside that source.
-        await wait(() => fmTable());
+        // area, and the caret lands inside that source. The table controller
+        // refreshes from MutationObserver on the next microtask; waiting with a
+        // timer here races Chrome virtual time, so yield directly to that queue.
+        await Promise.resolve();
+        expect(
+          fmTable(),
+          'the front matter table did not return after editing the body'
+        );
         fmTable().dispatchEvent(new MouseEvent('click', { bubbles: true }));
         await pause(160);
         expect(!fmTable(), 'clicking the table did not switch to the source view');
@@ -2952,7 +3040,9 @@ function testPage() {
             },
           },
         }));
+        testCheckpoint = 'waiting for reinitialized document body';
         await wait(() => root() && root().textContent.indexOf('Opened body') >= 0);
+        testCheckpoint = 'startup';
         await pause(200);
         expect(
           window.vditor.getValue() === openedSource,
@@ -2988,7 +3078,11 @@ function testPage() {
         // Run direct code input after toolbar-selection fixtures so Vditor's
         // native input history cannot affect their deliberately synthetic focus.
         testCheckpoint = 'ordinary code direct editing';
-        await setMarkdown(markerFence + 'js\\nconst a = 1;\\n' + markerFence);
+        await setMarkdown(
+          'Before code\\n\\n' + markerFence +
+            'js\\nconst a = 1;\\nconst b = 2;\\n' + markerFence +
+            '\\n\\nAfter code'
+        );
         await pause(120);
         codeBlock = root().querySelector(
           '.vditor-wysiwyg__block[data-type="code-block"]'
@@ -2996,12 +3090,24 @@ function testPage() {
         codeSource = codeBlock.querySelector(':scope > .vditor-wysiwyg__pre');
         codePreview = codeBlock.querySelector(':scope > .vditor-wysiwyg__preview');
         codePreviewCode = codePreview.querySelector(':scope > code');
-        const codeTopBeforeEdit = codePreview.getBoundingClientRect().top;
+        const paragraphAfterCode = codeBlock.nextElementSibling;
+        const codeRectBeforeEdit = codeBlock.getBoundingClientRect();
+        const paragraphAfterRectBeforeEdit = paragraphAfterCode.getBoundingClientRect();
+        const codeGapAfterBeforeEdit =
+          paragraphAfterRectBeforeEdit.top - codeRectBeforeEdit.bottom;
         codePreviewCode.click();
         await pause();
+        const codeRectAfterEdit = codeBlock.getBoundingClientRect();
+        const paragraphAfterRectAfterEdit = paragraphAfterCode.getBoundingClientRect();
+        const codeGapAfterAfterEdit =
+          paragraphAfterRectAfterEdit.top - codeRectAfterEdit.bottom;
         expect(
           codeBlock.classList.contains('vmd-code-block--editing') &&
-            Math.abs(codePreview.getBoundingClientRect().top - codeTopBeforeEdit) <= 1 &&
+            Math.abs(codeRectAfterEdit.top - codeRectBeforeEdit.top) <= 1 &&
+            Math.abs(codeRectAfterEdit.width - codeRectBeforeEdit.width) <= 1 &&
+            Math.abs(codeRectAfterEdit.height - codeRectBeforeEdit.height) <= 1 &&
+            Math.abs(codeGapAfterAfterEdit - codeGapAfterBeforeEdit) <= 1 &&
+            codeGapAfterAfterEdit >= 15 &&
             getComputedStyle(codeSource).display !== 'none' &&
             getComputedStyle(codePreviewCode).display === 'none' &&
             getComputedStyle(codeBlock.querySelector('.vmd-code-toolbar')).display === 'flex',
@@ -3077,6 +3183,100 @@ function testPage() {
         expect(
           !window.vditor.getValue().includes('vmd-code-'),
           'the code editing controls leaked into Markdown'
+        );
+
+        // This reproduces 00-docs/代码修复-20260813-031654.md: multiple ordinary
+        // code blocks placed down the WYSIWYG document used to let Vditor's
+        // off-screen copy textareas enlarge html/body and create a second,
+        // document-external scrollbar.
+        testCheckpoint = 'code copy outer scroll containment';
+        const scrollContainmentMarkdown = [
+          '# Code copy scroll containment',
+          '',
+          ...Array.from({ length: 8 }, (_, index) =>
+            'Long paragraph ' + index + ' '.repeat(36)
+          ),
+          '',
+          markerFence + 'html',
+          '<details>',
+          '<summary>Title</summary>',
+          '',
+          'Hidden body',
+          '',
+          '</details>',
+          markerFence,
+          '',
+          ...Array.from({ length: 8 }, (_, index) =>
+            'Middle paragraph ' + index + ' '.repeat(36)
+          ),
+          '',
+          markerFence + 'text',
+          'closed details did not render as a title-free thin horizontal bar',
+          markerFence,
+          '',
+          'Last paragraph',
+        ].join('\\n\\n');
+        await setMarkdown(scrollContainmentMarkdown);
+        await pause(160);
+        const containedEditorRoot = root();
+        const containmentCopyButtons = Array.from(
+          containedEditorRoot.querySelectorAll(
+            '.vditor-copy .vditor-tooltipped'
+          )
+        );
+        const containmentTextareas = Array.from(
+          containedEditorRoot.querySelectorAll('.vditor-copy > textarea')
+        );
+        const outerScrollRange = (element) =>
+          Math.max(0, element.scrollHeight - element.clientHeight);
+        expect(
+          containmentCopyButtons.length === 2 &&
+            containmentTextareas.length === 2 &&
+            containmentTextareas.every((textarea) => {
+              const style = getComputedStyle(textarea);
+              return style.position === 'fixed' &&
+                textarea.getBoundingClientRect().right < 0;
+            }),
+          'ordinary code copy textareas were not safely contained off-screen'
+        );
+        expect(
+          outerScrollRange(containedEditorRoot) > 0 &&
+            outerScrollRange(document.documentElement) === 0 &&
+            outerScrollRange(document.body) === 0 &&
+            outerScrollRange(document.getElementById('app')) === 0 &&
+            outerScrollRange(document.querySelector('.vditor-content')) === 0 &&
+            outerScrollRange(document.querySelector('.vditor-wysiwyg')) === 0,
+          'code copy controls created a document-external scroll range: ' +
+            JSON.stringify({
+              html: outerScrollRange(document.documentElement),
+              body: outerScrollRange(document.body),
+              app: outerScrollRange(document.getElementById('app')),
+              content: outerScrollRange(document.querySelector('.vditor-content')),
+              wysiwyg: outerScrollRange(document.querySelector('.vditor-wysiwyg')),
+              editor: outerScrollRange(containedEditorRoot),
+            })
+        );
+        const containmentCopyAttempts = window.__vmdCodeCopyAttempts;
+        containmentCopyButtons[1].click();
+        await pause();
+        expect(
+          window.__vmdCodeCopyAttempts === containmentCopyAttempts + 1 &&
+            window.__vmdClipboardText.trim() ===
+              'closed details did not render as a title-free thin horizontal bar' &&
+            containmentCopyButtons[1].classList.contains(
+              'vditor-tooltipped--hover'
+            ),
+          'containing the code copy textarea broke copying or success feedback: ' +
+            JSON.stringify({
+              attemptsBefore: containmentCopyAttempts,
+              attemptsAfter: window.__vmdCodeCopyAttempts,
+              clipboard: window.__vmdClipboardText,
+              label: containmentCopyButtons[1].getAttribute('aria-label'),
+              feedback: containmentCopyButtons[1].classList.contains(
+                'vditor-tooltipped--hover'
+              ),
+              textarea: containmentTextareas[1].value,
+            })
         );
 
         testCheckpoint = 'mode switch after ordinary code editing';
@@ -3194,11 +3394,11 @@ async function main() {
         '--no-first-run',
         '--no-default-browser-check',
         `--user-data-dir=${profile}`,
-        '--virtual-time-budget=18000',
+        '--virtual-time-budget=24000',
         '--dump-dom',
         `http://127.0.0.1:${port}/`,
       ],
-      { timeout: 25000, maxBuffer: 2 * 1024 * 1024 }
+      { timeout: 30000, maxBuffer: 2 * 1024 * 1024 }
     )
     assert.match(
       stdout,

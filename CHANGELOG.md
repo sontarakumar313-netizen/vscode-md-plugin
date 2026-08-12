@@ -12,6 +12,8 @@ All notable changes to Markdown Interactor will be documented in this file.
 - Ordinary code blocks now switch in place between highlighted viewing and
   plain-text editing, with an Alert-style local language menu; Mermaid and other
   rich-render code blocks retain Vditor's native preview/source behavior.
+- Prevented hidden code-copy controls from creating a second Webview scrollbar
+  that could move beyond the Markdown document boundary.
 - Removed the obsolete NW.js cut workaround plus the jQuery, jquery-confirm,
   Lodash, and date-fns runtime dependencies.
 - Removed the custom find/replace implementation and delegated `Ctrl/Cmd+F` to

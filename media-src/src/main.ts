@@ -10,7 +10,7 @@ import { fileToBase64, fixLinkClick } from './utils'
 import Vditor from 'vditor'
 import 'vditor/dist/index.css'
 import { captureCaretAnchor, restoreCaretAnchor } from './caret-anchor'
-import { lang } from './lang'
+import { lang, t } from './lang'
 import {
   installEditorModeShortcutGuard,
   installToolbarSelectionPreserver,
@@ -85,12 +85,39 @@ function localVditorAsset(file: string): string {
  * relaxing the CSP.
  */
 function installCodeCopyHandler(): void {
-  const setCopyLabel = (button: HTMLElement, copied: boolean) => {
+  const feedbackTimers = new WeakMap<HTMLElement, number>()
+
+  const copyLabel = (copied: boolean): string => {
     const i18n = (window as any).VditorI18n || {}
-    button.setAttribute(
-      'aria-label',
-      copied ? i18n.copied || 'Copied' : i18n.copy || 'Copy'
-    )
+    return copied ? i18n.copied || 'Copied' : i18n.copy || 'Copy'
+  }
+
+  const showCopyFeedback = (
+    button: HTMLElement,
+    label: string
+  ): void => {
+    const pending = feedbackTimers.get(button)
+    if (pending !== undefined) window.clearTimeout(pending)
+    button.setAttribute('aria-label', label)
+    // Vditor normally exposes the label only while hover/focus happens to
+    // remain active. Pin its standard tooltip briefly so the outcome is visible
+    // even when the click itself changes active/hover state.
+    button.classList.add('vditor-tooltipped--hover')
+    const timer = window.setTimeout(() => {
+      feedbackTimers.delete(button)
+      if (!button.isConnected) return
+      button.classList.remove('vditor-tooltipped--hover')
+      button.setAttribute('aria-label', copyLabel(false))
+    }, 1500)
+    feedbackTimers.set(button, timer)
+  }
+
+  const showCopiedFeedback = (button: HTMLElement): void => {
+    showCopyFeedback(button, copyLabel(true))
+  }
+
+  const showCopyFailedFeedback = (button: HTMLElement): void => {
+    showCopyFeedback(button, t('copyFailed'))
   }
 
   document.addEventListener(
@@ -122,7 +149,7 @@ function installCodeCopyHandler(): void {
       textarea.blur()
 
       if (copied) {
-        setCopyLabel(button, true)
+        showCopiedFeedback(button)
         return
       }
 
@@ -131,12 +158,12 @@ function installCodeCopyHandler(): void {
       // fallback when the host exposes it.
       const writeText = navigator.clipboard?.writeText
       if (!writeText) {
-        setCopyLabel(button, false)
+        showCopyFailedFeedback(button)
         return
       }
       void writeText.call(navigator.clipboard, textarea.value).then(
-        () => setCopyLabel(button, true),
-        () => setCopyLabel(button, false)
+        () => showCopiedFeedback(button),
+        () => showCopyFailedFeedback(button)
       )
     },
     true

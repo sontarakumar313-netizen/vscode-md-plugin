@@ -645,6 +645,10 @@ export function initWysiwygCodeBlocks(): { rebind(): void } {
   }
 
   menu.addEventListener('pointerdown', (event) => {
+    const target = event.target instanceof Element ? event.target : null
+    if (!target?.closest('button[data-code-language]')) return
+    // Keep the source caret only when a language item is pressed. Preventing
+    // pointerdown on the whole menu also prevents dragging its native scrollbar.
     event.preventDefault()
     event.stopPropagation()
   })
@@ -661,7 +665,22 @@ export function initWysiwygCodeBlocks(): { rebind(): void } {
   menu.addEventListener('keydown', onMenuKeydown)
   document.addEventListener('pointerdown', onDocumentPointerDown, true)
   document.addEventListener('keydown', onDocumentKeydown, true)
-  document.addEventListener('scroll', hideMenu, true)
+  document.addEventListener(
+    'scroll',
+    (event) => {
+      // The menu is intentionally scrollable. Scroll events do not bubble but
+      // are observable here in capture phase, so ignore the menu's own scroll
+      // while still closing it when an editor or outer container moves.
+      if (
+        event.target === menu ||
+        (event.target instanceof Node && menu.contains(event.target))
+      ) {
+        return
+      }
+      hideMenu()
+    },
+    true
+  )
   window.addEventListener('resize', hideMenu)
   window.addEventListener('blur', hideMenu)
 

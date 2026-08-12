@@ -58,6 +58,8 @@ body,
    while a large document's content was still settling. Our own restore logic already
    handles reapplying a saved position across those same layout shifts explicitly. */
 .vditor-wysiwyg .vditor-reset {
+  --vmd-details-gutter: 2rem;
+  --vmd-details-inline-end: 0.6rem;
   overflow-anchor: none;
 }
 .vmd-confirm-dialog {
@@ -197,7 +199,7 @@ body,
   box-sizing: border-box;
   min-height: 28px;
   margin: 2px 0;
-  padding: 4px 34px 4px 1.25em;
+  padding: 4px 34px 4px var(--vmd-details-gutter);
   cursor: pointer;
   list-style: none;
   color: inherit;
@@ -213,7 +215,7 @@ body,
 .vditor-wysiwyg .vditor-reset .vmd-details-toggle {
   position: absolute;
   top: 50%;
-  left: 0.2em;
+  left: 0.55rem;
   width: 0;
   height: 0;
   border-top: 0.3em solid transparent;
@@ -274,8 +276,11 @@ body,
    vmd-details-content--open/first/last so a grouped border can be drawn
    around them collectively, mirroring the list-region border style. */
 .vditor-wysiwyg .vditor-reset .vmd-details-content--open {
+  position: relative;
   box-sizing: border-box;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   /* Vditor gives paragraphs, lists, quotes, headings, and tables different
      outer margins. Those margins sit outside each block's side borders and
      make one details boundary look like several disconnected fragments. Keep
@@ -286,9 +291,41 @@ body,
     var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.55));
   border-right: 1px solid
     var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.55));
-  /* Match the body text with the summary text after its disclosure arrow. */
-  padding-left: calc(1.25em - 1px);
-  padding-right: 0.6em;
+  /* This fixed gutter is relative to the virtual details document, not to the
+     current block's font size. Headings therefore align with paragraphs while
+     still leaving room for H1-H6 labels inside the details boundary. */
+  padding-left: var(--vmd-details-gutter);
+  padding-right: var(--vmd-details-inline-end);
+  overflow-wrap: anywhere;
+}
+.vditor-wysiwyg
+  .vditor-reset
+  .vmd-details-content--open:is(h1, h2, h3, h4, h5, h6)::before {
+  box-sizing: border-box;
+  /* Vditor places heading labels in the root editor gutter with -29px. Move
+     that same float into this virtual document's reserved gutter instead. */
+  margin-left: calc(0.4rem - var(--vmd-details-gutter));
+  padding-right: 0.4rem;
+}
+/* Top-level list outlines normally expand four pixels beyond their block. In a
+   details virtual document the outline belongs inside its local boundary. */
+.vditor-wysiwyg
+  .vditor-reset
+  :is(ul, ol).vmd-details-content--open[data-block="0"]:not(li *) {
+  outline-offset: -4px;
+}
+/* Built-in rich blocks must resolve percentage sizing against the virtual
+   document's content box and keep their own scrolling inside that box. */
+.vditor-wysiwyg
+  .vditor-reset
+  .vmd-details-content--open.vditor-wysiwyg__block
+  > :is(pre, .vditor-wysiwyg__preview),
+.vditor-wysiwyg
+  .vditor-reset
+  .vmd-details-content--open
+  :is(img, video, audio, iframe, canvas, svg) {
+  box-sizing: border-box;
+  max-width: 100%;
 }
 .vditor-wysiwyg
   .vditor-reset
@@ -443,10 +480,36 @@ body,
   outline-color: var(--vscode-focusBorder, var(--vscode-editorWidget-border, #007fd4));
 }
 
+/* Vditor keeps raw code for its copy action in an absolutely positioned
+   textarea at left:-100000px. In WYSIWYG the copy bar is moved into our static
+   toolbar, and that off-screen child can then enlarge html/body scrollHeight.
+   Fixed positioning keeps it selectable for execCommand('copy') without making
+   any editor or Webview ancestor scrollable. This applies to every Vditor code
+   copy control, including ordinary WYSIWYG blocks and split-preview blocks. */
+.vditor-reset .vditor-copy > textarea {
+  position: fixed !important;
+  top: 0 !important;
+  left: -10000px !important;
+  width: 1px !important;
+  height: 1px !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  opacity: 0;
+}
+
 /* Ordinary WYSIWYG code blocks show one highlighted surface while idle. Their
    existing Vditor source replaces that surface in place during editing; rich
-   renderers such as Mermaid never receive these classes or controls. */
+   renderers such as Mermaid never receive these classes or controls. Keep the
+   outer spacing on the stable block: margins on flex children do not collapse,
+   which otherwise shifts the frame and removes its gap to the next paragraph. */
+.vditor-wysiwyg .vditor-reset .vmd-code-block--ordinary {
+  margin: 1em 0;
+}
 .vditor-wysiwyg .vditor-reset .vmd-code-block--ordinary > .vditor-wysiwyg__preview {
+  margin: 0 !important;
   overflow: hidden;
   border-radius: 5px;
 }
@@ -512,12 +575,9 @@ body,
 }
 .vditor-wysiwyg .vditor-reset .vmd-code-block--editing > .vditor-wysiwyg__preview {
   order: 1;
-  margin: 1em 0 0 !important;
+  margin: 0 !important;
   padding: 0 !important;
   border: 0 !important;
-}
-.vditor-wysiwyg .vditor-reset .vmd-code-block--editing > .vditor-wysiwyg__preview {
-  margin-bottom: 0 !important;
   border-radius: 5px 5px 0 0;
 }
 .vditor-wysiwyg .vditor-reset .vmd-code-block--editing > .vditor-wysiwyg__preview > code,
@@ -526,8 +586,7 @@ body,
 }
 .vditor-wysiwyg .vditor-reset .vmd-code-block--editing > .vditor-wysiwyg__pre {
   order: 2;
-  margin-top: 0 !important;
-  margin-bottom: 1em !important;
+  margin: 0 !important;
 }
 .vditor-wysiwyg .vditor-reset .vmd-code-block--editing > .vditor-wysiwyg__pre > code {
   border-radius: 0 0 5px 5px;
@@ -541,6 +600,7 @@ body,
   max-height: min(420px, calc(100vh - 16px));
   padding: 4px;
   overflow-y: auto;
+  overscroll-behavior: contain;
   box-sizing: border-box;
   border: 1px solid var(--vscode-menu-border, var(--border-color));
   border-radius: 5px;
@@ -646,6 +706,40 @@ body,
 }
 .vditor-wysiwyg .vditor-reset blockquote.vmd-alert > .vmd-alert-title + p {
   margin-top: 0;
+}
+
+/* Quotes and Alerts keep their own left accent, but that accent belongs inside
+   the details virtual document. The one-pixel edge remains the details frame. */
+.vditor-wysiwyg
+  .vditor-reset
+  blockquote.vmd-details-content--open {
+  padding-left: var(--vmd-details-gutter);
+  padding-right: var(--vmd-details-inline-end);
+  border-left: 1px solid
+    var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.55));
+}
+.vditor-wysiwyg
+  .vditor-reset
+  blockquote.vmd-details-content--open::before {
+  position: absolute;
+  top: 0.5rem;
+  bottom: calc(1em + 0.5rem);
+  left: 0.55rem;
+  width: 0.25rem;
+  border-radius: 2px;
+  background: var(--border-color, rgba(127, 127, 127, 0.55));
+  content: '';
+  pointer-events: none;
+}
+.vditor-wysiwyg
+  .vditor-reset
+  blockquote.vmd-alert.vmd-details-content--open::before {
+  background: var(--vmd-alert-color);
+}
+.vditor-wysiwyg
+  .vditor-reset
+  blockquote.vmd-details-content--last::before {
+  bottom: 0.5rem;
 }
 
 #vmd-alert-type-menu {
