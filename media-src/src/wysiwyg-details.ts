@@ -160,8 +160,6 @@ export function initWysiwygDetails() {
 
     event.preventDefault()
     event.stopImmediatePropagation()
-    const target = event.target instanceof Element ? event.target : null
-    if (!target?.closest(`.${DETAILS_TOGGLE_CLASS}`)) return
 
     const { opener } = detailsTarget
     const preview = getPreviewDetails(opener)

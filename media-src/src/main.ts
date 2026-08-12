@@ -39,7 +39,6 @@ import {
 } from './wysiwyg-front-matter'
 import type { FrontMatterDisplay } from './wysiwyg-front-matter'
 import { initSearch } from './search'
-import { initLineNumbers } from './line-numbers'
 import {
   canApplyHostUpdate,
   keepNewestHostUpdate,
@@ -51,6 +50,7 @@ import {
 } from './vditor-adapter'
 import { installStructuredTabPolicy } from './editor-tab-policy'
 import { initSplitScrollSync } from './split-scroll-sync'
+import { getScrollElement } from './scroll-target'
 import { installSvCodeIndentRepair } from './sv-code-indent'
 import { vditorI18n } from 'virtual:vditor-i18n'
 import './themes/light.css'
@@ -161,25 +161,7 @@ function scrollLog(...args: any[]) {
 }
 
 function getScrollEl(): HTMLElement | null {
-  // The actual scrollable container isn't always the same node (depends on toolbar
-  // pin state / layout), so pick whichever candidate is really overflowing instead of
-  // hardcoding one selector.
-  const mode = getVditorMode()
-  const selectorsByMode: Record<string, string[]> = {
-    wysiwyg: ['.vditor-wysiwyg .vditor-reset', '.vditor-wysiwyg'],
-    sv: ['.vditor-sv.vditor-reset', '.vditor-sv'],
-  }
-  const candidates = [
-    ...(selectorsByMode[mode] || []),
-    '.vditor-content',
-  ]
-    .map((sel) => document.querySelector<HTMLElement>(sel))
-    .filter(
-      (element): element is HTMLElement =>
-        !!element && element.getClientRects().length > 0
-    )
-  const overflowing = candidates.find((el) => el.scrollHeight - el.clientHeight > 10)
-  return overflowing || candidates[0] || null
+  return getScrollElement()
 }
 
 // Reports the current scroll position to the extension host so it can be restored
@@ -360,7 +342,6 @@ function applyWorkspaceStyle(css: string | null): void {
   if (css === null) {
     style?.remove()
     document.body.removeAttribute('data-vmd-workspace-style-loaded')
-    ;(window as any).__vmdLineNumbers?.refresh?.()
     return
   }
 
@@ -374,7 +355,6 @@ function applyWorkspaceStyle(css: string | null): void {
   // reporting success while still exposing the previous stylesheet contents.
   style.textContent = css
   document.body.setAttribute('data-vmd-workspace-style-loaded', '1')
-  ;(window as any).__vmdLineNumbers?.refresh?.()
 }
 
 /**
@@ -778,11 +758,6 @@ function initVditor(msg) {
       } else {
         ;(window as any).__vmdSearch.rebind?.()
       }
-      if (!(window as any).__vmdLineNumbers) {
-        ;(window as any).__vmdLineNumbers = initLineNumbers()
-      } else {
-        ;(window as any).__vmdLineNumbers.rebind?.()
-      }
       if (!(window as any).__vmdSplitScrollSync) {
         ;(window as any).__vmdSplitScrollSync = initSplitScrollSync(vditor)
       } else {
@@ -897,11 +872,11 @@ function initializeFromMessage(msg) {
   setBuiltInTheme(msg.theme)
   if (Object.prototype.hasOwnProperty.call(msg, 'workspaceStyleCss')) {
     applyWorkspaceStyle(msg.workspaceStyleCss)
-    console.info(
-      '[markdown-interactor] workspace CSS:',
-      msg.workspaceStylePath || 'not found'
-    )
-  }
+      console.info(
+        '[markdown-interactor] workspace CSS:',
+        msg.workspaceStylePath || 'not found'
+      )
+    }
   if (msg.options && msg.options.useVscodeThemeColor) {
     document.body.setAttribute('data-use-vscode-theme-color', '1')
   } else {

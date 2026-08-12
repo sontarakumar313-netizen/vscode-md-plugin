@@ -2,6 +2,12 @@ import {
   getVditorEditorElement,
   getVditorMode,
 } from './vditor-adapter'
+import {
+  getEditorSelectionContext,
+  getVisibleTextBefore,
+  getVisibleTextBeforeElement,
+} from './caret-anchor'
+import type { EditorSelectionContext } from './caret-anchor'
 
 function asElement(node: Node): HTMLElement | null {
   return node.nodeType === Node.ELEMENT_NODE
@@ -36,6 +42,129 @@ function getEditorRange(editor: HTMLElement): Range | null {
 function isSourceListMarker(element: Element | null): boolean {
   const type = element?.getAttribute('data-type')
   return type === 'li-marker' || type === 'task-marker'
+}
+
+// ── Blockquote Tab indent / outdent ──────────────────────────────────────────
+
+/**
+ * Find the contiguous blockquote block in `source` that contains `offset`.
+ * Returns null when the line at `offset` does not start with '>'.
+ */
+function findQuoteBlockAt(
+  source: string,
+  offset: number
+): { lineStart: number; lineEnd: number } | null {
+  const safeOff = Math.min(Math.max(0, offset), source.length)
+  const lineStart = source.lastIndexOf('\n', safeOff - 1) + 1
+  const lineNl = source.indexOf('\n', lineStart)
+  const lineEnd = lineNl >= 0 ? lineNl : source.length
+  if (!source.slice(lineStart, lineEnd).startsWith('>')) return null
+
+  // Walk backward to find the first '>' line.
+  let blockStart = lineStart
+  while (blockStart > 0) {
+    const prevNl = blockStart - 1
+    const prevLineStart = source.lastIndexOf('\n', prevNl - 1) + 1
+    if (!source.slice(prevLineStart, prevNl).startsWith('>')) break
+    blockStart = prevLineStart
+  }
+
+  // Walk forward to find the last '>' line.
+  let pos = blockStart
+  while (pos < source.length) {
+    const nl = source.indexOf('\n', pos)
+    const end = nl >= 0 ? nl : source.length
+    if (!source.slice(pos, end).startsWith('>')) break
+    pos = nl >= 0 ? nl + 1 : source.length
+  }
+
+  return { lineStart: blockStart, lineEnd: pos }
+}
+
+function applyBlockquoteIndent(
+  source: string,
+  block: { lineStart: number; lineEnd: number },
+  isShift: boolean
+): string {
+  const raw = source.slice(block.lineStart, block.lineEnd)
+  const trailingNl = raw.endsWith('\n')
+  const lines = (trailingNl ? raw.slice(0, -1) : raw).split('\n')
+
+  let changed: string[]
+  if (isShift) {
+    // Outdent: remove one '> ' level. Stop if any line has no '>' prefix.
+    if (!lines.every((l) => l.startsWith('>'))) return source
+    changed = lines.map((l) => (l.startsWith('> ') ? l.slice(2) : l.slice(1)))
+  } else {
+    // Indent: add one '> ' level.
+    changed = lines.map((l) => `> ${l}`)
+  }
+
+  return (
+    source.slice(0, block.lineStart) +
+    changed.join('\n') +
+    (trailingNl ? '\n' : '') +
+    source.slice(block.lineEnd)
+  )
+}
+
+/**
+ * Handle Tab / Shift+Tab when the caret is inside a blockquote.
+ * Returns true when it consumed the event, false when it did nothing.
+ */
+function handleBlockquoteTab(vditor: any, event: KeyboardEvent): boolean {
+  const editor = getVditorEditorElement(vditor)
+  const target = event.target
+  if (!editor || !(target instanceof Node) || !editor.contains(target)) return false
+
+  const range = getEditorRange(editor)
+  if (!range) return false
+
+  const mode = getVditorMode(vditor)
+  const source = String(vditor?.getValue?.() || '')
+  const context: EditorSelectionContext | null = getEditorSelectionContext(vditor)
+  if (!context) return false
+
+  let block: { lineStart: number; lineEnd: number } | null = null
+
+  if (mode === 'sv') {
+    const visibleBefore = getVisibleTextBefore(context)
+    if (!source.startsWith(visibleBefore)) return false
+    block = findQuoteBlockAt(source, visibleBefore.length)
+  } else if (mode === 'wysiwyg') {
+    const blockquoteEl = closestInEditor(range.startContainer, 'blockquote', editor)
+    if (!blockquoteEl) return false
+
+    // Use the alert marker as a unique anchor when available.
+    const domType = blockquoteEl.getAttribute('data-vmd-alert')
+    if (domType) {
+      const marker = `> [!${domType}]`
+      let pos = 0
+      while (pos < source.length) {
+        const idx = source.indexOf(marker, pos)
+        if (idx < 0) break
+        if (idx === 0 || source[idx - 1] === '\n') {
+          block = findQuoteBlockAt(source, idx)
+          break
+        }
+        pos = idx + 1
+      }
+    }
+
+    if (!block) {
+      const before = getVisibleTextBeforeElement(context, blockquoteEl as HTMLElement)
+      if (source.startsWith(before)) block = findQuoteBlockAt(source, before.length)
+    }
+  }
+
+  if (!block) return false
+
+  const newSource = applyBlockquoteIndent(source, block, event.shiftKey)
+  if (newSource === source) return false
+
+  vditor.setValue(newSource)
+  ;(window as any).__vmdCommitProgrammaticEdit?.()
+  return true
 }
 
 function rangeStartsAtEndOf(range: Range, element: HTMLElement): boolean {
@@ -129,6 +258,13 @@ export function installStructuredTabPolicy(): void {
     // While the toggle is on, leave Tab entirely alone so the browser's own
     // sequential focus navigation can carry the user out of the editor.
     if (tabMovesFocus) return
+
+    // Blockquote indent/outdent takes priority over the generic Tab policy.
+    if (handleBlockquoteTab((window as any).vditor, event)) {
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      return
+    }
 
     const allowed = allowsTabInEditor((window as any).vditor, event)
     if (allowed !== false) return

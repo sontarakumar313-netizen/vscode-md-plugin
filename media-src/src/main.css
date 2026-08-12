@@ -52,30 +52,7 @@ body,
 .vditor-toolbar .vmd-outline-toggle {
   display: inline-flex!important;
 }
-/* Reserve gutter space in every editable mode. */
-body.vmd-line-numbers-enabled .vditor-wysiwyg .vditor-reset,
-body.vmd-line-numbers-enabled .vditor-sv {
-  padding-left: 60px!important;
-}
-#vmd-line-number-gutter {
-  position: fixed;
-  width: 32px;
-  pointer-events: none;
-  user-select: none;
-  z-index: 10;
-  overflow: hidden;
-  border-right: 1px solid rgba(128, 128, 128, 0.12);
-}
-body:not(.vmd-line-numbers-enabled) #vmd-line-number-gutter {
-  display: none;
-}
-#vmd-line-number-gutter .vmd-line-number {
-  position: absolute;
-  width: 26px;
-  text-align: right;
-  font: 11px/1 'Cascadia Code', 'Consolas', monospace;
-  color: rgba(150, 150, 150, 0.5);
-}
+
 /* Prevent the browser's native scroll-anchoring from autonomously shifting scrollTop
    as async content above the viewport (mermaid diagrams, images, lazily-sized
    elements) finishes rendering/loading. That happens independently of any of our own
@@ -105,7 +82,7 @@ body:not(.vmd-line-numbers-enabled) #vmd-line-number-gutter {
 .vditor-wysiwyg .vditor-reset details > summary.vmd-details-summary {
   position: relative;
   padding-left: 1.15em;
-  cursor: text;
+  cursor: pointer;
   list-style: none;
 }
 .vditor-wysiwyg
