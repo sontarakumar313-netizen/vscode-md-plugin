@@ -132,8 +132,16 @@ function handleBlockquoteTab(vditor: any, event: KeyboardEvent): boolean {
     if (!source.startsWith(visibleBefore)) return false
     block = findQuoteBlockAt(source, visibleBefore.length)
   } else if (mode === 'wysiwyg') {
-    const blockquoteEl = closestInEditor(range.startContainer, 'blockquote', editor)
-    if (!blockquoteEl) return false
+    // Start from the innermost blockquote, then walk up to the outermost so that
+    // getVisibleTextBeforeElement measures the gap before the whole block.
+    let bqEl = closestInEditor(range.startContainer, 'blockquote', editor)
+    if (!bqEl) return false
+    let parent: HTMLElement | null = bqEl.parentElement
+    while (parent && parent !== editor) {
+      if (parent.matches('blockquote')) bqEl = parent
+      parent = parent.parentElement
+    }
+    const blockquoteEl: HTMLElement = bqEl
 
     // Use the alert marker as a unique anchor when available.
     const domType = blockquoteEl.getAttribute('data-vmd-alert')
@@ -152,8 +160,18 @@ function handleBlockquoteTab(vditor: any, event: KeyboardEvent): boolean {
     }
 
     if (!block) {
-      const before = getVisibleTextBeforeElement(context, blockquoteEl as HTMLElement)
-      if (source.startsWith(before)) block = findQuoteBlockAt(source, before.length)
+      // getVisibleTextBeforeElement via Range.toString() returns rendered text
+      // without markdown syntax markers. The rendered text may have fewer
+      // newlines than the source (paragraph separators collapse to \n).
+      // Try matching at the exact offset, then scan forward up to 4 chars
+      // (enough to skip a blank line) to find the first '>' line.
+      const before = getVisibleTextBeforeElement(context, blockquoteEl)
+      if (source.startsWith(before)) {
+        let off = before.length
+        // Skip any newlines that the renderer collapsed to reach the '>' line.
+        while (off < source.length && source[off] === '\n') off++
+        block = findQuoteBlockAt(source, off)
+      }
     }
   }
 

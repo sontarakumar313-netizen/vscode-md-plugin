@@ -121,6 +121,65 @@ body,
   outline-offset: 2px;
 }
 
+/* ── Details title-edit box ────────────────────────────────────────────────
+   Appears below the summary when the block is open. This is the only place
+   where the title text can be edited; the <summary> itself is non-editable. */
+.vditor-wysiwyg .vditor-reset .vmd-details-title-edit {
+  display: block;
+  margin: 0.2em 0 0.3em;
+  padding: 3px 8px;
+  border: 1px solid
+    var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.45));
+  border-radius: 3px;
+  background: transparent;
+  font-size: inherit;
+  font-family: inherit;
+  line-height: inherit;
+  color: inherit;
+  outline: none;
+  cursor: text;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.vditor-wysiwyg .vditor-reset .vmd-details-title-edit:focus {
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+/* ── Details open-content border ───────────────────────────────────────────
+   Content blocks belonging to an open details group are marked with
+   vmd-details-content--open/first/last so a grouped border can be drawn
+   around them collectively, mirroring the list-region border style. */
+.vditor-wysiwyg .vditor-reset .vmd-details-content--open {
+  border-left: 1px solid
+    var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.55));
+  border-right: 1px solid
+    var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.55));
+  padding-left: 0.6em;
+  padding-right: 0.6em;
+}
+.vditor-wysiwyg .vditor-reset .vmd-details-content--first {
+  border-top: 1px solid
+    var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.55));
+  border-radius: 3px 3px 0 0;
+  padding-top: 0.3em;
+}
+.vditor-wysiwyg .vditor-reset .vmd-details-content--last {
+  border-bottom: 1px solid
+    var(--vscode-editorWidget-border, rgba(127, 127, 127, 0.55));
+  border-radius: 0 0 3px 3px;
+  padding-bottom: 0.3em;
+}
+/* When the same block is both first and last (single-item content). */
+.vditor-wysiwyg
+  .vditor-reset
+  .vmd-details-content--first.vmd-details-content--last {
+  border-radius: 3px;
+}
+/* Focus highlight for the grouped content area. */
+.vditor-wysiwyg .vditor-reset .vmd-details-content--open:focus-within {
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
 /* YAML front matter. The generated table lives in a .vditor-wysiwyg__preview
    container, which Lute skips when serializing back to Markdown, so hiding the
    source below never affects the document text. wysiwyg-front-matter.ts adds
@@ -551,6 +610,60 @@ body,
     padding-right: 4px;
     padding-left: 4px;
   }
+}
+
+/* ── Code block language bar (WYSIWYG) ─────────────────────────────────────
+   The language select and copy button live in a flex row (.vmd-code-lang-wrap)
+   that we inject as the first child of each rendered code block's <pre>.
+   The .vditor-copy div is moved into the wrap so both controls share one row.
+   ───────────────────────────────────────────────────────────────────────── */
+.vditor-wysiwyg .vditor-reset pre > .vmd-code-lang-wrap {
+  display: flex !important;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  /* Bleed to the pre's padding edges so the bar spans the full width. */
+  margin: -0.5em -0.5em 0.4em;
+  padding: 3px 10px 3px 8px;
+  border-bottom: 1px solid
+    var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.25));
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground, rgba(100, 100, 100, 0.85));
+}
+
+.vmd-code-lang-select {
+  font-size: 11px;
+  font-family: inherit;
+  color: var(--vscode-editor-foreground, inherit);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 1px 4px;
+  cursor: pointer;
+  outline: none;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 140px;
+}
+.vmd-code-lang-select:hover,
+.vmd-code-lang-select:focus {
+  border-color: var(--vscode-focusBorder, #007fd4);
+}
+
+/* Copy button is moved inside .vmd-code-lang-wrap — always visible there,
+   and its inner <span> is pulled out of its original absolute position. */
+.vmd-code-lang-wrap > .vditor-copy {
+  position: static !important;
+  display: flex !important;
+  align-items: center;
+  flex-shrink: 0;
+}
+.vmd-code-lang-wrap > .vditor-copy span {
+  position: static !important;
+  display: flex;
+  align-items: center;
 }
 
 /* WYSIWYG mode labels every block in the left gutter: "</>" for code blocks,

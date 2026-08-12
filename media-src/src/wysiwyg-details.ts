@@ -11,6 +11,7 @@ interface DetailsGroup {
 
 const DETAILS_SUMMARY_CLASS = 'vmd-details-summary'
 const DETAILS_TOGGLE_CLASS = 'vmd-details-toggle'
+const TITLE_EDIT_CLASS = 'vmd-details-title-edit'
 const SUMMARY_COMMIT_DEBOUNCE_MS = 300
 
 function getWysiwygRoot(): HTMLElement | null {
@@ -31,13 +32,6 @@ function isDetailsOpenBlock(source: string): boolean {
   return /^<details(?:\s[^>]*)?>/i.test(source) && !/<\/details\s*>/i.test(source)
 }
 
-/**
- * Returns how many groups this block closes, or 0 if it is not a pure run of
- * closing tags. Adjacent `</details>` lines with no blank line between them
- * arrive as a single HTML block, so requiring the block to be exactly one
- * closer left the stack unwound: every following sibling was then collected as
- * content of a group the source had already closed, and hidden with it.
- */
 function countDetailsCloseTags(source: string): number {
   const closers = source.match(/<\/details\s*>/gi)
   if (!closers) return 0
@@ -56,21 +50,33 @@ function getPreviewDetails(opener: HTMLElement): HTMLDetailsElement | null {
   )
 }
 
+function escapeHtmlText(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+/** Title text from <summary>, excluding the toggle arrow span and ZWSPs. */
+function getSummaryTitleText(summary: HTMLElement): string {
+  return Array.from(summary.childNodes)
+    .filter(
+      (n) =>
+        !(n instanceof HTMLElement && n.classList.contains(DETAILS_TOGGLE_CLASS))
+    )
+    .map((n) => n.textContent || '')
+    .join('')
+    .replace(/​/g, '')
+    .trim()
+}
+
 export function initWysiwygDetails() {
   const openState = new WeakMap<HTMLElement, boolean>()
   let root: HTMLElement | null = null
-  // The element the click handler is currently attached to. Tracked separately
-  // from `root` so rebind() can unbind the previous root: the handler closes
-  // over the shared `root` variable, so a stale listener left behind would
-  // still pass its containment check and toggle openState a second time,
-  // cancelling out the first toggle and making summaries stop responding.
   let boundRoot: HTMLElement | null = null
   let observer: MutationObserver | null = null
   let summaryCommitTimer: number | null = null
-  let pendingSummaryCommit: {
-    opener: HTMLElement
-    caretOffset: number
-  } | null = null
+  let pendingSummaryCommit: { opener: HTMLElement } | null = null
   const queuedRoots = new WeakSet<HTMLElement>()
 
   function refresh(targetRoot: HTMLElement): void {
@@ -80,7 +86,10 @@ export function initWysiwygDetails() {
       child.classList.remove(
         'vmd-details-opener',
         'vmd-details-closer',
-        'vmd-details-content--hidden'
+        'vmd-details-content--hidden',
+        'vmd-details-content--open',
+        'vmd-details-content--first',
+        'vmd-details-content--last'
       )
     }
 
@@ -120,11 +129,21 @@ export function initWysiwygDetails() {
     const hiddenBy = new Map<HTMLElement, number>()
     for (const group of groups) {
       const preview = getPreviewDetails(group.opener)
-      prepareEditableSummary(group.opener)
+      prepareSummaryDisplay(group.opener, group.open)
       preview?.toggleAttribute('open', group.open)
-      if (group.open) continue
-      for (const content of group.contents) {
-        hiddenBy.set(content, (hiddenBy.get(content) || 0) + 1)
+      if (group.open) {
+        // Mark content blocks so CSS can draw a grouped border around them.
+        const { contents } = group
+        for (let i = 0; i < contents.length; i += 1) {
+          const block = contents[i]
+          block.classList.add('vmd-details-content--open')
+          if (i === 0) block.classList.add('vmd-details-content--first')
+          if (i === contents.length - 1) block.classList.add('vmd-details-content--last')
+        }
+      } else {
+        for (const content of group.contents) {
+          hiddenBy.set(content, (hiddenBy.get(content) || 0) + 1)
+        }
       }
     }
 
@@ -139,6 +158,7 @@ export function initWysiwygDetails() {
     queueMicrotask(() => refresh(targetRoot))
   }
 
+  /** Returns the summary element + opener block if the event targets a summary. */
   function getSummaryTarget(event: Event): {
     summary: HTMLElement
     opener: HTMLElement
@@ -147,13 +167,23 @@ export function initWysiwygDetails() {
     const summary = target?.closest<HTMLElement>(`.${DETAILS_SUMMARY_CLASS}`)
     const opener = summary?.closest<HTMLElement>('.vmd-details-opener')
     if (!summary || !opener || !root?.contains(opener)) return null
-
     const preview = getPreviewDetails(opener)
     if (!preview || !preview.contains(summary)) return null
     return { summary, opener }
   }
 
-  // Declared once so they stay stable references for removeEventListener.
+  /** Returns the title-edit div + opener block if the event targets the edit area. */
+  function getTitleEditTarget(event: Event): {
+    titleEdit: HTMLElement
+    opener: HTMLElement
+  } | null {
+    const target = event.target instanceof Element ? event.target : null
+    const titleEdit = target?.closest<HTMLElement>(`.${TITLE_EDIT_CLASS}`)
+    const opener = titleEdit?.closest<HTMLElement>('.vmd-details-opener')
+    if (!titleEdit || !opener || !root?.contains(opener)) return null
+    return { titleEdit, opener }
+  }
+
   function onRootClick(event: Event): void {
     const detailsTarget = getSummaryTarget(event)
     if (!detailsTarget) return
@@ -162,6 +192,9 @@ export function initWysiwygDetails() {
     event.stopImmediatePropagation()
 
     const { opener } = detailsTarget
+    // Flush pending title edits before toggling so they are not lost.
+    if (pendingSummaryCommit) flushSummaryCommit(false)
+
     const preview = getPreviewDetails(opener)
     if (!preview || !root) return
     openState.set(opener, !(openState.get(opener) ?? preview.open))
@@ -174,61 +207,52 @@ export function initWysiwygDetails() {
     const pending = pendingSummaryCommit
     pendingSummaryCommit = null
     if (!pending) return
-
     const internal = getVditorInternals()
     if (!internal || internal.currentMode !== 'wysiwyg') return
     commitVditorWysiwygDomEdit(internal)
-    if (!restoreCaret) return
-
-    queueMicrotask(() => {
-      const summary = prepareEditableSummary(pending.opener)
-      if (summary) restoreSummaryCaretOffset(summary, pending.caretOffset)
-    })
+    // Browser preserves the caret in a contenteditable div naturally; no manual
+    // restoration needed for the title-edit box.
+    void restoreCaret
   }
 
-  function scheduleSummaryCommit(
-    opener: HTMLElement,
-    summary: HTMLElement
-  ): void {
-    pendingSummaryCommit = {
-      opener,
-      caretOffset: getSummaryCaretOffset(summary),
-    }
+  function scheduleTitleCommit(opener: HTMLElement): void {
+    pendingSummaryCommit = { opener }
     if (summaryCommitTimer !== null) window.clearTimeout(summaryCommitTimer)
     summaryCommitTimer = window.setTimeout(
-      () => flushSummaryCommit(true),
+      () => flushSummaryCommit(false),
       SUMMARY_COMMIT_DEBOUNCE_MS
     )
   }
 
-  function commitSummaryEdit(event: Event): void {
-    const detailsTarget = getSummaryTarget(event)
-    if (!detailsTarget) return
+  function commitTitleEdit(event: Event): void {
+    const target = getTitleEditTarget(event)
+    if (!target) return
     event.stopImmediatePropagation()
-    if (!syncSummaryToSource(detailsTarget.opener, detailsTarget.summary)) return
-    scheduleSummaryCommit(detailsTarget.opener, detailsTarget.summary)
+    if (!syncTitleToSource(target.opener, target.titleEdit)) return
+    scheduleTitleCommit(target.opener)
   }
 
   function onRootCompositionEnd(event: Event): void {
-    const detailsTarget = getSummaryTarget(event)
-    if (!detailsTarget) return
+    const target = getTitleEditTarget(event)
+    if (!target) return
     const internal = getVditorInternals()
     if (internal?.wysiwyg) internal.wysiwyg.composingLock = false
     event.stopImmediatePropagation()
-    if (syncSummaryToSource(detailsTarget.opener, detailsTarget.summary)) {
-      scheduleSummaryCommit(detailsTarget.opener, detailsTarget.summary)
+    if (syncTitleToSource(target.opener, target.titleEdit)) {
+      scheduleTitleCommit(target.opener)
     }
   }
 
-  function onSummaryBlur(event: FocusEvent): void {
-    const detailsTarget = getSummaryTarget(event)
-    if (!detailsTarget || summaryCommitTimer === null) return
-    syncSummaryToSource(detailsTarget.opener, detailsTarget.summary)
+  function onTitleEditBlur(event: FocusEvent): void {
+    const target = getTitleEditTarget(event)
+    if (!target || summaryCommitTimer === null) return
+    syncTitleToSource(target.opener, target.titleEdit)
     flushSummaryCommit(false)
   }
 
   function onRootKeydown(event: KeyboardEvent): void {
-    if (!getSummaryTarget(event)) return
+    if (!getTitleEditTarget(event)) return
+    // Keep title single-line.
     if (event.key === 'Enter') event.preventDefault()
     const isPrimary = event.ctrlKey || event.metaKey
     if (isPrimary && !event.altKey) {
@@ -244,7 +268,7 @@ export function initWysiwygDetails() {
   }
 
   function onRootKeyup(event: KeyboardEvent): void {
-    if (getSummaryTarget(event)) event.stopImmediatePropagation()
+    if (getTitleEditTarget(event)) event.stopImmediatePropagation()
   }
 
   function unbindRoots(): void {
@@ -252,9 +276,9 @@ export function initWysiwygDetails() {
     observer = null
     if (boundRoot) {
       boundRoot.removeEventListener('click', onRootClick, true)
-      boundRoot.removeEventListener('input', commitSummaryEdit, true)
+      boundRoot.removeEventListener('input', commitTitleEdit, true)
       boundRoot.removeEventListener('compositionend', onRootCompositionEnd, true)
-      boundRoot.removeEventListener('blur', onSummaryBlur, true)
+      boundRoot.removeEventListener('blur', onTitleEditBlur, true)
       boundRoot.removeEventListener('keydown', onRootKeydown, true)
       boundRoot.removeEventListener('keyup', onRootKeyup, true)
       boundRoot = null
@@ -267,7 +291,6 @@ export function initWysiwygDetails() {
       if (root) queueRefresh(root)
       return
     }
-
     if (summaryCommitTimer !== null) window.clearTimeout(summaryCommitTimer)
     summaryCommitTimer = null
     pendingSummaryCommit = null
@@ -276,9 +299,9 @@ export function initWysiwygDetails() {
     if (root) {
       const observedRoot = root
       observedRoot.addEventListener('click', onRootClick, true)
-      observedRoot.addEventListener('input', commitSummaryEdit, true)
+      observedRoot.addEventListener('input', commitTitleEdit, true)
       observedRoot.addEventListener('compositionend', onRootCompositionEnd, true)
-      observedRoot.addEventListener('blur', onSummaryBlur, true)
+      observedRoot.addEventListener('blur', onTitleEditBlur, true)
       observedRoot.addEventListener('keydown', onRootKeydown, true)
       observedRoot.addEventListener('keyup', onRootKeyup, true)
       boundRoot = observedRoot
@@ -306,85 +329,20 @@ export function initWysiwygDetails() {
   }
 }
 
-function escapeHtmlText(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-}
+/**
+ * Sets up the <summary> element (non-editable, with toggle arrow) and manages
+ * the title-edit box that appears below it when the details block is open.
+ */
+function prepareSummaryDisplay(opener: HTMLElement, isOpen: boolean): void {
+  const details = getPreviewDetails(opener)
+  if (!details) return
+  const summary = details.querySelector<HTMLElement>(':scope > summary')
+  if (!summary) return
 
-function getSummaryTextNodes(summary: HTMLElement): Text[] {
-  const nodes: Text[] = []
-  const walker = document.createTreeWalker(
-    summary,
-    NodeFilter.SHOW_TEXT,
-    {
-      acceptNode(node) {
-        return (node.parentElement?.closest(`.${DETAILS_TOGGLE_CLASS}`))
-          ? NodeFilter.FILTER_REJECT
-          : NodeFilter.FILTER_ACCEPT
-      },
-    }
-  )
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    nodes.push(node as Text)
-  }
-  return nodes
-}
-
-function getSummaryCaretOffset(summary: HTMLElement): number {
-  const selection = window.getSelection()
-  if (!selection?.rangeCount) return summary.textContent?.length || 0
-  const range = selection.getRangeAt(0)
-  if (!summary.contains(range.endContainer)) return summary.textContent?.length || 0
-
-  let offset = 0
-  for (const text of getSummaryTextNodes(summary)) {
-    if (text === range.endContainer) {
-      return offset + Math.min(range.endOffset, text.data.length)
-    }
-    offset += text.data.length
-  }
-  return offset
-}
-
-function restoreSummaryCaretOffset(summary: HTMLElement, offset: number): void {
-  const textNodes = getSummaryTextNodes(summary)
-  let remaining = Math.max(0, offset)
-  let target: Text | null = null
-  let targetOffset = 0
-  for (const text of textNodes) {
-    target = text
-    if (remaining <= text.data.length) {
-      targetOffset = remaining
-      break
-    }
-    remaining -= text.data.length
-    targetOffset = text.data.length
-  }
-
-  const selection = window.getSelection()
-  if (!selection) return
-  const range = document.createRange()
-  if (target) range.setStart(target, targetOffset)
-  else range.setStart(summary, summary.childNodes.length)
-  range.collapse(true)
-  summary.focus({ preventScroll: true })
-  selection.removeAllRanges()
-  selection.addRange(range)
-
-  const internal = getVditorInternals()
-  if (internal?.wysiwyg) internal.wysiwyg.range = range.cloneRange()
-}
-
-function prepareEditableSummary(opener: HTMLElement): HTMLElement | null {
-  const summary = getPreviewDetails(opener)?.querySelector<HTMLElement>(
-    ':scope > summary'
-  )
-  if (!summary) return null
-
+  // Summary is read-only — cursor cannot be placed inside it.
   summary.classList.add(DETAILS_SUMMARY_CLASS)
-  summary.setAttribute('contenteditable', 'true')
+  summary.removeAttribute('contenteditable')
+
   let toggle = summary.querySelector<HTMLElement>(
     `:scope > .${DETAILS_TOGGLE_CLASS}`
   )
@@ -395,19 +353,38 @@ function prepareEditableSummary(opener: HTMLElement): HTMLElement | null {
     toggle.setAttribute('aria-hidden', 'true')
     summary.prepend(toggle)
   }
-  return summary
+
+  // Title-edit box: injected when open, removed when closed.
+  const existingEdit = details.querySelector<HTMLElement>(
+    `:scope > .${TITLE_EDIT_CLASS}`
+  )
+  if (isOpen) {
+    if (!existingEdit) {
+      const titleEdit = document.createElement('div')
+      titleEdit.className = TITLE_EDIT_CLASS
+      titleEdit.setAttribute('contenteditable', 'true')
+      titleEdit.textContent = getSummaryTitleText(summary)
+      summary.insertAdjacentElement('afterend', titleEdit)
+    }
+  } else {
+    existingEdit?.remove()
+  }
 }
 
 /**
- * Keep Vditor's hidden HTML source authoritative while the rendered summary is
- * edited directly. The injected toggle has no text, so textContent is exactly
- * the visible title and no plugin-only markup can leak into Markdown.
+ * Reads the title from the edit box and writes it into the hidden HTML source.
+ * Returns true when the source actually changed.
  */
-function syncSummaryToSource(opener: HTMLElement, summary: HTMLElement): boolean {
+function syncTitleToSource(
+  opener: HTMLElement,
+  titleEdit: HTMLElement
+): boolean {
   const code = getHtmlBlockCode(opener)
   if (!code) return false
   const source = code.textContent || ''
-  const title = escapeHtmlText(summary.textContent?.replace(/\u200b/g, '') || '')
+  const title = escapeHtmlText(
+    titleEdit.textContent?.replace(/​/g, '') || ''
+  )
   const nextSource = source.replace(
     /(<summary(?:\s[^>]*)?>)[\s\S]*?(<\/summary\s*>)/i,
     `$1${title}$2`

@@ -33,6 +33,7 @@ import {
 } from './wysiwyg-list'
 import { initWysiwygDetails } from './wysiwyg-details'
 import { initWysiwygAlerts } from './wysiwyg-alert'
+import { initWysiwygCodeBlocks } from './wysiwyg-code-block'
 import {
   attachFrontMatterSeparator,
   initWysiwygFrontMatter,
@@ -737,6 +738,11 @@ function initVditor(msg) {
         ;(window as any).__vmdAlerts = initWysiwygAlerts()
       } else {
         ;(window as any).__vmdAlerts.rebind?.()
+      }
+      if (!(window as any).__vmdCodeBlocks) {
+        ;(window as any).__vmdCodeBlocks = initWysiwygCodeBlocks()
+      } else {
+        ;(window as any).__vmdCodeBlocks.rebind?.()
       }
       // Unknown values were already rejected by the host, so this only has to
       // cover the case of an older host that sends no value at all.
