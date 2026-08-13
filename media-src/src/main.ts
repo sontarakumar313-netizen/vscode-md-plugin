@@ -87,90 +87,128 @@ function localVditorAsset(file: string): string {
  * so delegate the action here instead of changing Vditor's generated DOM or
  * relaxing the CSP.
  */
-function installCodeCopyHandler(): void {
+function installCodeCopyHandler(): { dispose(): void } {
   const feedbackTimers = new WeakMap<HTMLElement, number>()
+  const activeTimers = new Set<number>()
+  let disposed = false
 
   const copyLabel = (copied: boolean): string => {
-    const i18n = (window as any).VditorI18n || {}
-    return copied ? i18n.copied || 'Copied' : i18n.copy || 'Copy'
+    const i18n = (window as Window & { VditorI18n?: unknown }).VditorI18n
+    if (!i18n || typeof i18n !== 'object') {
+      return copied ? 'Copied' : 'Copy'
+    }
+    const key = copied ? 'copied' : 'copy'
+    const value = (i18n as Record<string, unknown>)[key]
+    const fallback = copied ? 'Copied' : 'Copy'
+    return typeof value === 'string' && value.trim() ? value : fallback
   }
 
   const showCopyFeedback = (
     button: HTMLElement,
-    label: string
+    label: string,
+    copied: boolean
   ): void => {
+    if (disposed || !button.isConnected) return
     const pending = feedbackTimers.get(button)
-    if (pending !== undefined) window.clearTimeout(pending)
+    if (pending !== undefined) {
+      window.clearTimeout(pending)
+      activeTimers.delete(pending)
+    }
+
+    let feedback = button.querySelector<HTMLElement>(
+      ':scope > .vmd-code-copy-feedback'
+    )
+    if (!feedback) {
+      feedback = document.createElement('b')
+      feedback.className = 'vmd-code-copy-feedback'
+      feedback.setAttribute('aria-hidden', 'true')
+      button.appendChild(feedback)
+    }
+    feedback.textContent = `${copied ? '✓' : '!'} ${label}`
     button.setAttribute('aria-label', label)
-    // Vditor normally exposes the label only while hover/focus happens to
-    // remain active. Pin its standard tooltip briefly so the outcome is visible
-    // even when the click itself changes active/hover state.
-    button.classList.add('vditor-tooltipped--hover')
+    button.classList.remove('vditor-tooltipped--hover')
+    button.classList.add('vmd-code-copy--feedback')
+    button.classList.toggle('vmd-code-copy--success', copied)
+    button.classList.toggle('vmd-code-copy--failed', !copied)
+
     const timer = window.setTimeout(() => {
+      activeTimers.delete(timer)
       feedbackTimers.delete(button)
       if (!button.isConnected) return
-      button.classList.remove('vditor-tooltipped--hover')
+      button.classList.remove(
+        'vmd-code-copy--feedback',
+        'vmd-code-copy--success',
+        'vmd-code-copy--failed'
+      )
+      feedback.remove()
       button.setAttribute('aria-label', copyLabel(false))
     }, 1500)
+    activeTimers.add(timer)
     feedbackTimers.set(button, timer)
   }
 
   const showCopiedFeedback = (button: HTMLElement): void => {
-    showCopyFeedback(button, copyLabel(true))
+    showCopyFeedback(button, copyLabel(true), true)
   }
 
   const showCopyFailedFeedback = (button: HTMLElement): void => {
-    showCopyFeedback(button, t('copyFailed'))
+    showCopyFeedback(button, t('copyFailed'), false)
   }
 
-  document.addEventListener(
-    'click',
-    (event) => {
-      const target =
-        event.target instanceof Element ? event.target : null
-      const button = target?.closest<HTMLElement>(
-        '.vditor-copy .vditor-tooltipped'
-      )
-      if (!button) return
+  const handleClick = (event: MouseEvent): void => {
+    const target = event.target instanceof Element ? event.target : null
+    const button = target?.closest<HTMLElement>(
+      '.vditor-copy .vditor-tooltipped'
+    )
+    if (!button) return
 
-      const textarea = button.previousElementSibling
-      if (!(textarea instanceof HTMLTextAreaElement)) return
+    const textarea = button.previousElementSibling
+    if (!(textarea instanceof HTMLTextAreaElement)) return
 
-      // Run in the capture phase so the CSP-blocked inline handler never gets
-      // a chance to swallow the click without copying anything.
-      event.preventDefault()
-      event.stopPropagation()
-      textarea.focus()
-      textarea.select()
+    // Run in the capture phase so the CSP-blocked inline handler never gets
+    // a chance to swallow the click without copying anything.
+    event.preventDefault()
+    event.stopPropagation()
+    textarea.focus()
+    textarea.select()
 
-      let copied = false
-      try {
-        copied = document.execCommand('copy')
-      } catch (_) {
-        copied = false
-      }
-      textarea.blur()
+    let copied = false
+    try {
+      copied = document.execCommand('copy')
+    } catch (_) {
+      copied = false
+    }
+    textarea.blur()
 
-      if (copied) {
-        showCopiedFeedback(button)
-        return
-      }
+    if (copied) {
+      showCopiedFeedback(button)
+      return
+    }
 
-      // execCommand is the most compatible path for a click gesture, but some
-      // webview hosts disable it. Use the asynchronous Clipboard API as a
-      // fallback when the host exposes it.
-      const writeText = navigator.clipboard?.writeText
-      if (!writeText) {
-        showCopyFailedFeedback(button)
-        return
-      }
-      void writeText.call(navigator.clipboard, textarea.value).then(
-        () => showCopiedFeedback(button),
-        () => showCopyFailedFeedback(button)
-      )
+    // execCommand is the most compatible path for a click gesture, but some
+    // webview hosts disable it. Use the asynchronous Clipboard API as a
+    // fallback when the host exposes it.
+    const writeText = navigator.clipboard?.writeText
+    if (!writeText) {
+      showCopyFailedFeedback(button)
+      return
+    }
+    void writeText.call(navigator.clipboard, textarea.value).then(
+      () => showCopiedFeedback(button),
+      () => showCopyFailedFeedback(button)
+    )
+  }
+
+  document.addEventListener('click', handleClick, true)
+  return {
+    dispose(): void {
+      if (disposed) return
+      disposed = true
+      document.removeEventListener('click', handleClick, true)
+      activeTimers.forEach((timer) => window.clearTimeout(timer))
+      activeTimers.clear()
     },
-    true
-  )
+  }
 }
 
 installStructuredTabPolicy()
@@ -180,16 +218,17 @@ installStructuredTabPolicy()
 const toolbarShortcutController = installToolbarShortcutController()
 installEditorModeShortcutGuard()
 const editorClipboardController = installEditorClipboard()
+const codeCopyController = installCodeCopyHandler()
 window.addEventListener(
   'pagehide',
   () => {
     toolbarShortcutController.dispose()
     editorClipboardController.dispose()
+    codeCopyController.dispose()
     window.__vmdHeadingLevels?.dispose()
   },
   { once: true }
 )
-installCodeCopyHandler()
 installWysiwygSourcePanelAutoClose()
 
 // Reports the current scroll position to the extension host so it can be restored

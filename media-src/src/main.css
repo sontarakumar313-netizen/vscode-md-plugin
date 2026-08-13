@@ -500,11 +500,34 @@ body,
   opacity: 0;
 }
 
-/* Ordinary WYSIWYG code blocks show one highlighted surface while idle. Their
-   existing Vditor source replaces that surface in place during editing; rich
-   renderers such as Mermaid never receive these classes or controls. Keep the
-   outer spacing on the stable block: margins on flex children do not collapse,
-   which otherwise shifts the frame and removes its gap to the next paragraph. */
+/* Give every code-copy action an unmistakable result without relying on a
+   hover tooltip. The control briefly replaces its icon with status text, then
+   the handler restores Vditor's normal icon-only state. */
+.vditor-reset .vditor-copy > .vditor-tooltipped.vmd-code-copy--feedback {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  min-width: max-content;
+}
+.vditor-reset .vditor-copy > .vmd-code-copy--feedback > svg {
+  display: none;
+}
+.vditor-reset .vmd-code-copy-feedback {
+  color: inherit;
+  font: 12px/1.4 var(--vscode-font-family, sans-serif);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.vditor-reset .vmd-code-copy--success .vmd-code-copy-feedback {
+  color: var(--vscode-testing-iconPassed, #2ea043);
+}
+.vditor-reset .vmd-code-copy--failed .vmd-code-copy-feedback {
+  color: var(--vscode-testing-iconFailed, #f14c4c);
+}
+
+/* Ordinary WYSIWYG code blocks keep Vditor's native source-above-preview
+   editing behavior while adding a persistent language/copy toolbar. Rich
+   renderers such as Mermaid never receive these classes or controls. */
 .vditor-wysiwyg .vditor-reset .vmd-code-block--ordinary {
   margin: 1em 0;
 }
@@ -569,29 +592,6 @@ body,
   display: flex;
   align-items: center;
 }
-.vditor-wysiwyg .vditor-reset .vmd-code-block--editing {
-  display: flex !important;
-  flex-direction: column;
-}
-.vditor-wysiwyg .vditor-reset .vmd-code-block--editing > .vditor-wysiwyg__preview {
-  order: 1;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: 0 !important;
-  border-radius: 5px 5px 0 0;
-}
-.vditor-wysiwyg .vditor-reset .vmd-code-block--editing > .vditor-wysiwyg__preview > code,
-.vditor-wysiwyg .vditor-reset .vmd-code-block--editing > .vditor-wysiwyg__preview > span {
-  display: none !important;
-}
-.vditor-wysiwyg .vditor-reset .vmd-code-block--editing > .vditor-wysiwyg__pre {
-  order: 2;
-  margin: 0 !important;
-}
-.vditor-wysiwyg .vditor-reset .vmd-code-block--editing > .vditor-wysiwyg__pre > code {
-  border-radius: 0 0 5px 5px;
-}
-
 #vmd-code-language-menu {
   position: fixed;
   z-index: 10001;

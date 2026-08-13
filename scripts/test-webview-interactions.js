@@ -558,7 +558,7 @@ function testPage() {
           !richCodeBlock.classList.contains('vmd-code-block--ordinary') &&
             !richCodeBlock.querySelector('.vmd-code-toolbar') &&
             getComputedStyle(richCodeSource).display === 'none',
-          'a rich-render code block incorrectly received the ordinary in-place editor'
+          'a rich-render code block incorrectly received the ordinary code toolbar'
         );
 
         // Plain link clicks edit the raw href; only Ctrl/Cmd+click follows it.
@@ -2721,10 +2721,24 @@ function testPage() {
         codeCopyIcon.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
         await pause();
         expect(window.__vmdCodeCopyAttempts === copyAttemptsBefore + 1, 'code block copy did not invoke the clipboard command');
+        const copySuccessFeedback = codeCopyButton.querySelector(
+          ':scope > .vmd-code-copy-feedback'
+        );
         expect(
           codeCopyButton.getAttribute('aria-label') === (window.VditorI18n.copied || 'Copied') &&
-            codeCopyButton.classList.contains('vditor-tooltipped--hover'),
-          'code block copy did not show visible success feedback'
+            codeCopyButton.classList.contains('vmd-code-copy--success') &&
+            copySuccessFeedback?.textContent ===
+              '✓ ' + (window.VditorI18n.copied || 'Copied') &&
+            getComputedStyle(copySuccessFeedback).display !== 'none',
+          'code block copy did not show an explicit visible success status'
+        );
+        await pause(1600);
+        expect(
+          !codeCopyButton.classList.contains('vmd-code-copy--feedback') &&
+            !codeCopyButton.querySelector('.vmd-code-copy-feedback') &&
+            codeCopyButton.getAttribute('aria-label') ===
+              (window.VditorI18n.copy || 'Copy'),
+          'code block copy success status did not restore the normal control'
         );
 
         await setMarkdown('toolbar-only mode target');
@@ -3361,40 +3375,37 @@ function testPage() {
         codeSource = codeBlock.querySelector(':scope > .vditor-wysiwyg__pre');
         codePreview = codeBlock.querySelector(':scope > .vditor-wysiwyg__preview');
         codePreviewCode = codePreview.querySelector(':scope > code');
-        const paragraphAfterCode = codeBlock.nextElementSibling;
         const codeRectBeforeEdit = codeBlock.getBoundingClientRect();
-        const paragraphAfterRectBeforeEdit = paragraphAfterCode.getBoundingClientRect();
-        const codeGapAfterBeforeEdit =
-          paragraphAfterRectBeforeEdit.top - codeRectBeforeEdit.bottom;
         codePreviewCode.click();
         await pause();
         const codeRectAfterEdit = codeBlock.getBoundingClientRect();
-        const paragraphAfterRectAfterEdit = paragraphAfterCode.getBoundingClientRect();
-        const codeGapAfterAfterEdit =
-          paragraphAfterRectAfterEdit.top - codeRectAfterEdit.bottom;
+        const sourceRectAfterEdit = codeSource.getBoundingClientRect();
+        const previewRectAfterEdit = codePreview.getBoundingClientRect();
         expect(
-          codeBlock.classList.contains('vmd-code-block--editing') &&
-            Math.abs(codeRectAfterEdit.top - codeRectBeforeEdit.top) <= 1 &&
-            Math.abs(codeRectAfterEdit.width - codeRectBeforeEdit.width) <= 1 &&
-            Math.abs(codeRectAfterEdit.height - codeRectBeforeEdit.height) <= 1 &&
-            Math.abs(codeGapAfterAfterEdit - codeGapAfterBeforeEdit) <= 1 &&
-            codeGapAfterAfterEdit >= 15 &&
+          !codeBlock.classList.contains('vmd-code-block--editing') &&
             getComputedStyle(codeSource).display !== 'none' &&
-            getComputedStyle(codePreviewCode).display === 'none' &&
+            getComputedStyle(codePreviewCode).display !== 'none' &&
+            sourceRectAfterEdit.top <= previewRectAfterEdit.top &&
+            codeRectAfterEdit.height > codeRectBeforeEdit.height &&
             getComputedStyle(codeBlock.querySelector('.vmd-code-toolbar')).display === 'flex',
-          'clicking highlighted code did not replace it in place with one plain editable surface'
+          'clicking highlighted code did not open native source above the visible preview: ' +
+            JSON.stringify({
+              blockBefore: codeRectBeforeEdit.toJSON(),
+              blockAfter: codeRectAfterEdit.toJSON(),
+              source: sourceRectAfterEdit.toJSON(),
+              preview: previewRectAfterEdit.toJSON(),
+            })
         );
         expect(
-          parseFloat(getComputedStyle(codePreview).borderTopWidth) === 0 &&
-            window.vditor.vditor.wysiwyg.popover.style.display !== 'block',
-          'ordinary code editing still exposed the old source/preview divider or native language input'
+          window.vditor.vditor.wysiwyg.popover.style.display !== 'block',
+          "ordinary code editing restored Vditor's duplicate language popover"
         );
 
         let sourceCode = codeSource.querySelector(':scope > code');
         select(sourceCode, 0, sourceCode, sourceCode.childNodes.length);
         expect(
           document.execCommand('insertText', false, 'const edited = 2;'),
-          'the browser did not accept direct input in the plain code surface'
+          "the browser did not accept input in Vditor's native code source"
         );
         await pause(120);
         codeBlock = root().querySelector(
@@ -3405,10 +3416,11 @@ function testPage() {
         codePreviewCode = codePreview.querySelector(':scope > code');
         expect(
           window.vditor.getValue().includes('const edited = 2;') &&
-            codeBlock.classList.contains('vmd-code-block--editing') &&
+            !codeBlock.classList.contains('vmd-code-block--editing') &&
             getComputedStyle(codeSource).display !== 'none' &&
-            getComputedStyle(codePreviewCode).display === 'none',
-          'direct plain-code input was not synchronized or left the in-place editor'
+            getComputedStyle(codePreviewCode).display !== 'none' &&
+            codePreviewCode.textContent.includes('const edited = 2;'),
+          'native source input was not synchronized with the visible code preview'
         );
 
         codeLanguageButton = codeBlock.querySelector('.vmd-code-language-button');
@@ -3420,10 +3432,12 @@ function testPage() {
         const codeSelectionAfterLanguage = window.getSelection();
         expect(
           window.vditor.getValue().includes(markerFence + 'typescript\\nconst edited = 2;') &&
-            codeBlock.classList.contains('vmd-code-block--editing') &&
+            !codeBlock.classList.contains('vmd-code-block--editing') &&
+            getComputedStyle(codeSource).display !== 'none' &&
+            getComputedStyle(codePreviewCode).display !== 'none' &&
             codeSelectionAfterLanguage?.rangeCount &&
             codeSource.contains(codeSelectionAfterLanguage.getRangeAt(0).startContainer),
-          'switching language while editing lost the code body, caret, or edit mode'
+          'switching language while native source was open lost the code body, caret, or preview'
         );
         const directCopyButton = codeBlock.querySelector(
           '.vmd-code-toolbar .vditor-copy .vditor-tooltipped'
@@ -3432,7 +3446,7 @@ function testPage() {
         await pause();
         expect(
           window.__vmdClipboardText === 'const edited = 2;',
-          'the in-place code copy action did not use the latest edited content'
+          'the code copy action did not use the latest native-source content'
         );
 
         sourceCode = codeSource.querySelector(':scope > code');
@@ -3444,12 +3458,17 @@ function testPage() {
           cancelable: true,
         }));
         await pause();
+        document.body.dispatchEvent(new MouseEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause();
         expect(
           !codeBlock.classList.contains('vmd-code-block--editing') &&
             getComputedStyle(codeSource).display === 'none' &&
             getComputedStyle(codePreviewCode).display !== 'none' &&
             codePreviewCode.textContent.includes('const edited = 2;'),
-          'Escape did not return the ordinary code block to one highlighted preview'
+          'native code source did not close while retaining its preview'
         );
         expect(
           !window.vditor.getValue().includes('vmd-code-'),
@@ -3535,17 +3554,20 @@ function testPage() {
             window.__vmdClipboardText.trim() ===
               'closed details did not render as a title-free thin horizontal bar' &&
             containmentCopyButtons[1].classList.contains(
-              'vditor-tooltipped--hover'
-            ),
+              'vmd-code-copy--success'
+            ) &&
+            containmentCopyButtons[1].querySelector(
+              '.vmd-code-copy-feedback'
+            )?.textContent === '✓ ' + (window.VditorI18n.copied || 'Copied'),
           'containing the code copy textarea broke copying or success feedback: ' +
             JSON.stringify({
               attemptsBefore: containmentCopyAttempts,
               attemptsAfter: window.__vmdCodeCopyAttempts,
               clipboard: window.__vmdClipboardText,
               label: containmentCopyButtons[1].getAttribute('aria-label'),
-              feedback: containmentCopyButtons[1].classList.contains(
-                'vditor-tooltipped--hover'
-              ),
+              feedback: containmentCopyButtons[1].querySelector(
+                '.vmd-code-copy-feedback'
+              )?.textContent,
               textarea: containmentTextareas[1].value,
             })
         );

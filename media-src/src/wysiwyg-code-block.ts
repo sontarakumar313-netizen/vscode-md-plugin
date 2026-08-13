@@ -6,7 +6,6 @@ import {
 } from './vditor-adapter'
 
 const ORDINARY_CLASS = 'vmd-code-block--ordinary'
-const EDITING_CLASS = 'vmd-code-block--editing'
 const TOOLBAR_CLASS = 'vmd-code-toolbar'
 const LANGUAGE_BUTTON_CLASS = 'vmd-code-language-button'
 const MENU_ID = 'vmd-code-language-menu'
@@ -148,26 +147,6 @@ function selectionOffsetWithin(element: HTMLElement): number | null {
   return range.toString().length
 }
 
-function pointOffsetWithin(
-  element: HTMLElement,
-  clientX: number,
-  clientY: number
-): number {
-  const point = document.caretRangeFromPoint?.(clientX, clientY) ?? null
-  if (point && element.contains(point.startContainer)) {
-    const range = document.createRange()
-    range.selectNodeContents(element)
-    try {
-      range.setEnd(point.startContainer, point.startOffset)
-      return range.toString().length
-    } catch (_) {
-      // Fall back to the closest edge below.
-    }
-  }
-  const rect = element.getBoundingClientRect()
-  return clientY <= rect.top ? 0 : (element.textContent || '').length
-}
-
 function restoreTextOffset(element: HTMLElement, requestedOffset: number): void {
   const offset = Math.max(0, requestedOffset)
   const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
@@ -227,9 +206,9 @@ function createLanguageMenu(): HTMLDivElement {
 }
 
 /**
- * Gives ordinary WYSIWYG code blocks one in-place editor and an Alert-style
- * language picker. Diagram and other rich-render languages stay on Vditor's
- * native preview/source interaction.
+ * Adds a persistent language/copy toolbar to ordinary WYSIWYG code blocks.
+ * Source editing remains Vditor-native: clicking the rendered code opens its
+ * editable source above the still-visible preview.
  */
 export function initWysiwygCodeBlocks(): { rebind(): void } {
   const menu = createLanguageMenu()
@@ -238,7 +217,6 @@ export function initWysiwygCodeBlocks(): { rebind(): void } {
   let boundRoot: HTMLElement | null = null
   let observer: MutationObserver | null = null
   let refreshQueued = false
-  const pendingClickOffsets = new WeakMap<HTMLElement, number>()
 
   function hideMenu(): void {
     state?.button.setAttribute('aria-expanded', 'false')
@@ -309,13 +287,12 @@ export function initWysiwygCodeBlocks(): { rebind(): void } {
     if (!parts) return
     const language = languageFromCode(parts.sourceCode)
     if (isSpecialLanguage(language)) {
-      block.classList.remove(ORDINARY_CLASS, EDITING_CLASS)
+      block.classList.remove(ORDINARY_CLASS)
       parts.previewPre.querySelector(`:scope > .${TOOLBAR_CLASS}`)?.remove()
       return
     }
 
     block.classList.add(ORDINARY_CLASS)
-    block.classList.toggle(EDITING_CLASS, parts.source.style.display !== 'none')
 
     let toolbar = parts.previewPre.querySelector<HTMLElement>(
       `:scope > .${TOOLBAR_CLASS}`
@@ -376,37 +353,6 @@ export function initWysiwygCodeBlocks(): { rebind(): void } {
     queueMicrotask(refresh)
   }
 
-  function finishEditing(block: HTMLElement): void {
-    const parts = getCodeBlockParts(block)
-    if (!parts) return
-    parts.source.style.display = 'none'
-    block.classList.remove(EDITING_CLASS)
-    if (state?.block === block) hideMenu()
-  }
-
-  function finishEditingExcept(except: HTMLElement | null): void {
-    root
-      ?.querySelectorAll<HTMLElement>(`.${ORDINARY_CLASS}.${EDITING_CLASS}`)
-      .forEach((block) => {
-        if (block !== except) finishEditing(block)
-      })
-  }
-
-  function enterEditing(parts: CodeBlockParts, offset: number): void {
-    hideMenu()
-    finishEditingExcept(parts.block)
-    parts.block.classList.add(EDITING_CLASS)
-    parts.source.style.display = 'block'
-    const internal = getVditorInternals()
-    if (internal?.wysiwyg?.popover instanceof HTMLElement) {
-      internal.wysiwyg.popover.style.display = 'none'
-    }
-    requestAnimationFrame(() => {
-      if (!parts.sourceCode.isConnected) return
-      restoreTextOffset(parts.sourceCode, offset)
-    })
-  }
-
   function ordinaryBlockFor(target: Element | null): HTMLElement | null {
     return target?.closest<HTMLElement>(
       `.vditor-wysiwyg__block.${ORDINARY_CLASS}`
@@ -416,35 +362,22 @@ export function initWysiwygCodeBlocks(): { rebind(): void } {
   function onRootPointerDown(event: PointerEvent): void {
     const target = event.target instanceof Element ? event.target : null
     const block = ordinaryBlockFor(target)
-    if (!target || !block) return
+    if (!target || !block || !target.closest(`.${TOOLBAR_CLASS}`)) return
     const parts = getCodeBlockParts(block)
     if (!parts) return
 
-    const toolbar = target.closest(`.${TOOLBAR_CLASS}`)
-    if (toolbar) {
-      syncCopyTextarea(parts)
-      event.preventDefault()
-      event.stopImmediatePropagation()
-      return
-    }
-    if (!parts.preview.contains(target)) return
-
-    pendingClickOffsets.set(
-      block,
-      pointOffsetWithin(parts.previewCode, event.clientX, event.clientY)
-    )
+    // Toolbar actions must not move the source caret or make Vditor interpret
+    // the control press as a request to open the source panel.
+    syncCopyTextarea(parts)
     event.preventDefault()
     event.stopImmediatePropagation()
   }
 
   function onRootClick(event: MouseEvent): void {
     const target = event.target instanceof Element ? event.target : null
-    const block = ordinaryBlockFor(target)
-    if (!target || !block) return
-    const parts = getCodeBlockParts(block)
-    if (!parts) return
+    if (!ordinaryBlockFor(target)) return
 
-    const languageButton = target.closest<HTMLButtonElement>(
+    const languageButton = target?.closest<HTMLButtonElement>(
       `.${LANGUAGE_BUTTON_CLASS}`
     )
     if (languageButton) {
@@ -453,25 +386,12 @@ export function initWysiwygCodeBlocks(): { rebind(): void } {
       showMenu(languageButton)
       return
     }
-    if (target.closest(`.${TOOLBAR_CLASS}`)) {
+    if (target?.closest(`.${TOOLBAR_CLASS}`)) {
       event.preventDefault()
       event.stopImmediatePropagation()
-      return
     }
-    if (parts.preview.contains(target)) {
-      event.preventDefault()
-      event.stopImmediatePropagation()
-      enterEditing(
-        parts,
-        pendingClickOffsets.get(block) ??
-          pointOffsetWithin(parts.previewCode, event.clientX, event.clientY)
-      )
-      return
-    }
-    if (parts.source.contains(target)) {
-      // Keep Vditor's shared popover from restoring its native language input.
-      event.stopImmediatePropagation()
-    }
+    // Code-body clicks intentionally continue to Vditor's native WYSIWYG
+    // handler, which opens the editable source above the rendered preview.
   }
 
   function applyLanguage(language: string): void {
@@ -479,10 +399,10 @@ export function initWysiwygCodeBlocks(): { rebind(): void } {
     if (!current || !current.languages.has(language)) return
     const restoreOffset =
       selectionOffsetWithin(current.sourceCode) ?? current.caretOffset
-    const wasEditing = current.block.classList.contains(EDITING_CLASS)
+    const sourceWasOpen = getComputedStyle(current.source).display !== 'none'
     hideMenu()
     if (language === current.language) {
-      if (wasEditing && restoreOffset !== null) {
+      if (sourceWasOpen && restoreOffset !== null) {
         restoreTextOffset(current.sourceCode, restoreOffset)
       }
       return
@@ -505,18 +425,18 @@ export function initWysiwygCodeBlocks(): { rebind(): void } {
       current.source,
       current.preview
     )
-    if (wasEditing) {
-      current.source.style.display = 'block'
-      current.block.classList.add(EDITING_CLASS)
-    }
+    if (sourceWasOpen) current.source.style.display = 'block'
     decorateBlock(current.block)
     commitVditorWysiwygDomEdit(internal)
 
     requestAnimationFrame(() => {
       const nextParts = getCodeBlockParts(current.block)
       if (!nextParts) return
-      if (wasEditing && restoreOffset !== null) {
-        restoreTextOffset(nextParts.sourceCode, restoreOffset)
+      if (sourceWasOpen) {
+        nextParts.source.style.display = 'block'
+        if (restoreOffset !== null) {
+          restoreTextOffset(nextParts.sourceCode, restoreOffset)
+        }
       } else {
         nextParts.previewPre
           .querySelector<HTMLButtonElement>(`.${LANGUAGE_BUTTON_CLASS}`)
@@ -531,17 +451,15 @@ export function initWysiwygCodeBlocks(): { rebind(): void } {
 
     const codeButton = target?.closest(`.${LANGUAGE_BUTTON_CLASS}`) ?? null
     if (!codeButton) hideMenu()
-    const targetBlock = ordinaryBlockFor(target)
-    finishEditingExcept(targetBlock)
   }
 
-  function editingPartsFromSelection(): CodeBlockParts | null {
+  function sourcePartsFromSelection(): CodeBlockParts | null {
     const selection = window.getSelection()
     if (!selection || selection.rangeCount === 0) return null
     const node = selection.getRangeAt(0).startContainer
     const element = node instanceof Element ? node : node.parentElement
     const block = ordinaryBlockFor(element)
-    if (!block?.classList.contains(EDITING_CLASS)) return null
+    if (!block) return null
     const parts = getCodeBlockParts(block)
     return parts?.source.contains(node) ? parts : null
   }
@@ -556,30 +474,24 @@ export function initWysiwygCodeBlocks(): { rebind(): void } {
     const target = event.target instanceof Element ? event.target : null
     if (target?.closest(`#${MENU_ID}`)) return
 
-    const parts = editingPartsFromSelection()
-    if (!parts) return
+    const parts = sourcePartsFromSelection()
     if (
-      event.altKey &&
-      !event.ctrlKey &&
-      !event.metaKey &&
-      !event.shiftKey &&
-      event.key === 'Enter'
+      !parts ||
+      !event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      event.key !== 'Enter'
     ) {
-      const button = parts.previewPre.querySelector<HTMLButtonElement>(
-        `.${LANGUAGE_BUTTON_CLASS}`
-      )
-      if (!button) return
-      event.preventDefault()
-      event.stopImmediatePropagation()
-      showMenu(button, true)
       return
     }
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      event.stopImmediatePropagation()
-      finishEditing(parts.block)
-      root?.focus({ preventScroll: true })
-    }
+    const button = parts.previewPre.querySelector<HTMLButtonElement>(
+      `.${LANGUAGE_BUTTON_CLASS}`
+    )
+    if (!button) return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    showMenu(button, true)
   }
 
   function onMenuKeydown(event: KeyboardEvent): void {
@@ -628,7 +540,6 @@ export function initWysiwygCodeBlocks(): { rebind(): void } {
       return
     }
 
-    finishEditingExcept(null)
     unbindRoot()
     root = nextRoot
     if (!root) return
