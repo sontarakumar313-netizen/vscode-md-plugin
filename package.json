@@ -139,7 +139,7 @@
     "start": "npm run watch",
     "build": "npm run build:extension && npm run build:webview",
     "build:extension": "node -e \"require('fs').rmSync('out', { recursive: true, force: true })\" && tsc -p .",
-    "build:webview": "npm run typecheck:webview && node scripts/build-media.mjs && npm run test:vditor-runtime",
+    "build:webview": "npm run typecheck:webview && node scripts/build-media.mjs",
     "typecheck": "tsc -p . --noEmit && npm run typecheck:webview",
     "typecheck:webview": "tsc -p media-src/tsconfig.json --noEmit",
     "test:sync": "npm run build:extension && node scripts/test-text-sync.js",

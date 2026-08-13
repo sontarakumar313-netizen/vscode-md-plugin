@@ -57,7 +57,5 @@ Thumbs.db
 /.AGENTS.md
 /TODO.md
 /00-refs
-scripts/*.mjs
 scripts/*.py
 /out/
-/scripts/
