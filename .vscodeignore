@@ -3,11 +3,13 @@
 .pi-subagents/
 .pi/
 AGENTS.md
+TODO.md
+TODO_*.md
 test/
 media-src
 patches
 vendor
-/00-styles/**
+00-styles/**
 00-docs/**
 00-refs/**
 00-refs-code/**

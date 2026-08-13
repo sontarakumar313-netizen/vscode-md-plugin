@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="media/logo.png" width="128" height="128" alt="Markdown Interactor logo">
+  <img src="https://raw.githubusercontent.com/sontarakumar313-netizen/vscode-md-plugin/main/media/logo.png" width="128" height="128" alt="Markdown Interactor logo">
 </p>
 
 <h1 align="center">Markdown Interactor</h1>
@@ -149,6 +149,7 @@ pnpm build
 | `markdown-interactor.allowRemoteMedia`    | `true`   | 是否允许加载 Markdown 中的 HTTPS 图片和媒体。                  |
 | `markdown-interactor.useVscodeThemeColor` | `true`   | 是否在编辑器中使用当前 VS Code 主题色。                        |
 | `markdown-interactor.frontMatterDisplay`  | `table`  | Front Matter 的可视化显示方式：表格、代码块或隐藏。             |
+| `markdown-interactor.toolbarShortcuts`    | 见下文   | 为顶部功能区操作配置单段快捷键，并阻止事件穿透到 VS Code。      |
 
 关闭 `allowRemoteMedia` 只会阻止文档里引用的远程图片、视频和音频，不会阻止远程字体、
 样式表和脚本，编辑器自身需要加载后者。
@@ -171,6 +172,20 @@ pnpm build
 }
 ```
 
+`toolbarShortcuts` 使用工具栏操作 ID 作为键。`Mod` 在 Windows/Linux 表示 `Ctrl`，在 macOS 表示 `Cmd`；空字符串可禁用某项快捷键。修改后会立即应用到已打开的编辑器：
+
+```json
+{
+  "markdown-interactor.toolbarShortcuts": {
+    "bold": "Mod+B",
+    "math-inline": "Mod+Alt+M",
+    "vmd-mode-sv": "Mod+Alt+9"
+  }
+}
+```
+
+剪切、复制、粘贴、全选、撤销、重做、查找和切换 Tab 焦点等基础编辑快捷键不会被工具栏配置覆盖。若配置项无效、使用未知操作 ID 或与其他工具栏操作冲突，插件会显示警告且不执行冲突项。
+
 ## 自定义样式
 
 扩展内置浅色和深色两套主题，并随 VS Code 当前主题自动切换。还可以为每个工作区提供完整的自定义 CSS：
@@ -181,7 +196,7 @@ pnpm build
 
 扩展只读取当前 Markdown 文件所属工作区中的 `.vscode/markdown-interactor.css`，不会向父目录继续查找。样式文件不会自动监听，修改后需要手动重新加载。
 
-[`00-styles/`](00-styles/) 中还提供三套可直接使用的工作区主题，具体说明见 [`00-styles/README.md`](00-styles/README.md)。
+[`00-styles/`](https://github.com/sontarakumar313-netizen/vscode-md-plugin/tree/main/00-styles) 中还提供三套可直接使用的工作区主题，具体说明见 [`00-styles/README.md`](https://github.com/sontarakumar313-netizen/vscode-md-plugin/blob/main/00-styles/README.md)。
 
 ## 开发
 
@@ -211,7 +226,7 @@ GitHub Actions 会在代码推送到 `main` 后自动构建并打包 VSIX，无�
 | `scripts/`       | 构建脚本与自动化测试                             |
 | `00-styles/`     | 工作区自定义 CSS 示例                            |
 
-更多版本变化见 [CHANGELOG.md](CHANGELOG.md)。问题与建议请提交到 [GitHub Issues](https://github.com/sontarakumar313-netizen/vscode-md-plugin/issues)。
+更多版本变化见 [CHANGELOG.md](https://github.com/sontarakumar313-netizen/vscode-md-plugin/blob/main/CHANGELOG.md)。问题与建议请提交到 [GitHub Issues](https://github.com/sontarakumar313-netizen/vscode-md-plugin/issues)。
 
 ## 致谢
 

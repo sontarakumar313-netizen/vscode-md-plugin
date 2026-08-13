@@ -13,6 +13,7 @@ import { setEditMode } from 'vditor/src/ts/toolbar/EditMode'
 import { afterRenderEvent as commitWysiwygAfterRender } from 'vditor/src/ts/wysiwyg/afterRenderEvent'
 import { renderDomByMd } from 'vditor/src/ts/wysiwyg/renderDomByMd'
 import { processCodeRender } from 'vditor/src/ts/util/processCode'
+import { renderToc } from 'vditor/src/ts/util/toc'
 import {
   genAPopover,
   highlightToolbarWYSIWYG,
@@ -172,6 +173,15 @@ export function commitVditorWysiwygDomEdit(internal: any): void {
     enableHint: false,
     enableInput: true,
   })
+}
+
+/** Commits a heading-level DOM replacement and refreshes the outline. */
+export function commitVditorWysiwygHeadingEdit(editor: unknown): boolean {
+  const internal = getVditorInternals(editor)
+  if (!internal || internal.currentMode !== 'wysiwyg') return false
+  renderToc(internal)
+  commitVditorWysiwygDomEdit(internal)
+  return true
 }
 
 /** Rebuilds one ordinary code preview from its serializer-owned source node. */

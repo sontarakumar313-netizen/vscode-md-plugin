@@ -39,6 +39,17 @@ const detailsIcon = '<svg class="vmd-details-toolbar-icon" viewBox="0 0 24 24" x
 const alertIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 10.5v6M12 7.5h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>'
 const editingModeIcon = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 18.5h3.5L18 9l-3-3-9.5 9.5L5 18.5zm8.5-11 3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 
+interface ToolbarDefinition {
+	className?: string
+	click?: () => void | Promise<void>
+	hotkey?: string
+	icon?: string
+	name: string
+	tip?: string
+	tipPosition?: string
+	toolbar?: Array<string | ToolbarDefinition>
+}
+
 // insertMD writes raw Markdown, so a `$` inside the selection would close the
 // math delimiter early and turn `a$b` into the broken `$a$b$`. Normalize every
 // dollar to the LaTeX literal `\$`; the optional leading backslash in the
@@ -279,7 +290,7 @@ function selectEditorMode(mode: VditorMode): void {
 	})
 }
 
-/** Blocks Vditor's private mode hotkeys so switching is toolbar-only. */
+/** Blocks Vditor's private heading/mode hotkeys not owned by our controller. */
 export function installEditorModeShortcutGuard(): void {
 	if ((window as any).__vmdEditorModeShortcutGuardInstalled) return
 	;(window as any).__vmdEditorModeShortcutGuardInstalled = true
@@ -293,7 +304,7 @@ export function installEditorModeShortcutGuard(): void {
 			!primary ||
 			!event.altKey ||
 			event.shiftKey ||
-			!/^Digit[7-9]$/.test(event.code)
+			!/^Digit[1-9]$/.test(event.code)
 		) {
 			return
 		}
@@ -314,10 +325,10 @@ export function installEditorModeShortcutGuard(): void {
 	document.addEventListener('keydown', onKeydown, true)
 }
 
-export const toolbar = [
+const toolbarItems: Array<string | ToolbarDefinition> = [
 	{
 		name: 'outline',
-		tipPosition: 's',
+		tipPosition: 'se',
 		tip: t('toggleOutline'),
 		className: 'vmd-outline-toggle',
 		icon: outlineIcon,
@@ -326,7 +337,7 @@ export const toolbar = [
 	{
 		hotkey: '⌘s',
 		name: 'save',
-		tipPosition: 's',
+		tipPosition: 'se',
 		tip: t('save'),
 		className: 'save',
 		icon:
@@ -405,7 +416,7 @@ export const toolbar = [
 	'|',
 	{
 		name: 'vmd-edit-mode',
-		tipPosition: 'e',
+		tipPosition: 'sw',
 		tip: t('editingMode'),
 		icon: editingModeIcon,
 		toolbar: [
@@ -427,7 +438,7 @@ export const toolbar = [
 	},
 	{
 		name: 'more',
-		tipPosition: 'e',
+		tipPosition: 'sw',
 		toolbar: [
 			{
 				name: 'copy-markdown',
@@ -475,14 +486,25 @@ export const toolbar = [
 			'help',
 		],
 	},
-].map((it: any) => {
-	if (typeof it === 'string') {
-		it = { name: it }
+]
+
+function normalizeToolbarItem(
+	item: string | ToolbarDefinition
+): ToolbarDefinition {
+	const normalized: ToolbarDefinition =
+		typeof item === 'string' ? { name: item } : { ...item }
+	normalized.hotkey = ''
+	normalized.tipPosition = normalized.tipPosition || 's'
+	if (normalized.toolbar) {
+		normalized.toolbar = normalized.toolbar.map(normalizeToolbarItem)
+		// Vditor routes unknown custom dropdown triggers through Custom, which
+		// calls menuItem.click before its submenu toggler.
+		if (typeof normalized.click !== 'function') normalized.click = () => {}
 	}
-	it.tipPosition = it.tipPosition || 'n'
-	// Vditor routes unknown custom dropdown triggers through Custom, which calls
-	// menuItem.click unconditionally before its submenu toggler. Supply a no-op
-	// so custom dropdowns open without throwing.
-	if (it.toolbar && typeof it.click !== 'function') it.click = () => {}
-	return it
-})
+	return normalized
+}
+
+// Vditor's built-in hotkeys are disabled above. The configurable capture-phase
+// controller is the only toolbar shortcut dispatcher, preventing duplicate
+// actions and VS Code workbench penetration.
+export const toolbar = toolbarItems.map(normalizeToolbarItem)

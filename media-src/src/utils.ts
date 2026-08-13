@@ -20,6 +20,7 @@ declare global {
     __vmdDetails?: { rebind?: () => void }
     __vmdAlerts?: { rebind?: () => void }
     __vmdCodeBlocks?: { rebind?: () => void }
+    __vmdHeadingLevels?: { dispose(): void; rebind(): void }
     __vmdFrontMatter?: { rebind?: () => void }
     __vmdSplitScrollSync?: { rebind?: (editor?: unknown) => void }
   }

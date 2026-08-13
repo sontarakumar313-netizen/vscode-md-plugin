@@ -59,3 +59,5 @@ Thumbs.db
 /00-refs
 scripts/*.py
 /out/
+AGENTS.md
+.tmp-repro/

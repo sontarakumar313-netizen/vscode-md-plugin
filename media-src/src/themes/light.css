@@ -115,6 +115,10 @@
   background-color: var(--vmd-content-code-background);
 }
 
+:where(body[data-vmd-theme='light']) #app .vditor-reset .language-math {
+  background-color: transparent;
+}
+
 :where(body[data-vmd-theme='light']) #app .vditor-reset ::selection {
   background-color: var(--vmd-content-selection-background);
 }

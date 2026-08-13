@@ -98,6 +98,25 @@ export class MarkdownEditorProvider
       disposables
     )
 
+    vscode.workspace.onDidChangeConfiguration(
+      (event) => {
+        if (
+          panelDisposed ||
+          !event.affectsConfiguration(
+            'markdown-interactor.toolbarShortcuts',
+            uri
+          )
+        ) {
+          return
+        }
+        void controller.updateToolbarShortcuts().catch((error) => {
+          if (!panelDisposed) console.error(error)
+        })
+      },
+      null,
+      disposables
+    )
+
     webviewPanel.onDidDispose(() => {
       panelDisposed = true
       disposables.forEach((disposable) => disposable.dispose())

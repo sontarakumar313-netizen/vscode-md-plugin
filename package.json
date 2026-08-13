@@ -10,13 +10,13 @@
     "url": "https://github.com/sontarakumar313-netizen"
   },
   "license": "MIT",
-  "homepage": "https://github.com/sontarakumar313-netizen/vscode-md-interactor#readme",
+  "homepage": "https://github.com/sontarakumar313-netizen/vscode-md-plugin#readme",
   "bugs": {
-    "url": "https://github.com/sontarakumar313-netizen/vscode-md-interactor/issues"
+    "url": "https://github.com/sontarakumar313-netizen/vscode-md-plugin/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/sontarakumar313-netizen/vscode-md-interactor.git"
+    "url": "https://github.com/sontarakumar313-netizen/vscode-md-plugin.git"
   },
   "engines": {
     "vscode": "^1.51.0"
@@ -107,6 +107,31 @@
           "type": "boolean",
           "default": true,
           "markdownDescription": "Use the active VS Code theme palette throughout the Markdown editor. The built-in light/dark theme still follows the VS Code theme kind when this is disabled.\n\n[$(new-file) Generate default workspace CSS](command:markdown-interactor.generateWorkspaceStyle)"
+        },
+        "markdown-interactor.toolbarShortcuts": {
+          "type": "object",
+          "default": {
+            "save": "Mod+S",
+            "heading-1": "Mod+Alt+1",
+            "heading-2": "Mod+Alt+2",
+            "heading-3": "Mod+Alt+3",
+            "heading-4": "Mod+Alt+4",
+            "heading-5": "Mod+Alt+5",
+            "heading-6": "Mod+Alt+6",
+            "bold": "Mod+B",
+            "italic": "Mod+I",
+            "strike": "Mod+Shift+X",
+            "link": "Mod+K",
+            "list": "Mod+Shift+8",
+            "ordered-list": "Mod+Shift+7",
+            "quote": "Mod+Shift+.",
+            "code": "Mod+Alt+C",
+            "inline-code": "Mod+E"
+          },
+          "additionalProperties": {
+            "type": "string"
+          },
+          "markdownDescription": "Keyboard shortcuts for Markdown Interactor toolbar actions. Use an action ID as the property name and a single chord such as `Mod+B` as its value; `Mod` maps to Ctrl on Windows/Linux and Cmd on macOS. Set an action to an empty string to disable its shortcut. Supported IDs: `outline`, `save`, `headings`, `heading-1` through `heading-6`, `bold`, `italic`, `strike`, `link`, `list`, `ordered-list`, `check`, `outdent`, `indent`, `quote`, `vmd-alert`, `line`, `code`, `inline-code`, `math-block`, `math-inline`, `details`, `insert-before`, `insert-after`, `upload`, `table`, `vmd-edit-mode`, `vmd-mode-wysiwyg`, `vmd-mode-sv`, `more`, `copy-markdown`, `copy-html`, `reload-workspace-style`, `normalize-formatting`, `reset-config`, `devtools`, `info`, and `help`."
         },
         "markdown-interactor.frontMatterDisplay": {
           "type": "string",

@@ -365,7 +365,6 @@ body {
 }
 
 /* ── Diagrams, tables, media and controls ─────────────────────────────── */
-#app.vditor .vditor-reset .language-math,
 #app.vditor .vditor-reset .language-mermaid,
 #app.vditor .vditor-reset .language-echarts,
 #app.vditor .vditor-reset .language-graphviz,
@@ -378,6 +377,10 @@ body {
   border-radius: 7px;
   padding: 0.85em;
   overflow: auto;
+}
+
+#app.vditor .vditor-reset .language-math {
+  background: transparent;
 }
 
 #app.vditor .vditor-reset table {

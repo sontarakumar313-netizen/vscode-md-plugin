@@ -9,6 +9,10 @@ import {
   mergeThreeWayTextPreferringLocal,
   reconcileCanonicalisedEdit,
 } from './text-sync'
+import {
+  readToolbarShortcutConfiguration,
+  ToolbarShortcutMap,
+} from './toolbar-shortcuts'
 
 export const KeyVditorOptions = 'vditor.options'
 
@@ -396,7 +400,9 @@ export function getWebviewTheme(): WebviewTheme {
  */
 export function getVditorOptions(
   context: vscode.ExtensionContext,
-  uri?: vscode.Uri
+  uri?: vscode.Uri,
+  toolbarShortcuts: ToolbarShortcutMap = readToolbarShortcutConfiguration(uri)
+    .shortcuts
 ) {
   const config = vscode.workspace.getConfiguration('markdown-interactor', uri)
   const savedOptions = context.globalState.get<unknown>(KeyVditorOptions)
@@ -406,6 +412,7 @@ export function getVditorOptions(
     useVscodeThemeColor: config.get<boolean>('useVscodeThemeColor'),
     mode: savedMode ?? DEFAULT_VDITOR_MODE,
     frontMatterDisplay: getFrontMatterDisplay(config),
+    toolbarShortcuts,
   }
 }
 
@@ -555,6 +562,7 @@ export class MarkdownWebviewController implements vscode.Disposable {
   private editorBaseline: EditorProjectionBaseline | undefined
   private pendingEditAcknowledgement: EditAcknowledgementMessage | undefined
   private editAcknowledgementDelivery: Promise<void> | undefined
+  private lastToolbarShortcutWarning = ''
 
   constructor(private readonly host: MarkdownWebviewHost) {
     this.messageDisposable = host.panel.webview.onDidReceiveMessage(
@@ -765,11 +773,17 @@ export class MarkdownWebviewController implements vscode.Disposable {
     ) + 1
     this.editorGenerationSerial = editorGeneration
     this.pendingInitialization = { generation: editorGeneration }
+    const shortcutConfiguration = readToolbarShortcutConfiguration(this.host.uri)
 
     try {
+      this.reportToolbarShortcutWarnings(shortcutConfiguration.warnings)
       await this.update({
         type: 'init',
-        options: getVditorOptions(this.host.context, this.host.uri),
+        options: getVditorOptions(
+          this.host.context,
+          this.host.uri,
+          shortcutConfiguration.shortcuts
+        ),
         theme: getWebviewTheme(),
         workspaceStyleCss: this.workspaceStyle.css,
         workspaceStylePath: this.workspaceStyle.path,
@@ -787,6 +801,31 @@ export class MarkdownWebviewController implements vscode.Disposable {
     await this.host.panel.webview.postMessage({
       command: 'theme',
       theme: getWebviewTheme(),
+    })
+  }
+
+  public async updateToolbarShortcuts(): Promise<void> {
+    if (this.disposed || this.host.isDisposed()) return
+    const configuration = readToolbarShortcutConfiguration(this.host.uri)
+    this.reportToolbarShortcutWarnings(configuration.warnings)
+    if (this.disposed || this.host.isDisposed()) return
+    await this.host.panel.webview.postMessage({
+      command: 'toolbar-shortcuts',
+      shortcuts: configuration.shortcuts,
+    })
+  }
+
+  private reportToolbarShortcutWarnings(warnings: readonly string[]): void {
+    const message = warnings.join(' ')
+    if (message === this.lastToolbarShortcutWarning) return
+    this.lastToolbarShortcutWarning = message
+    if (!message || this.disposed || this.host.isDisposed()) return
+    void Promise.resolve(
+      vscode.window.showWarningMessage(
+        `Markdown Interactor toolbar shortcuts: ${message}`
+      )
+    ).catch((error) => {
+      if (!this.disposed && !this.host.isDisposed()) console.error(error)
     })
   }
 

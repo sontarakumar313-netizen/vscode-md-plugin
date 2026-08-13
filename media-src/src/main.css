@@ -915,6 +915,21 @@ body,
   shape-rendering: geometricPrecision;
 }
 
+/* A fixed top toolbar needs downward tooltips even on narrow screens. Vditor
+   disables tooltip content below 520px; restore it for toolbar controls only. */
+@media screen and (max-width: 520px) {
+  .vditor-toolbar .vditor-tooltipped::before {
+    content: '';
+  }
+  .vditor-toolbar .vditor-tooltipped::after {
+    content: attr(aria-label);
+  }
+}
+.vditor-toolbar .vditor-tooltipped.vmd-toolbar-menu-open::before,
+.vditor-toolbar .vditor-tooltipped.vmd-toolbar-menu-open::after {
+  display: none !important;
+}
+
 /* WYSIWYG mode labels every block in the left gutter: "</>" for code blocks,
    "$$" for math, "F" for front matter. The heading labels (H1-H6) are useful
    for telling levels apart at a glance, but the block symbols only repeat what
@@ -926,5 +941,108 @@ body,
    content would leave a floated empty box still shifting the first line. */
 .vditor-wysiwyg div.vditor-wysiwyg__block::before {
   display: none;
+}
+
+/* Real heading-level controls replace Vditor's non-interactive H1-H6 pseudo
+   labels. They are serializer-ignored preview nodes positioned in the gutter. */
+.vditor-wysiwyg .vditor-reset :is(h1, h2, h3, h4, h5, h6).vmd-heading-level--decorated {
+  position: relative;
+}
+.vditor-wysiwyg
+  .vditor-reset
+  :is(h1, h2, h3, h4, h5, h6).vmd-heading-level--decorated::before {
+  display: none !important;
+}
+.vditor-wysiwyg .vditor-reset .vmd-heading-level-button {
+  position: absolute;
+  z-index: 1;
+  top: 0.25rem;
+  left: -31px;
+  display: inline-flex;
+  width: 27px;
+  min-width: 27px;
+  height: 22px;
+  min-height: 22px;
+  margin: 0;
+  padding: 0 2px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  align-items: center;
+  justify-content: center;
+  color: var(--vscode-descriptionForeground, var(--second-color));
+  background: transparent;
+  font: 11px/1 var(--vscode-font-family, sans-serif);
+  cursor: pointer;
+  user-select: none;
+}
+.vditor-wysiwyg .vditor-reset .vmd-heading-level-button::before {
+  content: attr(data-label);
+}
+.vditor-wysiwyg
+  .vditor-reset
+  .vmd-details-content--open
+  > .vmd-heading-level-button {
+  left: 0.25rem;
+}
+.vditor-wysiwyg .vditor-reset .vmd-heading-level-button:hover,
+.vditor-wysiwyg .vditor-reset .vmd-heading-level-button:focus-visible {
+  border-color: var(--vscode-focusBorder, var(--toolbar-icon-hover-color));
+  color: var(--vscode-foreground, var(--textarea-text-color));
+  background: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.15));
+  outline: none;
+}
+
+#vmd-heading-level-menu {
+  position: fixed;
+  z-index: 10001;
+  display: none;
+  min-width: 128px;
+  padding: 4px;
+  box-sizing: border-box;
+  border: 1px solid var(--vscode-menu-border, var(--border-color));
+  border-radius: 5px;
+  color: var(--vscode-menu-foreground, var(--toolbar-icon-color));
+  background: var(--vscode-menu-background, var(--panel-background-color));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  font: 13px/1.4 var(--vscode-font-family, sans-serif);
+  user-select: none;
+}
+#vmd-heading-level-menu button {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 4px 28px 4px 8px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 3px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+#vmd-heading-level-menu button:hover,
+#vmd-heading-level-menu button:focus-visible {
+  color: var(--vscode-menu-selectionForeground, #fff);
+  background: var(--vscode-menu-selectionBackground, #04395e);
+  outline: none;
+}
+#vmd-heading-level-menu .vmd-heading-level-menu__current::after {
+  position: absolute;
+  right: 9px;
+  content: '✓';
+}
+
+/* Formula renderers always expose the document surface. Keep this stronger
+   than bundled/workspace themes so inline and display math never gain a fill. */
+body #app.vditor .vditor-reset .language-math,
+body #app.vditor .vditor-reset .language-math .katex,
+body
+  #app.vditor
+  .vditor-wysiwyg__block[data-type='math-block']
+  > .vditor-wysiwyg__preview {
+  background: transparent !important;
+  background-image: none !important;
 }
 

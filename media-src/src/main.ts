@@ -30,6 +30,7 @@ import {
 import { initWysiwygDetails } from './wysiwyg-details'
 import { initWysiwygAlerts } from './wysiwyg-alert'
 import { initWysiwygCodeBlocks } from './wysiwyg-code-block'
+import { initWysiwygHeadingLevels } from './wysiwyg-heading-level'
 import {
   attachFrontMatterSeparator,
   initWysiwygFrontMatter,
@@ -50,6 +51,8 @@ import { getScrollElement } from './scroll-target'
 import { installSvCodeIndentRepair } from './sv-code-indent'
 import { formatUploadTimestamp } from './upload-timestamp'
 import { installWysiwygSourcePanelAutoClose } from './wysiwyg-source-panel'
+import { installToolbarShortcutController } from './toolbar-shortcuts'
+import { installEditorClipboard } from './editor-clipboard'
 import { vditorI18n } from 'virtual:vditor-i18n'
 import './themes/light.css'
 import './themes/dark.css'
@@ -171,7 +174,21 @@ function installCodeCopyHandler(): void {
 }
 
 installStructuredTabPolicy()
+// Register before the private Vditor heading/mode guard. Configured shortcuts
+// are consumed here; unconfigured private combinations fall through to the
+// guard and cannot reactivate Vditor's hidden shortcut paths.
+const toolbarShortcutController = installToolbarShortcutController()
 installEditorModeShortcutGuard()
+const editorClipboardController = installEditorClipboard()
+window.addEventListener(
+  'pagehide',
+  () => {
+    toolbarShortcutController.dispose()
+    editorClipboardController.dispose()
+    window.__vmdHeadingLevels?.dispose()
+  },
+  { once: true }
+)
 installCodeCopyHandler()
 installWysiwygSourcePanelAutoClose()
 
@@ -531,9 +548,11 @@ function flushEditorContent(): void {
 }
 
 function refreshModeDependentFeatures(): void {
+  toolbarShortcutController.rebind()
   window.__vmdDetails?.rebind?.()
   window.__vmdAlerts?.rebind?.()
   window.__vmdCodeBlocks?.rebind?.()
+  window.__vmdHeadingLevels?.rebind?.()
   window.__vmdFrontMatter?.rebind?.()
   window.__vmdSplitScrollSync?.rebind?.(window.vditor)
 }
@@ -632,6 +651,10 @@ function initVditor(msg) {
   const requestedMode = msg.options?.mode === 'sv' ? 'sv' : 'wysiwyg'
   const receivedOptions =
     msg.options && typeof msg.options === 'object' ? msg.options : {}
+  const receivedToolbarShortcuts = receivedOptions.toolbarShortcuts
+  const vditorOptions = { ...receivedOptions }
+  delete vditorOptions.toolbarShortcuts
+  toolbarShortcutController.setShortcuts(receivedToolbarShortcuts)
   const receivedHint =
     receivedOptions.hint && typeof receivedOptions.hint === 'object'
       ? receivedOptions.hint
@@ -646,7 +669,7 @@ function initVditor(msg) {
       : {}
   const defaultOptions: any = {
     _lutePath: localVditorAsset('lute.min.js'),
-    ...receivedOptions,
+    ...vditorOptions,
     // Lute appends /<name>.png, so this stays a directory URL with no trailing
     // slash, matching the CDN default it replaces.
     hint: {
@@ -779,6 +802,7 @@ function initVditor(msg) {
       )
       installToolbarSelectionPreserver(vditor)
       syncEditorModeToolbar(vditor)
+      toolbarShortcutController.rebind()
       installWysiwygListCommands(vditor)
       if (!(window as any).__vmdDetails) {
         ;(window as any).__vmdDetails = initWysiwygDetails()
@@ -794,6 +818,11 @@ function initVditor(msg) {
         ;(window as any).__vmdCodeBlocks = initWysiwygCodeBlocks()
       } else {
         ;(window as any).__vmdCodeBlocks.rebind?.()
+      }
+      if (!window.__vmdHeadingLevels) {
+        window.__vmdHeadingLevels = initWysiwygHeadingLevels()
+      } else {
+        window.__vmdHeadingLevels.rebind()
       }
       // Unknown values were already rejected by the host, so this only has to
       // cover the case of an older host that sends no value at all.
@@ -973,6 +1002,11 @@ window.addEventListener('message', (e) => {
     }
     case 'theme': {
       updateBuiltInTheme(msg.theme)
+      break
+    }
+    case 'toolbar-shortcuts': {
+      toolbarShortcutController.setShortcuts(msg.shortcuts)
+      toolbarShortcutController.rebind()
       break
     }
     case 'workspace-style': {
