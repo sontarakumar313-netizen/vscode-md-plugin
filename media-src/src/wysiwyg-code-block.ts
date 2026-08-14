@@ -23,6 +23,7 @@ const LANGUAGE_CLASS = 'vmd-code-language'
 const ZERO_WIDTH_SPACE = '\u200b'
 const SELECTED_CLASS = 'vmd-code-block--selected'
 const BLOCK_EDGE_WIDTH = 18
+const BLOCK_GAP_HEIGHT = 32
 const ATOMIC_BLOCK_SELECTOR = [
   '.vditor-wysiwyg__block[data-type="code-block"]',
   '.vditor-wysiwyg__block[data-type="math-block"]',
@@ -319,6 +320,37 @@ function closestElement(node: Node): Element | null {
   return node instanceof Element ? node : node.parentElement
 }
 
+function atomicBlockAtPoint(event: PointerEvent): HTMLElement | null {
+  const range = document.caretRangeFromPoint?.(event.clientX, event.clientY)
+  if (!range) return null
+  const candidate = closestElement(range.startContainer)?.closest<HTMLElement>(
+    ATOMIC_BLOCK_SELECTOR
+  ) || null
+  return isAtomicBlock(candidate) ? candidate : null
+}
+
+function isAtomicBlockGap(
+  block: HTMLElement,
+  target: Element,
+  event: PointerEvent
+): boolean {
+  const interactive = target.closest(INTERACTIVE_BLOCK_SELECTOR)
+  if (interactive && block.contains(interactive)) return false
+  const preview = block.querySelector<HTMLElement>(
+    ':scope > .vditor-wysiwyg__preview'
+  )
+  if (preview?.contains(target)) return false
+
+  const rect = block.getBoundingClientRect()
+  return (
+    rect.width > 0 &&
+    event.clientX >= rect.left &&
+    event.clientX <= rect.right &&
+    event.clientY >= rect.top - BLOCK_GAP_HEIGHT &&
+    event.clientY <= rect.bottom + BLOCK_GAP_HEIGHT
+  )
+}
+
 function codeBlockAtRange(range: Range): HTMLElement | null {
   const start = closestElement(range.startContainer)?.closest<HTMLElement>(
     ATOMIC_BLOCK_SELECTOR
@@ -338,17 +370,64 @@ function rangeContainsNodeContents(range: Range, node: HTMLElement): boolean {
   )
 }
 
+function directRangeBlock(range: Range): HTMLElement | null {
+  const element = closestElement(range.startContainer)
+  const root = element?.closest<HTMLElement>('.vditor-reset') || null
+  const start = element instanceof HTMLElement ? element : element?.parentElement
+  if (!start || !root) return null
+  let block = start
+  while (block.parentElement && block.parentElement !== root) {
+    block = block.parentElement
+  }
+  return block.parentElement === root ? block : null
+}
+
+function rangeEdgeIsEmpty(
+  range: Range,
+  block: HTMLElement,
+  edge: 'before' | 'after'
+): boolean {
+  const remainder = document.createRange()
+  remainder.selectNodeContents(block)
+  try {
+    if (edge === 'before') {
+      remainder.setEnd(range.startContainer, range.startOffset)
+    } else {
+      remainder.setStart(range.startContainer, range.startOffset)
+    }
+  } catch {
+    return false
+  }
+  return !remainder.toString().replaceAll(ZERO_WIDTH_SPACE, '').trim()
+}
+
 function codeBlockBeforeBoundary(range: Range): HTMLElement | null {
-  if (!range.collapsed || !(range.startContainer instanceof Element)) return null
-  const previous = range.startContainer.childNodes[range.startOffset - 1]
+  if (!range.collapsed) return null
+  if (range.startContainer instanceof Element) {
+    const previous = range.startContainer.childNodes[range.startOffset - 1]
+    if (previous instanceof HTMLElement && isAtomicBlock(previous)) {
+      return previous
+    }
+  }
+
+  const block = directRangeBlock(range)
+  if (!block || !rangeEdgeIsEmpty(range, block, 'before')) return null
+  const previous = block.previousElementSibling
   return previous instanceof HTMLElement && isAtomicBlock(previous)
     ? previous
     : null
 }
 
 function codeBlockAfterBoundary(range: Range): HTMLElement | null {
-  if (!range.collapsed || !(range.startContainer instanceof Element)) return null
-  const next = range.startContainer.childNodes[range.startOffset]
+  if (!range.collapsed) return null
+  if (range.startContainer instanceof Element) {
+    const next = range.startContainer.childNodes[range.startOffset]
+    if (next instanceof HTMLElement && isAtomicBlock(next)) return next
+  }
+
+  const block = directRangeBlock(range)
+  if (!block || !rangeEdgeIsEmpty(range, block, 'after')) return null
+  const next = block.nextElementSibling
   return next instanceof HTMLElement && isAtomicBlock(next) ? next : null
 }
 
@@ -415,8 +494,45 @@ function insertParagraphByCodeBlock(
 export function initWysiwygCodeBlocks(): void {
   let writing = false
   let pendingSideClick: HTMLElement | null = null
+  let suppressNextAtomicClick = false
+  const guardedPreviews = new Set<HTMLElement>()
   const renderTimers = new WeakMap<HTMLElement, number>()
   const renderVersions = new WeakMap<HTMLElement, number>()
+
+  const stopVditorPreviewEvent = (event: Event): void => {
+    // Target handlers and browser defaults have already run by the time a
+    // bubbling event reaches the preview. Stop only the editor-root listener
+    // that would reveal serializer-owned source through Vditor's showCode().
+    event.stopPropagation()
+  }
+
+  function clearPreviewGuards(): void {
+    guardedPreviews.forEach((preview) => {
+      preview.removeEventListener('click', stopVditorPreviewEvent)
+      preview.removeEventListener('keyup', stopVditorPreviewEvent)
+    })
+    guardedPreviews.clear()
+  }
+
+  function guardAtomicPreviews(root: HTMLElement): void {
+    guardedPreviews.forEach((preview) => {
+      if (preview.isConnected && root.contains(preview)) return
+      preview.removeEventListener('click', stopVditorPreviewEvent)
+      preview.removeEventListener('keyup', stopVditorPreviewEvent)
+      guardedPreviews.delete(preview)
+    })
+    root
+      .querySelectorAll<HTMLElement>(ATOMIC_BLOCK_SELECTOR)
+      .forEach((block) => {
+        const preview = block.querySelector<HTMLElement>(
+          ':scope > .vditor-wysiwyg__preview'
+        )
+        if (!preview || guardedPreviews.has(preview)) return
+        preview.addEventListener('click', stopVditorPreviewEvent)
+        preview.addEventListener('keyup', stopVditorPreviewEvent)
+        guardedPreviews.add(preview)
+      })
+  }
 
   function decorateBlock(block: HTMLElement): void {
     const parts = getCodeBlockParts(block)
@@ -480,6 +596,7 @@ export function initWysiwygCodeBlocks(): void {
   }
 
   function refresh(root: HTMLElement): void {
+    guardAtomicPreviews(root)
     if (selectedCodeBlock && !root.contains(selectedCodeBlock)) {
       clearCodeBlockSelection()
     }
@@ -605,10 +722,13 @@ export function initWysiwygCodeBlocks(): void {
     refresh,
     beforeRebind: () => {
       pendingSideClick = null
+      suppressNextAtomicClick = false
+      clearPreviewGuards()
       clearCodeBlockSelection()
     },
     onPointerDown: (event) => {
       pendingSideClick = null
+      suppressNextAtomicClick = false
       const target = event.target instanceof Element ? event.target : null
       const editButton = target?.closest(
         `.${WYSIWYG_SOURCE_EDIT_BUTTON_CLASS}`
@@ -633,10 +753,33 @@ export function initWysiwygCodeBlocks(): void {
         return true
       }
 
+      const projectedBlock = block || atomicBlockAtPoint(event)
+      if (
+        event.button === 0 &&
+        projectedBlock &&
+        target &&
+        isAtomicBlockGap(projectedBlock, target, event)
+      ) {
+        // Margins and wrapper-only whitespace are not editing surfaces. Claim
+        // pointerdown before Chromium briefly projects the caret into the
+        // nearest preview, and suppress the matching click before Vditor can
+        // transfer that caret into hidden source.
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        suppressNextAtomicClick = true
+        return true
+      }
+
       return false
     },
     onClick: (event) => {
       const target = event.target instanceof Element ? event.target : null
+      if (suppressNextAtomicClick) {
+        suppressNextAtomicClick = false
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        return true
+      }
       if (
         target &&
         pendingSideClick &&
@@ -655,46 +798,42 @@ export function initWysiwygCodeBlocks(): void {
       const atomicBlock = isAtomicBlock(atomicCandidate)
         ? atomicCandidate
         : null
-      if (target && atomicBlock?.dataset.type === 'html-block') {
-        const interactive = target.closest(INTERACTIVE_BLOCK_SELECTOR)
+      const codeBlock = atomicBlock?.dataset.type === 'code-block'
+        ? atomicBlock
+        : null
+      const parts = codeBlock ? getCodeBlockParts(codeBlock) : null
+      if (target && parts) {
+        if (target.closest('.vditor-copy')) return false
+        const editButton = target.closest(
+          `.${WYSIWYG_SOURCE_EDIT_BUTTON_CLASS}`
+        )
+        if (editButton) {
+          event.preventDefault()
+          event.stopImmediatePropagation()
+          openEditor(parts, 'content')
+          return true
+        }
+      }
+
+      if (target && atomicBlock) {
         const preview = atomicBlock.querySelector<HTMLElement>(
           ':scope > .vditor-wysiwyg__preview'
         )
-        if (
-          (!interactive || !atomicBlock.contains(interactive)) &&
-          preview?.contains(target)
-        ) {
-          // Keep Chromium's native caret/text selection in rendered HTML, but
-          // do not let Vditor move it into serializer-owned hidden source.
+        if (preview?.contains(target)) {
+          const interactive = target.closest(INTERACTIVE_BLOCK_SELECTOR)
+          if (interactive && atomicBlock.contains(interactive)) {
+            // A preview-level bubbling guard preserves the target's own click
+            // and default action, then stops Vditor at the editor root.
+            return false
+          }
+          // Rendered block content remains selectable/readable, but ordinary
+          // clicks never reveal source or open an editor.
           event.stopImmediatePropagation()
           return true
         }
       }
 
-      const block = atomicBlock?.dataset.type === 'code-block'
-        ? atomicBlock
-        : null
-      const parts = block ? getCodeBlockParts(block) : null
-      if (!target || !parts) return false
-
-      if (target.closest('.vditor-copy')) return false
-      const editButton = target.closest(
-        `.${WYSIWYG_SOURCE_EDIT_BUTTON_CLASS}`
-      )
-      if (!editButton) {
-        if (parts.preview.contains(target)) {
-          // Code and rich-render previews stay interactive/readable but never
-          // open serializer-owned source without the explicit edit action.
-          event.stopImmediatePropagation()
-          return true
-        }
-        return false
-      }
-
-      event.preventDefault()
-      event.stopImmediatePropagation()
-      openEditor(parts, 'content')
-      return true
+      return false
     },
     onKeydown: (event) => {
       if (event.isComposing) return false
@@ -754,6 +893,29 @@ export function initWysiwygCodeBlocks(): void {
       }
       return false
     },
+    onKeyup: (event) => {
+      if (
+        event.key !== 'ArrowDown' &&
+        event.key !== 'ArrowRight' &&
+        event.key !== 'ArrowLeft' &&
+        event.key !== 'ArrowUp' &&
+        event.key !== 'Backspace'
+      ) {
+        return false
+      }
+      const target = event.target instanceof Element ? event.target : null
+      if (target?.closest(ATOMIC_BLOCK_SELECTOR)) {
+        // Preview-level bubbling guards run after target handlers.
+        return false
+      }
+      const selection = window.getSelection()
+      const range = selection?.rangeCount === 1
+        ? selection.getRangeAt(0)
+        : null
+      if (!range || !codeBlockAtRange(range)) return false
+      event.stopImmediatePropagation()
+      return true
+    },
     onSelectionChange: () => {
       const selection = window.getSelection()
       const range = selection?.rangeCount === 1
@@ -785,6 +947,8 @@ export function initWysiwygCodeBlocks(): void {
     },
     dispose: () => {
       pendingSideClick = null
+      suppressNextAtomicClick = false
+      clearPreviewGuards()
       clearCodeBlockSelection()
     },
   })

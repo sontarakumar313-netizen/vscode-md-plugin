@@ -11,6 +11,7 @@ export interface WysiwygDomFeature {
   onPointerDown?: RootEventHandler<PointerEvent>
   onClick?: RootEventHandler<MouseEvent>
   onKeydown?: RootEventHandler<KeyboardEvent>
+  onKeyup?: RootEventHandler<KeyboardEvent>
   onSelectionChange?: RootEventHandler<Event>
   dispose?(): void
 }
@@ -34,7 +35,11 @@ function runRootHandlers<EventType extends Event>(
   event: EventType,
   handler: keyof Pick<
     WysiwygDomFeature,
-    'onPointerDown' | 'onClick' | 'onKeydown' | 'onSelectionChange'
+    | 'onPointerDown'
+    | 'onClick'
+    | 'onKeydown'
+    | 'onKeyup'
+    | 'onSelectionChange'
   >
 ): void {
   const currentRoot = root
@@ -57,6 +62,10 @@ function onRootClick(event: MouseEvent): void {
 
 function onRootKeydown(event: KeyboardEvent): void {
   runRootHandlers(event, 'onKeydown')
+}
+
+function onRootKeyup(event: KeyboardEvent): void {
+  runRootHandlers(event, 'onKeyup')
 }
 
 function onSelectionChange(event: Event): void {
@@ -82,6 +91,7 @@ function unbindRoot(): void {
   root.removeEventListener('pointerdown', onRootPointerDown, true)
   root.removeEventListener('click', onRootClick, true)
   root.removeEventListener('keydown', onRootKeydown, true)
+  root.removeEventListener('keyup', onRootKeyup, true)
   root = null
 }
 
@@ -135,6 +145,7 @@ export function rebindWysiwygDom(): void {
   root.addEventListener('pointerdown', onRootPointerDown, true)
   root.addEventListener('click', onRootClick, true)
   root.addEventListener('keydown', onRootKeydown, true)
+  root.addEventListener('keyup', onRootKeyup, true)
   observer = new MutationObserver(requestAllRefreshes)
   observer.observe(root, {
     childList: true,

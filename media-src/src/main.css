@@ -177,6 +177,7 @@ body,
 textarea.vmd-source-popover__input {
   min-height: 9em;
   max-height: 52vh;
+  overflow: auto;
   resize: vertical;
   tab-size: 2;
   white-space: pre;

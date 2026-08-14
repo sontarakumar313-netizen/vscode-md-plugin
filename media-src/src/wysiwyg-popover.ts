@@ -465,11 +465,20 @@ function queueActivePopoverPosition(): void {
       } else if (placement === 'html-block') {
         popover.style.removeProperty('transform')
         const aboveBottom = targetRect.top - gap
+        const belowTop = targetRect.bottom + gap
         const aboveSpace = Math.max(0, aboveBottom - visibleTop)
-        if (popoverHeight > aboveSpace) {
+        const belowSpace = Math.max(0, visibleBottom - belowTop)
+        // Raw HTML commonly appears at the start of README files. Always
+        // forcing its editor above the block reduced the panel to a thin,
+        // awkward scroll area there even though most of the viewport was free
+        // below it. Prefer the larger side; ties retain the established
+        // above-target placement.
+        const above = aboveSpace >= belowSpace
+        const chosenSpace = above ? aboveSpace : belowSpace
+        if (popoverHeight > chosenSpace) {
           popover.style.setProperty(
             '--vmd-source-popover-available-height',
-            `${Math.max(1, aboveSpace)}px`
+            `${Math.max(1, chosenSpace)}px`
           )
           popoverRect = popover.getBoundingClientRect()
           popoverWidth = popoverRect.width
@@ -480,8 +489,10 @@ function queueActivePopoverPosition(): void {
           visibleLeft,
           visibleRight - popoverWidth
         )
-        viewportTop = aboveBottom - popoverHeight
-        popover.dataset.vmdPosition = 'above'
+        viewportTop = above
+          ? aboveBottom - popoverHeight
+          : belowTop
+        popover.dataset.vmdPosition = above ? 'above' : 'below'
       } else if (placement === 'math-block') {
         popover.style.removeProperty('transform')
         if (placeMathOnLeft) {

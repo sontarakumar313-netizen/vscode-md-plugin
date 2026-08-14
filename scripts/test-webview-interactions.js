@@ -136,6 +136,31 @@ function testPage() {
       selection.removeAllRanges();
       selection.addRange(range);
     };
+    const atomicBlockSelector = [
+      '.vditor-wysiwyg__block[data-type="code-block"]',
+      '.vditor-wysiwyg__block[data-type="math-block"]',
+      '.vditor-wysiwyg__block[data-type="html-block"]',
+    ].join(', ');
+    const atomicGapPoint = (block, side) => {
+      const rect = block.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      for (let distance = 1; distance <= 32; distance += 1) {
+        const y = side === 'above' ? rect.top - distance : rect.bottom + distance;
+        const hit = document.elementFromPoint(x, y);
+        const pointRange = document.caretRangeFromPoint?.(x, y);
+        const pointElement = pointRange?.startContainer instanceof Element
+          ? pointRange.startContainer
+          : pointRange?.startContainer?.parentElement;
+        if (
+          hit &&
+          pointElement?.closest(atomicBlockSelector) === block &&
+          !block.contains(hit)
+        ) {
+          return { hit, x, y };
+        }
+      }
+      return null;
+    };
     const selectTextOccurrence = (element, query, collapseAtEnd = false) => {
       const nodes = [];
       const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
@@ -412,6 +437,26 @@ function testPage() {
         mathPreview.click();
         await pause(60);
         let sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        expect(
+          sourcePopover?.style.display !== 'block' &&
+            getComputedStyle(mathSource).display === 'none',
+          'ordinary display-formula clicking opened or exposed source'
+        );
+        mathPreview.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          button: 2,
+          clientX: 80,
+          clientY: 80,
+        }));
+        await pause();
+        const mathContextEdit = document.querySelector(
+          '#vmd-block-context-menu button[data-type="edit-block-source"]'
+        );
+        expect(mathContextEdit, 'the display-formula context menu has no explicit edit action');
+        mathContextEdit.click();
+        await pause(60);
+        sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
         let sourcePopoverRect = sourcePopover.getBoundingClientRect();
         const wysiwygElement = sourcePopover.parentElement;
         const visibleMathBounds = () => {
@@ -502,6 +547,80 @@ function testPage() {
             sourcePopover.style.display === 'none',
           'Escape exposed formula source or failed to close its popover'
         );
+
+        const gapCodeBlock = root().querySelector(
+          '.vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        const gapCaretContainer = root();
+        const gapCaretOffset = 0;
+        const testedAtomicGapSides = new Set();
+        for (const [label, block] of [
+          ['code', gapCodeBlock],
+          ['display formula', mathBlock],
+        ]) {
+          let testedBlockGaps = 0;
+          for (const side of ['above', 'below']) {
+            const point = atomicGapPoint(block, side);
+            if (!point) continue;
+            testedBlockGaps += 1;
+            testedAtomicGapSides.add(side);
+            select(
+              gapCaretContainer,
+              gapCaretOffset,
+              gapCaretContainer,
+              gapCaretOffset
+            );
+            const gapPointerDown = new PointerEvent('pointerdown', {
+              bubbles: true,
+              cancelable: true,
+              button: 0,
+              clientX: point.x,
+              clientY: point.y,
+              pointerType: 'mouse',
+            });
+            point.hit.dispatchEvent(gapPointerDown);
+            const gapClick = new MouseEvent('click', {
+              bubbles: true,
+              cancelable: true,
+              button: 0,
+              clientX: point.x,
+              clientY: point.y,
+            });
+            point.hit.dispatchEvent(gapClick);
+            const gapRange = window.getSelection()?.getRangeAt(0);
+            expect(
+              gapPointerDown.defaultPrevented &&
+                gapClick.defaultPrevented &&
+                gapRange?.collapsed &&
+                gapRange.startContainer === gapCaretContainer &&
+                gapRange.startOffset === gapCaretOffset &&
+                getComputedStyle(
+                  block.querySelector(':scope > pre:not(.vditor-wysiwyg__preview)')
+                ).display === 'none',
+              'clicking the ' + side + ' ' + label +
+                ' gap changed the caret or exposed source: ' + JSON.stringify({
+                  pointerPrevented: gapPointerDown.defaultPrevented,
+                  clickPrevented: gapClick.defaultPrevented,
+                  rangeContainer: gapRange?.startContainer.parentElement?.outerHTML?.slice(0, 300),
+                  rangeOffset: gapRange?.startOffset,
+                  expectedOffset: gapCaretOffset,
+                  sourceDisplay: getComputedStyle(
+                    block.querySelector(':scope > pre:not(.vditor-wysiwyg__preview)')
+                  ).display,
+                  point: { x: point.x, y: point.y, target: point.hit.outerHTML?.slice(0, 300) },
+                })
+            );
+          }
+          expect(
+            testedBlockGaps > 0,
+            'the fixture exposed no external gap for the ' + label + ' block'
+          );
+        }
+        expect(
+          testedAtomicGapSides.has('above') && testedAtomicGapSides.has('below'),
+          'the atomic gap fixtures did not cover both vertical sides'
+        );
+
         let codeBlock = root().querySelector(
           '.vditor-wysiwyg__block[data-type="code-block"]'
         );
@@ -541,11 +660,29 @@ function testPage() {
 
         codeLanguageLabel.click();
         codePreviewCode.click();
+        const codePreviewText = textNode(codePreviewCode);
+        select(codePreviewText, 2, codePreviewText, 2);
+        codePreviewCode.dispatchEvent(new KeyboardEvent('keyup', {
+          key: 'ArrowRight',
+          bubbles: true,
+          cancelable: true,
+        }));
+        // Arrow-key default handling can move Selection into a preview while
+        // keyup still targets the paragraph/root where keydown began.
+        gapCaretContainer.dispatchEvent(new KeyboardEvent('keyup', {
+          key: 'ArrowDown',
+          bubbles: true,
+          cancelable: true,
+        }));
         await pause();
         sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        const guardedCodeRange = window.getSelection()?.getRangeAt(0);
         expect(
-          sourcePopover?.style.display !== 'block',
-          'clicking the code language or content opened the source popover'
+          sourcePopover?.style.display !== 'block' &&
+            getComputedStyle(codeSource).display === 'none' &&
+            guardedCodeRange?.collapsed &&
+            codePreviewCode.contains(guardedCodeRange.startContainer),
+          'ordinary code interaction or arrow-key release exposed source'
         );
         codeEditButton.click();
         await pause();
@@ -701,7 +838,7 @@ function testPage() {
         // popover while serializer-owned source remains out of layout.
         await setMarkdown(
           '# <p align="center">Centered title</p>\\n\\n' +
-            '<p align="center">Selectable HTML <a href="https://example.com/raw" target="_blank"><img src="assets/raw.png" alt="raw"></a></p>\\n\\n' +
+            '<p align="center">Selectable HTML <a href="https://example.com/raw" target="_blank"><img src="assets/raw.png" alt="raw"></a><button type="button">Action</button></p>\\n\\n' +
             'Inline $x$ and &copy; and <span>word</span>.'
         );
         await pause(160);
@@ -712,6 +849,37 @@ function testPage() {
         const htmlSource = htmlBlock.querySelector(':scope > pre:not(.vditor-wysiwyg__preview)');
         const htmlPreview = htmlBlock.querySelector(':scope > .vditor-wysiwyg__preview');
         const htmlBlockRect = htmlBlock.getBoundingClientRect();
+        const htmlTopGap = atomicGapPoint(htmlBlock, 'above');
+        expect(htmlTopGap, 'the raw HTML fixture exposed no upper block gap');
+        const htmlGapCaretContainer = root();
+        select(htmlGapCaretContainer, 0, htmlGapCaretContainer, 0);
+        const htmlGapPointerDown = new PointerEvent('pointerdown', {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          clientX: htmlTopGap.x,
+          clientY: htmlTopGap.y,
+          pointerType: 'mouse',
+        });
+        htmlTopGap.hit.dispatchEvent(htmlGapPointerDown);
+        const htmlGapClick = new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          clientX: htmlTopGap.x,
+          clientY: htmlTopGap.y,
+        });
+        htmlTopGap.hit.dispatchEvent(htmlGapClick);
+        const htmlGapRange = window.getSelection()?.getRangeAt(0);
+        expect(
+          htmlGapPointerDown.defaultPrevented &&
+            htmlGapClick.defaultPrevented &&
+            htmlGapRange?.collapsed &&
+            htmlGapRange.startContainer === htmlGapCaretContainer &&
+            htmlGapRange.startOffset === 0 &&
+            getComputedStyle(htmlSource).display === 'none',
+          'clicking the raw HTML upper gap changed the caret or exposed source'
+        );
         expect(
           centeredHeading.classList.contains('vmd-html-align-center') &&
             Array.from(centeredHeading.querySelectorAll('code[data-type="html-inline"]')).every(
@@ -776,6 +944,20 @@ function testPage() {
               preview: htmlPreview?.outerHTML.slice(0, 1500),
             })
         );
+        const rawHtmlButton = htmlPreview.querySelector('button');
+        let rawHtmlButtonClicks = 0;
+        rawHtmlButton.addEventListener('click', () => {
+          rawHtmlButtonClicks += 1;
+        });
+        rawHtmlButton.click();
+        await pause();
+        expect(
+          rawHtmlButtonClicks === 1 &&
+            getComputedStyle(htmlSource).display === 'none' &&
+            document.querySelector('.vmd-source-popover')?.style.display !== 'block',
+          'blocking Vditor preview clicks also blocked an HTML control or exposed source'
+        );
+
         const htmlRightEdge = new PointerEvent('pointerdown', {
           bubbles: true,
           cancelable: true,
@@ -843,13 +1025,53 @@ function testPage() {
         const htmlPreviewRect = htmlPreview.getBoundingClientRect();
         expect(
           htmlInput?.value.includes('<p align="center">') &&
-            sourcePopover.dataset.vmdPosition === 'above' &&
+            sourcePopover.dataset.vmdPosition === 'below' &&
             Math.abs(htmlPopoverRect.left - htmlPreviewRect.left) <= 2 &&
-            Math.abs(htmlPopoverRect.bottom - htmlPreviewRect.top + 6) <= 2 &&
+            Math.abs(htmlPopoverRect.top - htmlPreviewRect.bottom - 6) <= 2 &&
+            sourcePopover.scrollHeight <= sourcePopover.clientHeight + 1 &&
             getComputedStyle(htmlSource).display === 'none',
-          'the HTML context-menu action did not open sanitized source editing'
+          'the HTML context-menu action did not use the larger lower area without clipping: ' +
+            JSON.stringify({
+              position: sourcePopover?.dataset.vmdPosition,
+              popover: htmlPopoverRect,
+              preview: htmlPreviewRect,
+              clientHeight: sourcePopover?.clientHeight,
+              scrollHeight: sourcePopover?.scrollHeight,
+            })
         );
-        htmlInput.value = htmlInput.value.replace('align="center"', 'align="right"');
+        const rightAlignedHtmlSource = htmlInput.value.replace(
+          'align="center"',
+          'align="right"'
+        );
+        const longScrollableHtmlSource = lines(
+          '<div>',
+          ...Array.from(
+            { length: 32 },
+            (_, index) => '<span>HTML source line ' + index + '</span>'
+          ),
+          '</div>'
+        );
+        htmlInput.value = longScrollableHtmlSource;
+        htmlInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'long source' }));
+        await pause(80);
+        const htmlInputScrollRange = htmlInput.scrollHeight - htmlInput.clientHeight;
+        htmlInput.scrollTop = htmlInput.scrollHeight;
+        expect(
+          sourcePopover.dataset.vmdPosition === 'below' &&
+            getComputedStyle(htmlInput).overflowY === 'auto' &&
+            htmlInputScrollRange > 0 &&
+            htmlInput.scrollTop > 0 &&
+            htmlPreview.textContent.includes('HTML source line 31'),
+          'a long HTML source editor could not scroll downward while refreshing its preview: ' +
+            JSON.stringify({
+              position: sourcePopover?.dataset.vmdPosition,
+              overflow: getComputedStyle(htmlInput).overflowY,
+              clientHeight: htmlInput?.clientHeight,
+              scrollHeight: htmlInput?.scrollHeight,
+              scrollTop: htmlInput?.scrollTop,
+            })
+        );
+        htmlInput.value = rightAlignedHtmlSource;
         htmlInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'right' }));
         await pause(80);
         expect(
@@ -3568,6 +3790,36 @@ function testPage() {
           'pasting copied whole-block plain text did not recreate the same code block: ' +
             JSON.stringify(window.vditor.getValue())
         );
+
+        const adjacentProtectedMarkdown = protectedCodeMarkdown + '\\n\\nafter protected block';
+        await setMarkdown(adjacentProtectedMarkdown);
+        protectedCodeBlock = root().querySelector(
+          ':scope > .vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        const adjacentParagraph = protectedCodeBlock.nextElementSibling;
+        const adjacentText = textNode(adjacentParagraph);
+        select(adjacentText, 0, adjacentText, 0);
+        const adjacentBackspace = new KeyboardEvent('keydown', {
+          key: 'Backspace',
+          bubbles: true,
+          cancelable: true,
+        });
+        adjacentText.dispatchEvent(adjacentBackspace);
+        await pause(80);
+        expect(
+          adjacentBackspace.defaultPrevented &&
+            protectedCodeBlock.classList.contains('vmd-code-block--selected') &&
+            getComputedStyle(
+              protectedCodeBlock.querySelector(':scope > pre:not(.vditor-wysiwyg__preview)')
+            ).display === 'none' &&
+            window.vditor.getValue().replace(/\\n+$/, '') === adjacentProtectedMarkdown,
+          'Backspace at text immediately after an atomic block revealed its hidden source'
+        );
+        root().dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }));
 
         await setMarkdown(protectedCodeMarkdown);
         protectedCodeBlock = root().querySelector(

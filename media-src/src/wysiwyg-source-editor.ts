@@ -102,7 +102,7 @@ function validateInlineHtml(value: string): boolean {
   )
 }
 
-/** Moves formula, raw HTML, inline HTML and entity source into the shared popover. */
+/** Moves serializer-owned source into the shared explicit editing popover. */
 export function initWysiwygSourceEditors(): void {
   let writing = false
   let suppressedInlineClick: HTMLElement | null = null
@@ -293,7 +293,6 @@ export function initWysiwygSourceEditors(): void {
   }
 
   const directlyEditableOwnerSelector =
-    '.vditor-wysiwyg__block[data-type="math-block"], ' +
     'span.vditor-wysiwyg__block[data-type="math-inline"], ' +
     'span.vditor-wysiwyg__block[data-type="html-entity"]'
 
