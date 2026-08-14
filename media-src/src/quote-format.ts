@@ -9,6 +9,12 @@ export const ALERT_TYPES = [
 export type AlertType = (typeof ALERT_TYPES)[number]
 export type QuoteType = AlertType | null
 
+export function normalizeAlertType(value: unknown): AlertType | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.toUpperCase()
+  return ALERT_TYPES.find((type) => type === normalized) || null
+}
+
 export interface SourceLine {
   start: number
   end: number
@@ -28,8 +34,37 @@ export interface QuoteSourceChange {
   targetSourceOffset: number
 }
 
-const ALERT_MARKER = /^>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*$/
-const QUOTE_PREFIX = /^> ?/
+const ALERT_MARKER = /^ {0,3}>[ \t]{0,4}\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*$/i
+const QUOTE_PREFIX = /^ {0,3}> ?/
+const SETEXT_UNDERLINE = /^ {0,3}(?:=+|-+)[ \t]*$/
+const BLOCK_START = /^ {0,3}(?:#{1,6}(?:[ \t]+|$)|(?:[-+*]|\d+[.)])[ \t]+|`{3,}|~{3,}|<|>)/
+const LIST_ITEM = /^( {0,3})(?:[-+*]|\d+[.)])[ \t]+/
+const DETAILS_TAG = /<\/?details(?:\s[^>]*)?>/gi
+
+function alertMarkerType(line: string): AlertType | null {
+  return normalizeAlertType(ALERT_MARKER.exec(line)?.[1])
+}
+
+function quoteLineContent(line: string): string {
+  return line.replace(QUOTE_PREFIX, '')
+}
+
+function opensLazyParagraph(line: SourceLine): boolean {
+  const content = quoteLineContent(line.text)
+  return Boolean(content.trim()) && !BLOCK_START.test(content)
+}
+
+function hasAlertBody(lines: SourceLine[]): boolean {
+  if (lines.length < 2) return false
+  const firstBodyLine = quoteLineContent(lines[1].text)
+  if (SETEXT_UNDERLINE.test(firstBodyLine)) return false
+  const body = lines
+    .slice(1)
+    .map((line) => quoteLineContent(line.text))
+    .join('\n')
+    .replace(/<!--[\s\S]*?-->/g, '')
+  return Boolean(body.trim())
+}
 
 export function sourceLineAt(source: string, offset: number): SourceLine {
   const safeOffset = Math.min(Math.max(0, offset), source.length)
@@ -45,7 +80,7 @@ function nextSourceLine(source: string, line: SourceLine): SourceLine | null {
 }
 
 function isQuoteLine(line: SourceLine): boolean {
-  return line.text.startsWith('>')
+  return QUOTE_PREFIX.test(line.text)
 }
 
 export function findQuoteBlocks(source: string): QuoteBlock[] {
@@ -62,20 +97,25 @@ export function findQuoteBlocks(source: string): QuoteBlock[] {
 
     const lines: SourceLine[] = []
     const start = line.start
-    while (isQuoteLine(line)) {
+    let lazyParagraphOpen = false
+    while (isQuoteLine(line) || (lazyParagraphOpen && Boolean(line.text.trim()))) {
+      const explicitQuoteLine = isQuoteLine(line)
       lines.push(line)
+      lazyParagraphOpen = explicitQuoteLine
+        ? opensLazyParagraph(line)
+        : Boolean(line.text.trim())
       const next = nextSourceLine(source, line)
       if (!next) break
       line = next
     }
 
     const first = lines[0]
-    const marker = ALERT_MARKER.exec(first.text)
+    const markerType = alertMarkerType(first.text)
     const last = lines[lines.length - 1]
     blocks.push({
       start,
       end: last.end,
-      type: marker ? (marker[1] as AlertType) : null,
+      type: markerType && hasAlertBody(lines) ? markerType : null,
       lines,
     })
 
@@ -90,7 +130,6 @@ export function findQuoteBlockAt(
   offset: number
 ): QuoteBlock | null {
   const line = sourceLineAt(source, offset)
-  if (!isQuoteLine(line)) return null
   return (
     findQuoteBlocks(source).find(
       (block) => line.start >= block.start && line.start <= block.end
@@ -112,6 +151,50 @@ export function quoteDepth(line: string): number {
     result = result.replace(QUOTE_PREFIX, '')
   }
   return depth
+}
+
+function isInsideDetails(source: string, offset: number): boolean {
+  const prefix = source.slice(0, offset)
+  let depth = 0
+  for (const match of prefix.matchAll(DETAILS_TAG)) {
+    depth += /^<\/details/i.test(match[0]) ? -1 : 1
+    depth = Math.max(0, depth)
+  }
+  return depth > 0
+}
+
+/** Whether the Alert toolbar can produce a top-level GitHub Alert here. */
+export function isTopLevelAlertLocation(
+  source: string,
+  lineStart: number
+): boolean {
+  const line = sourceLineAt(source, lineStart)
+  const depth = quoteDepth(line.text)
+  if (depth > 1 || isInsideDetails(source, line.start)) return false
+
+  const content = stripQuotePrefixes(line.text)
+  if (LIST_ITEM.test(content)) return false
+
+  const currentIndent = /^ */.exec(line.text)?.[0].length || 0
+  let previous = line.start > 0
+    ? sourceLineAt(source, line.start - 1)
+    : null
+  while (previous && previous.text.trim()) {
+    const previousContent = stripQuotePrefixes(previous.text)
+    const list = LIST_ITEM.exec(previousContent)
+    const previousIndent = /^ */.exec(previous.text)?.[0].length || 0
+    if (
+      list &&
+      quoteDepth(previous.text) === depth &&
+      previousIndent + list[1].length < currentIndent
+    ) {
+      return false
+    }
+    previous = previous.start > 0
+      ? sourceLineAt(source, previous.start - 1)
+      : null
+  }
+  return true
 }
 
 function replaceSourceRange(

@@ -19,6 +19,7 @@ compiledModule._compile(compiledSource, sourcePath)
 const {
   adjustPlainQuoteDepthAt,
   findQuoteBlockAt,
+  isTopLevelAlertLocation,
   sourceLineAt,
   toggleDefaultAlertAt,
   toggleQuoteAt,
@@ -106,6 +107,56 @@ assert.strictEqual(
   )),
   '> [!NOTE]\n> first\n\n> [!TIP]\n> second',
   'switching a repeated Alert type must change the block at the caret'
+)
+
+const lowercaseAlert = '> [!note]\n> lowercase body'
+assert.strictEqual(
+  findQuoteBlockAt(lowercaseAlert, lowercaseAlert.indexOf('body'))?.type,
+  'NOTE',
+  'GitHub Alert types must be recognized case-insensitively'
+)
+
+const markerOnly = '> [!NOTE]'
+assert.strictEqual(
+  findQuoteBlockAt(markerOnly, 0)?.type,
+  null,
+  'an Alert marker without body content must remain a plain quote'
+)
+
+const lazyAlert = '> [!WaRnInG]\nlazy body'
+const lazyBlock = findQuoteBlockAt(lazyAlert, lazyAlert.indexOf('body'))
+assert.strictEqual(
+  lazyBlock?.type,
+  'WARNING',
+  'a GitHub Alert must include a lazy-continuation body line'
+)
+assert.strictEqual(
+  lazyBlock?.lines.length,
+  2,
+  'the lazy-continuation body must belong to the source Alert block'
+)
+
+assert.strictEqual(
+  isTopLevelAlertLocation('> > [!NOTE]\n> > nested body', 0),
+  false,
+  'the Alert toolbar must reject a nested quote location'
+)
+const detailsAlert = '<details>\n\ninside details\n\n</details>'
+assert.strictEqual(
+  isTopLevelAlertLocation(detailsAlert, detailsAlert.indexOf('inside')),
+  false,
+  'the Alert toolbar must reject a details location'
+)
+const listAlert = '- item\n  continued item'
+assert.strictEqual(
+  isTopLevelAlertLocation(listAlert, listAlert.indexOf('continued')),
+  false,
+  'the Alert toolbar must reject a list continuation location'
+)
+assert.strictEqual(
+  isTopLevelAlertLocation('   > [!NOTE]\n   > body', 0),
+  true,
+  'an indented top-level blockquote must remain eligible for Alert toggling'
 )
 
 const multiLine = '> first\n> second'

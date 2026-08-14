@@ -2013,7 +2013,8 @@ function testPage() {
         for (const [index, alert] of renderedAlerts.entries()) {
           expect(alert.dataset.vmdAlert === alertTypes[index], 'GitHub Alert type was decorated incorrectly');
           const title = alert.querySelector('.vmd-alert-title');
-          expect(title?.textContent === alertTypes[index], 'GitHub Alert title is missing');
+          const expectedTitle = alertTypes[index][0] + alertTypes[index].slice(1).toLowerCase();
+          expect(title?.textContent === expectedTitle, 'GitHub Alert title is missing');
           expect(
             title?.getAttribute('aria-haspopup') === 'menu',
             'GitHub Alert title does not expose its type menu'
@@ -2038,6 +2039,108 @@ function testPage() {
           getComputedStyle(alertTypeMenu).display === 'none' &&
             window.vditor.getValue() === serializedAlerts,
           'Escape did not close the Alert type menu without changing Markdown'
+        );
+
+        await setMarkdown(
+          '>[!note]\\n>lowercase body\\n\\n' +
+            '> [!WaRnInG]\\n> mixed-case body\\n\\n' +
+            '   >    [!TiP]\\n   > indented body\\n\\n' +
+            '> [!important]  \\n> hard-break body'
+        );
+        await pause(80);
+        const caseInsensitiveAlerts = root().querySelectorAll(':scope > blockquote.vmd-alert');
+        expect(
+          caseInsensitiveAlerts.length === 4 &&
+            caseInsensitiveAlerts[0].dataset.vmdAlert === 'NOTE' &&
+            caseInsensitiveAlerts[1].dataset.vmdAlert === 'WARNING' &&
+            caseInsensitiveAlerts[2].dataset.vmdAlert === 'TIP' &&
+            caseInsensitiveAlerts[3].dataset.vmdAlert === 'IMPORTANT',
+          'GitHub-compatible case-insensitive Alert markers were not recognized'
+        );
+        expect(
+          caseInsensitiveAlerts[0].querySelector(':scope > .vmd-alert-title')?.textContent === 'Note' &&
+            caseInsensitiveAlerts[1].querySelector(':scope > .vmd-alert-title')?.textContent === 'Warning',
+          'case-insensitive Alert markers did not use canonical display titles'
+        );
+        expect(
+          window.vditor.getValue().includes('[!note]') &&
+            window.vditor.getValue().includes('[!WaRnInG]'),
+          'recognizing a case-insensitive Alert marker changed its Markdown spelling'
+        );
+        await selectAlertType(caseInsensitiveAlerts[0], 'TIP');
+        expect(
+          window.vditor.getValue().includes('[!TIP]') &&
+            !window.vditor.getValue().includes('[!note]'),
+          'switching a lowercase Alert type did not write the canonical uppercase marker'
+        );
+
+        for (const invalidAlertMarkdown of [
+          '> [!NOTE]',
+          '> [!NOTE]\\n>   ',
+          '> [!NOTE] body',
+          '> [!UNKNOWN]\\n> body',
+          '> intro\\n> [!NOTE]\\n> body',
+          '> [!NOTE]\\n> <!-- comment only -->',
+          '>     [!NOTE]\\n> body',
+          '    > [!NOTE]\\n    > body',
+        ]) {
+          await setMarkdown(invalidAlertMarkdown);
+          await pause(80);
+          expect(
+            !root().querySelector('.vmd-alert') &&
+              root().textContent.includes('[!'),
+            'Markdown rendered as an Alert even though GitHub treats it as a plain quote: ' +
+              JSON.stringify(invalidAlertMarkdown)
+          );
+        }
+
+        await setMarkdown('> > [!NOTE]\\n> > nested quote body\\n\\n- > [!TIP]\\n  > nested list body');
+        await pause(80);
+        expect(
+          !root().querySelector('.vmd-alert') &&
+            root().querySelector('blockquote blockquote') &&
+            root().querySelector('li blockquote'),
+          'an Alert nested in a quote or list was not left as a plain blockquote'
+        );
+        const nestedAlertSource = window.vditor.getValue();
+        selectTextOccurrence(root(), 'nested quote body', true);
+        document.querySelector('.vditor-toolbar [data-type="vmd-alert"]').click();
+        await pause(80);
+        expect(
+          window.vditor.getValue() === nestedAlertSource,
+          'the Alert toolbar changed Markdown from a nested quote position'
+        );
+
+        await setMarkdown(
+          '<details open>\\n<summary>Nested Alert</summary>\\n\\n' +
+            '> [!IMPORTANT]\\n> details body\\n\\n</details>'
+        );
+        await pause(80);
+        const detailsAlertQuote = root().querySelector(':scope > blockquote');
+        expect(
+          detailsAlertQuote?.classList.contains('vmd-details-content--open') &&
+            !detailsAlertQuote.classList.contains('vmd-alert'),
+          'an Alert inside details was not left as a plain blockquote'
+        );
+        const detailsAlertSource = window.vditor.getValue();
+        selectTextOccurrence(detailsAlertQuote, 'details body', true);
+        document.querySelector('.vditor-toolbar [data-type="vmd-alert"]').click();
+        await pause(80);
+        expect(
+          window.vditor.getValue() === detailsAlertSource,
+          'the Alert toolbar changed Markdown from inside details'
+        );
+
+        await setMarkdown(
+          '> [!warning]\\nlazy continuation body\\n\\n' +
+            '> [!TIP]\\n> # heading body\\n\\n' +
+            '> [!CAUTION]\\n> ' + markerFence + '\\n> ' + markerFence + '\\n\\n' +
+            '> [!IMPORTANT]\\n> <!-- ignored comment -->\\n> visible body'
+        );
+        await pause(80);
+        expect(
+          root().querySelectorAll(':scope > blockquote.vmd-alert').length === 4,
+          'GitHub-supported lazy, heading, code, or comment-plus-content Alert bodies were rejected'
         );
 
         await setMarkdown('selected alert body');
@@ -2893,6 +2996,40 @@ function testPage() {
           svQuoteValue() === 'SV before\\n\\nSV current\\nSV after',
           'Split View active Alert did not toggle off in place: ' +
             JSON.stringify(window.vditor.getValue())
+        );
+
+        await setMarkdown('> > [!NOTE]\\n> > nested SV Alert body');
+        const nestedSvAlertText = findSvText('nested SV Alert body');
+        const nestedSvAlertOffset = nestedSvAlertText.data.indexOf('nested SV Alert body');
+        select(
+          nestedSvAlertText,
+          nestedSvAlertOffset,
+          nestedSvAlertText,
+          nestedSvAlertOffset
+        );
+        const nestedSvAlertSource = window.vditor.getValue();
+        alertButton.click();
+        await pause(80);
+        expect(
+          window.vditor.getValue() === nestedSvAlertSource,
+          'Split View Alert toolbar changed Markdown inside a nested quote'
+        );
+
+        await setMarkdown('<details>\\n\\nSV details Alert body\\n\\n</details>');
+        const detailsSvAlertText = findSvText('SV details Alert body');
+        const detailsSvAlertOffset = detailsSvAlertText.data.indexOf('SV details Alert body');
+        select(
+          detailsSvAlertText,
+          detailsSvAlertOffset,
+          detailsSvAlertText,
+          detailsSvAlertOffset
+        );
+        const detailsSvAlertSource = window.vditor.getValue();
+        alertButton.click();
+        await pause(80);
+        expect(
+          window.vditor.getValue() === detailsSvAlertSource,
+          'Split View Alert toolbar changed Markdown inside details'
         );
 
         await setMarkdown('SV plain Tab target');

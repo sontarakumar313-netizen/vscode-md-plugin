@@ -9,6 +9,7 @@ import {
 	restoreCaretAnchor,
 } from './caret-anchor'
 import { resolveDetailsSelectionRange } from './details-selection'
+import { findInnermostDetailsBlocks } from './wysiwyg-details'
 import { t } from './lang'
 import { getScrollElement } from './scroll-target'
 import {
@@ -18,7 +19,10 @@ import {
 	restoreEditorLineAnchor,
 	restoreSourceViewAnchor,
 } from './quote-caret'
-import { toggleDefaultAlertAt } from './quote-format'
+import {
+	isTopLevelAlertLocation,
+	toggleDefaultAlertAt,
+} from './quote-format'
 import type { QuoteSourceChange } from './quote-format'
 import { confirm } from './utils'
 import {
@@ -113,11 +117,33 @@ function applyQuoteSourceChange(
 	;(window as any).__vmdCommitProgrammaticEdit?.()
 }
 
+function canToggleTopLevelAlert(
+	source: string,
+	context: NonNullable<ReturnType<typeof getEditorSelectionContext>>
+): boolean {
+	if (context.mode !== 'wysiwyg') {
+		const caret = resolveCaretLine(source, context)
+		return Boolean(
+			caret && isTopLevelAlertLocation(source, caret.line.start)
+		)
+	}
+	const container = context.range.startContainer
+	const element = container instanceof Element
+		? container
+		: container.parentElement
+	if (!element || !context.root.contains(element)) return false
+	if (element.closest('li')) return false
+
+	const blockquote = element.closest<HTMLElement>('blockquote')
+	if (blockquote && blockquote.parentElement !== context.root) return false
+	return !findInnermostDetailsBlocks(context.root, element)
+}
+
 /** Creates a NOTE Alert, or removes the active Alert of any type. */
 function toggleDefaultAlert(editor: typeof window.vditor): void {
 	const source = String(editor.getValue?.() || '')
 	const context = getEditorSelectionContext(editor)
-	if (!context) return
+	if (!context || !canToggleTopLevelAlert(source, context)) return
 	const caret = resolveCaretLine(source, context)
 	if (!caret) return
 
