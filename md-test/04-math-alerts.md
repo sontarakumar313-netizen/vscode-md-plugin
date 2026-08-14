@@ -5,7 +5,7 @@
 预期：以下公式与正文位于同一行，且上下标不会导致异常的行高或背景色。
 
 - 勾股定理：$a^2 + b^2 = c^2$
-- 欧拉恒等式：$e^{i\pi} + 1 = 0$ dgxcvgx
+- 欧拉恒等式：$e^{i\pi} + 1 = 0$
 - 求和：$S_n = \sum_{k=1}^{n} k = \frac{n(n+1)}{2}$
 - 希腊字母：$\alpha, \beta, \gamma, \Delta, \Omega$
 - 行内矩阵：$A = \begin{pmatrix} a & b \\ c & d \end{pmatrix}$
@@ -80,14 +80,14 @@ P(A \mid B) = \frac{P(B \mid A)\,P(A)}{P(B)}
 
 > [!CAUTION] 阿斯蒂芬
 > 这是普通说明信息。
->
+> 
 > 第二段包含 **粗体**、*斜体*、`行内代码` 和 [链接](https://example.com)。
 
 ### 3.2 TIP
 
 > [!TIP]
 > 这是建议或小技巧。
->
+> 
 > - 技巧一：检查浅色主题
 > - 技巧二：检查深色主题
 
@@ -95,14 +95,14 @@ P(A \mid B) = \frac{P(B \mid A)\,P(A)}{P(B)}
 
 > [!NOTE] 水电费
 > 这是需要特别注意的重要信息。
->
+> 
 > 数学内容也应正常显示：$E = mc^2$。
 
 ### 3.4 WARNING
 
 > [!WARNING]
 > 这是警告信息。
->
+> 
 > ```bash
 > echo "alert 中的代码块"
 > ```
@@ -111,7 +111,7 @@ P(A \mid B) = \frac{P(B \mid A)\,P(A)}{P(B)}
 
 > [!CAUTION]
 > 这是表示潜在风险的提示信息。
->
+> 
 > 1. 阅读说明
 > 2. 备份数据
 > 3. 再执行操作
@@ -132,3 +132,4 @@ P(A \mid B) = \frac{P(B \mid A)\,P(A)}{P(B)}
 > 这是普通 Blockquote，没有 `[!TYPE]` 标记，不应获得 GitHub Alert 的标题或颜色。
 
 预期：NOTE、TIP、IMPORTANT、WARNING、CAUTION 五种类型具有不同图标或强调色；普通引用保持普通引用样式。
+

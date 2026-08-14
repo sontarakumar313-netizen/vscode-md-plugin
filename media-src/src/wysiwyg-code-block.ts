@@ -22,7 +22,6 @@ const ACTIONS_CLASS = 'vmd-code-toolbar__actions'
 const LANGUAGE_CLASS = 'vmd-code-language'
 const ZERO_WIDTH_SPACE = '\u200b'
 const SELECTED_CLASS = 'vmd-code-block--selected'
-const DRAG_THRESHOLD = 4
 const BLOCK_EDGE_WIDTH = 18
 const ATOMIC_BLOCK_SELECTOR = [
   '.vditor-wysiwyg__block[data-type="code-block"]',
@@ -415,44 +414,9 @@ function insertParagraphByCodeBlock(
 /** Edits fenced blocks and coordinates shared atomic-block caret/selection behavior. */
 export function initWysiwygCodeBlocks(): void {
   let writing = false
-  let richDrag: {
-    block: HTMLElement
-    moved: boolean
-    pointerId: number
-    startX: number
-    startY: number
-  } | null = null
   let pendingSideClick: HTMLElement | null = null
   const renderTimers = new WeakMap<HTMLElement, number>()
   const renderVersions = new WeakMap<HTMLElement, number>()
-
-  const onPointerMove = (event: PointerEvent): void => {
-    if (!richDrag || event.pointerId !== richDrag.pointerId) return
-    if (
-      Math.abs(event.clientX - richDrag.startX) >= DRAG_THRESHOLD ||
-      Math.abs(event.clientY - richDrag.startY) >= DRAG_THRESHOLD
-    ) {
-      richDrag.moved = true
-    }
-  }
-
-  const finishRichDrag = (event: PointerEvent): void => {
-    if (!richDrag || event.pointerId !== richDrag.pointerId) return
-    const completed = richDrag
-    richDrag = null
-    if (completed.moved && completed.block.isConnected) {
-      event.preventDefault()
-      selectCodeBlock(completed.block)
-    }
-  }
-
-  const cancelRichDrag = (event: PointerEvent): void => {
-    if (richDrag?.pointerId === event.pointerId) richDrag = null
-  }
-
-  document.addEventListener('pointermove', onPointerMove, true)
-  document.addEventListener('pointerup', finishRichDrag, true)
-  document.addEventListener('pointercancel', cancelRichDrag, true)
 
   function decorateBlock(block: HTMLElement): void {
     const parts = getCodeBlockParts(block)
@@ -640,7 +604,6 @@ export function initWysiwygCodeBlocks(): void {
   const registration = registerWysiwygDomFeature({
     refresh,
     beforeRebind: () => {
-      richDrag = null
       pendingSideClick = null
       clearCodeBlockSelection()
     },
@@ -665,26 +628,11 @@ export function initWysiwygCodeBlocks(): void {
       if (block && placement) {
         event.preventDefault()
         event.stopImmediatePropagation()
-        richDrag = null
         pendingSideClick = block
         placeCaretNextToBlock(block, placement)
         return true
       }
 
-      if (
-        event.button === 0 &&
-        block?.classList.contains(RICH_CLASS) &&
-        target &&
-        !target.closest(`.${TOOLBAR_CLASS}`)
-      ) {
-        richDrag = {
-          block,
-          moved: false,
-          pointerId: event.pointerId,
-          startX: event.clientX,
-          startY: event.clientY,
-        }
-      }
       return false
     },
     onClick: (event) => {
@@ -701,9 +649,31 @@ export function initWysiwygCodeBlocks(): void {
       }
       pendingSideClick = null
 
-      const block = target?.closest<HTMLElement>(
-        '.vditor-wysiwyg__block[data-type="code-block"]'
-      )
+      const atomicCandidate = target?.closest<HTMLElement>(
+        ATOMIC_BLOCK_SELECTOR
+      ) || null
+      const atomicBlock = isAtomicBlock(atomicCandidate)
+        ? atomicCandidate
+        : null
+      if (target && atomicBlock?.dataset.type === 'html-block') {
+        const interactive = target.closest(INTERACTIVE_BLOCK_SELECTOR)
+        const preview = atomicBlock.querySelector<HTMLElement>(
+          ':scope > .vditor-wysiwyg__preview'
+        )
+        if (
+          (!interactive || !atomicBlock.contains(interactive)) &&
+          preview?.contains(target)
+        ) {
+          // Keep Chromium's native caret/text selection in rendered HTML, but
+          // do not let Vditor move it into serializer-owned hidden source.
+          event.stopImmediatePropagation()
+          return true
+        }
+      }
+
+      const block = atomicBlock?.dataset.type === 'code-block'
+        ? atomicBlock
+        : null
       const parts = block ? getCodeBlockParts(block) : null
       if (!target || !parts) return false
 
@@ -814,12 +784,8 @@ export function initWysiwygCodeBlocks(): void {
       return false
     },
     dispose: () => {
-      richDrag = null
       pendingSideClick = null
       clearCodeBlockSelection()
-      document.removeEventListener('pointermove', onPointerMove, true)
-      document.removeEventListener('pointerup', finishRichDrag, true)
-      document.removeEventListener('pointercancel', cancelRichDrag, true)
     },
   })
 }

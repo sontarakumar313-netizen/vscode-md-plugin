@@ -51,6 +51,7 @@ import {
 } from './vditor-adapter'
 import { installStructuredTabPolicy } from './editor-tab-policy'
 import { initSplitScrollSync } from './split-scroll-sync'
+import { renderSplitPreviewPresentation } from './split-preview-presentation'
 import { getScrollElement } from './scroll-target'
 import { installSvCodeIndentRepair } from './sv-code-indent'
 import { formatUploadTimestamp } from './upload-timestamp'
@@ -60,6 +61,7 @@ import {
 } from './wysiwyg-dom'
 import { installToolbarShortcutController } from './toolbar-shortcuts'
 import { installEditorClipboard } from './editor-clipboard'
+import { installVditorImageViewerClose } from './vditor-image-viewer'
 import { vditorI18n } from 'virtual:vditor-i18n'
 import './themes/light.css'
 import './themes/dark.css'
@@ -226,10 +228,17 @@ const toolbarShortcutController = installToolbarShortcutController()
 installEditorModeShortcutGuard()
 const editorClipboardController = installEditorClipboard()
 const codeCopyController = installCodeCopyHandler()
+const imageViewerController = installVditorImageViewerClose()
 let wysiwygFeaturesInitialized = false
 let frontMatterController: ReturnType<typeof initWysiwygFrontMatter> | null = null
+let activeFrontMatterDisplay: FrontMatterDisplay = 'table'
+
+function validFrontMatterDisplay(value: unknown): FrontMatterDisplay {
+  return value === 'codeBlock' || value === 'hide' ? value : 'table'
+}
 
 function initializeWysiwygFeatures(display: FrontMatterDisplay): void {
+  activeFrontMatterDisplay = display
   if (!wysiwygFeaturesInitialized) {
     initWysiwygDetails()
     initWysiwygAlerts()
@@ -251,6 +260,7 @@ window.addEventListener(
     toolbarShortcutController.dispose()
     editorClipboardController.dispose()
     codeCopyController.dispose()
+    imageViewerController.dispose()
     disposeWysiwygDom()
     disposeFloatingPanels()
     disposeWysiwygPopover()
@@ -420,6 +430,7 @@ function updateBuiltInTheme(theme: unknown): void {
     builtInTheme.code,
     ''
   )
+  renderSplitPreviewPresentation(vditor, activeFrontMatterDisplay)
 }
 
 function applyWorkspaceStyle(css: string | null): void {
@@ -616,6 +627,7 @@ function flushEditorContent(): void {
 function refreshModeDependentFeatures(): void {
   toolbarShortcutController.rebind()
   rebindWysiwygDom()
+  renderSplitPreviewPresentation(vditor, activeFrontMatterDisplay)
   window.__vmdSplitScrollSync?.rebind?.(window.vditor)
 }
 
@@ -705,6 +717,9 @@ document.addEventListener(
 function initVditor(msg) {
   const initializationGeneration = editorGeneration
   const content = msg.content
+  activeFrontMatterDisplay = validFrontMatterDisplay(
+    msg.options?.frontMatterDisplay
+  )
   // Hide the editor for the duration of its initial or explicitly requested rebuild.
   // Ordinary document and theme updates never come through this function.
   document.body.removeAttribute('data-vmd-ready')
@@ -788,6 +803,17 @@ function initVditor(msg) {
     // Vditor option disable Lute's sanitizer.
     sanitize: true,
   }
+  const configuredPreviewParse =
+    typeof defaultOptions.preview.parse === 'function'
+      ? defaultOptions.preview.parse
+      : null
+  defaultOptions.preview.parse = (previewElement: HTMLElement) => {
+    configuredPreviewParse?.(previewElement)
+    const editor = window.vditor
+    if (editor) {
+      renderSplitPreviewPresentation(editor, activeFrontMatterDisplay)
+    }
+  }
   // Vditor 3.11.2 invokes this optional callback without a guard. Use it to
   // remove generic block actions and adjust the remaining context controls.
   const customWysiwygToolbar =
@@ -868,7 +894,8 @@ function initVditor(msg) {
       installWysiwygListCommands(vditor)
       // Unknown values were already rejected by the host, so this only has to
       // cover the case of an older host that sends no value at all.
-      initializeWysiwygFeatures(msg.options?.frontMatterDisplay ?? 'table')
+      initializeWysiwygFeatures(activeFrontMatterDisplay)
+      renderSplitPreviewPresentation(vditor, activeFrontMatterDisplay)
       initTableContextMenu()
       initBlockContextMenu()
       vditor.focus()

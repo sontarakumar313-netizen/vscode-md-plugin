@@ -215,6 +215,7 @@ textarea.vmd-source-popover__input {
   color: inherit;
   white-space: normal;
   font-family: inherit;
+  cursor: text;
 }
 .vditor-wysiwyg .vditor-reset [data-type='html-block']
   > .vmd-html-transparent-preview > * {
@@ -473,21 +474,24 @@ textarea.vmd-source-popover__input {
   > .vditor-wysiwyg__preview {
   position: relative;
 }
-.vditor-wysiwyg .vditor-reset .vmd-front-matter__code {
+.vditor .vditor-reset .vmd-front-matter__code {
   margin: 0 0 1em;
   white-space: pre-wrap;
-  cursor: default;
+  cursor: text;
 }
-.vditor-wysiwyg .vditor-reset table.vmd-front-matter {
+.vditor .vditor-reset table.vmd-front-matter {
   display: table;
   width: auto;
   min-width: min(100%, 32em);
   margin: 0 0 1em;
   border-collapse: collapse;
-  cursor: pointer;
+  cursor: text;
   font-size: 0.92em;
 }
-.vditor-wysiwyg .vditor-reset table.vmd-front-matter > caption {
+.vditor-wysiwyg .vditor-reset table.vmd-front-matter {
+  cursor: pointer;
+}
+.vditor .vditor-reset table.vmd-front-matter > caption {
   padding: 0 0 0.3em;
   color: var(--vscode-descriptionForeground, rgba(127, 127, 127, 0.9));
   font-size: 0.85em;
@@ -495,74 +499,74 @@ textarea.vmd-source-popover__input {
   text-align: left;
   text-transform: uppercase;
 }
-.vditor-wysiwyg .vditor-reset table.vmd-front-matter td {
+.vditor .vditor-reset table.vmd-front-matter td {
   padding: 0.24em 0.7em;
   border: 1px solid
     var(--vscode-editorWidget-border, var(--border-color, rgba(127, 127, 127, 0.45)));
   vertical-align: top;
 }
-.vditor-wysiwyg .vditor-reset .vmd-front-matter__key {
+.vditor .vditor-reset .vmd-front-matter__key {
   width: 1%;
   color: var(--vscode-symbolIcon-propertyForeground, inherit);
   font-weight: 600;
   white-space: nowrap;
 }
-.vditor-wysiwyg .vditor-reset .vmd-front-matter__key--depth-1 {
+.vditor .vditor-reset .vmd-front-matter__key--depth-1 {
   padding-left: 1.6em;
   font-weight: 400;
 }
-.vditor-wysiwyg .vditor-reset .vmd-front-matter__key--depth-2 {
+.vditor .vditor-reset .vmd-front-matter__key--depth-2 {
   padding-left: 3em;
   font-weight: 400;
 }
-.vditor-wysiwyg .vditor-reset .vmd-front-matter__key--depth-3 {
+.vditor .vditor-reset .vmd-front-matter__key--depth-3 {
   padding-left: 4.4em;
   font-weight: 400;
 }
 /* Scalar types are distinguished so `false` and `null` cannot be mistaken for
    the strings "false" and "null" in the table. */
-.vditor-wysiwyg .vditor-reset .vmd-front-matter__value--number,
-.vditor-wysiwyg .vditor-reset .vmd-front-matter__value--boolean,
-.vditor-wysiwyg .vditor-reset .vmd-front-matter__value--date {
+.vditor .vditor-reset .vmd-front-matter__value--number,
+.vditor .vditor-reset .vmd-front-matter__value--boolean,
+.vditor .vditor-reset .vmd-front-matter__value--date {
   color: var(--vscode-debugTokenExpression-number, #4080c0);
   font-variant-numeric: tabular-nums;
 }
-.vditor-wysiwyg .vditor-reset .vmd-front-matter__value--null::after {
+.vditor .vditor-reset .vmd-front-matter__value--null::after {
   content: 'null';
   opacity: 0.6;
   font-style: italic;
 }
-.vditor-wysiwyg .vditor-reset .vmd-front-matter__value {
+.vditor .vditor-reset .vmd-front-matter__value {
   /* Literal and folded block scalars carry real line breaks. */
   white-space: pre-wrap;
   word-break: break-word;
 }
-.vditor-wysiwyg .vditor-reset .vmd-front-matter__list {
+.vditor .vditor-reset .vmd-front-matter__list {
   margin: 0;
   padding-left: 1.2em;
 }
-.vditor-wysiwyg .vditor-reset .vmd-front-matter__list > li {
+.vditor .vditor-reset .vmd-front-matter__list > li {
   margin: 0;
 }
-.vditor-wysiwyg .vditor-reset .vmd-front-matter--empty {
+.vditor .vditor-reset .vmd-front-matter--empty {
   margin-bottom: 1em;
   color: var(--vscode-descriptionForeground, rgba(127, 127, 127, 0.9));
   font-size: 0.85em;
 }
-.vditor-wysiwyg .vditor-reset .vmd-front-matter--error {
+.vditor .vditor-reset .vmd-front-matter--error {
   margin-bottom: 1em;
   padding: 0.5em 0.7em;
   border-left: 3px solid
     var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground, #c04040));
   background: var(--vscode-inputValidation-errorBackground, rgba(192, 64, 64, 0.08));
 }
-.vditor-wysiwyg .vditor-reset .vmd-front-matter__error {
+.vditor .vditor-reset .vmd-front-matter__error {
   color: var(--vscode-errorForeground, #c04040);
   font-size: 0.9em;
 }
 /* The raw source is echoed under the error so an unparseable block can still be
-   read. It is a copy for display; the editable source is the hidden pre above. */
-.vditor-wysiwyg .vditor-reset .vmd-front-matter__raw {
+   read. It is a display-only copy; editing remains in the active source UI. */
+.vditor .vditor-reset .vmd-front-matter__raw {
   margin: 0.4em 0 0;
   background: none;
   color: var(--vscode-descriptionForeground, rgba(127, 127, 127, 0.9));
@@ -629,6 +633,10 @@ textarea.vmd-source-popover__input {
    the shared popover. Rich renderers reveal their toolbar on hover. */
 .vditor-wysiwyg .vditor-reset .vmd-code-block--ordinary {
   margin: 1em 0;
+}
+.vditor-wysiwyg .vditor-reset [data-type='code-block']
+  > .vditor-wysiwyg__preview {
+  cursor: text;
 }
 .vditor-wysiwyg .vditor-reset .vmd-code-block--selected
   > .vditor-wysiwyg__preview {
@@ -729,9 +737,9 @@ textarea.vmd-source-popover__input {
   opacity: 1;
 }
 
-/* GitHub Alerts remain ordinary blockquotes in Markdown. The controller hides
-   only their source marker and adds a serializer-ignored title for editing. */
-.vditor-wysiwyg .vditor-reset blockquote.vmd-alert {
+/* GitHub Alerts remain ordinary blockquotes in Markdown. Visual mode keeps a
+   hidden serializer marker; Split View modifies only its disposable preview. */
+.vditor .vditor-reset blockquote.vmd-alert {
   --vmd-alert-color: #0969da;
   --vmd-alert-background: rgba(9, 105, 218, 0.08);
   margin: 1em 0;
@@ -740,26 +748,26 @@ textarea.vmd-source-popover__input {
   color: inherit;
   background: var(--vmd-alert-background);
 }
-.vditor-wysiwyg .vditor-reset blockquote.vmd-alert--tip {
+.vditor .vditor-reset blockquote.vmd-alert--tip {
   --vmd-alert-color: #1a7f37;
   --vmd-alert-background: rgba(26, 127, 55, 0.08);
 }
-.vditor-wysiwyg .vditor-reset blockquote.vmd-alert--important {
+.vditor .vditor-reset blockquote.vmd-alert--important {
   --vmd-alert-color: #8250df;
   --vmd-alert-background: rgba(130, 80, 223, 0.08);
 }
-.vditor-wysiwyg .vditor-reset blockquote.vmd-alert--warning {
+.vditor .vditor-reset blockquote.vmd-alert--warning {
   --vmd-alert-color: #9a6700;
   --vmd-alert-background: rgba(154, 103, 0, 0.09);
 }
-.vditor-wysiwyg .vditor-reset blockquote.vmd-alert--caution {
+.vditor .vditor-reset blockquote.vmd-alert--caution {
   --vmd-alert-color: #cf222e;
   --vmd-alert-background: rgba(207, 34, 46, 0.08);
 }
-.vditor-wysiwyg .vditor-reset .vmd-alert-marker {
+.vditor .vditor-reset .vmd-alert-marker {
   display: none;
 }
-.vditor-wysiwyg .vditor-reset .vmd-alert-title {
+.vditor .vditor-reset .vmd-alert-title {
   display: flex;
   align-items: center;
   gap: 0.4em;
@@ -773,8 +781,11 @@ textarea.vmd-source-popover__input {
   font-weight: 600;
   line-height: 1.25;
   text-align: left;
-  cursor: pointer;
+  cursor: text;
   appearance: none;
+}
+.vditor-wysiwyg .vditor-reset .vmd-alert-title {
+  cursor: pointer;
 }
 .vditor-wysiwyg .vditor-reset .vmd-alert-title:hover {
   text-decoration: underline;
@@ -793,10 +804,10 @@ textarea.vmd-source-popover__input {
   stroke-linejoin: round;
   stroke-width: 1.35;
 }
-.vditor-wysiwyg .vditor-reset blockquote.vmd-alert > p {
+.vditor .vditor-reset blockquote.vmd-alert > p {
   margin: 0.45em 0 0;
 }
-.vditor-wysiwyg .vditor-reset blockquote.vmd-alert > .vmd-alert-title + p {
+.vditor .vditor-reset blockquote.vmd-alert > .vmd-alert-title + p {
   margin-top: 0;
 }
 

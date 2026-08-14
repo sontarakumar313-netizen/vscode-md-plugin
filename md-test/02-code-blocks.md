@@ -354,3 +354,4 @@ const longMessage = 'This is an intentionally long line used to verify horizonta
 <div class="test">& < > " '</div>
 ${template} {{ braces }} [link](not-a-link-here)
 ```
+

@@ -292,15 +292,33 @@ export function initWysiwygSourceEditors(): void {
     return sourcePartsForOwner(nearest)
   }
 
+  const directlyEditableOwnerSelector =
+    '.vditor-wysiwyg__block[data-type="math-block"], ' +
+    'span.vditor-wysiwyg__block[data-type="math-inline"], ' +
+    'span.vditor-wysiwyg__block[data-type="html-entity"]'
+
   function eventParts(event: MouseEvent, target: Element): SourceParts | null {
-    const owner = target.closest<HTMLElement>(
-      '.vditor-wysiwyg__block[data-type="math-block"], ' +
-        'span.vditor-wysiwyg__block[data-type="math-inline"], ' +
-        'span.vditor-wysiwyg__block[data-type="html-entity"]'
-    )
+    const owner = target.closest<HTMLElement>(directlyEditableOwnerSelector)
     return owner
       ? sourcePartsForOwner(owner)
       : nearestInlineHtmlParts(event, target)
+  }
+
+  function selectionInlinePreviewParts(): SourceParts | null {
+    const selection = window.getSelection()
+    const range = selection?.rangeCount === 1
+      ? selection.getRangeAt(0)
+      : null
+    if (!range) return null
+    const element = range.startContainer instanceof Element
+      ? range.startContainer
+      : range.startContainer.parentElement
+    const owner = element?.closest<HTMLElement>(
+      'span.vditor-wysiwyg__block[data-type="math-inline"], ' +
+        'span.vditor-wysiwyg__block[data-type="html-entity"]'
+    )
+    const parts = owner ? sourcePartsForOwner(owner) : null
+    return parts?.preview?.contains(range.startContainer) ? parts : null
   }
 
   function inlineCaretPlacement(
@@ -376,6 +394,18 @@ export function initWysiwygSourceEditors(): void {
         return true
       }
       suppressedInlineClick = null
+
+      if (
+        target &&
+        !target.closest(directlyEditableOwnerSelector) &&
+        selectionInlinePreviewParts()
+      ) {
+        // A click in the line beside an inline render can leave Chromium's
+        // native caret in its preview. Do not let Vditor's bubbling click
+        // handler transfer that caret into the hidden serializer source.
+        event.stopImmediatePropagation()
+        return true
+      }
 
       const parts = target ? eventParts(event, target) : null
       if (!target || !parts || !shouldOpen(parts, target)) return false

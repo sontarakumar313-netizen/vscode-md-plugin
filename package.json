@@ -142,11 +142,11 @@
             "hide"
           ],
           "enumDescriptions": [
-            "Show YAML front matter as a read-only table and edit its source in the shared popup.",
-            "Show YAML front matter as a read-only code preview and edit its source in the shared popup.",
-            "Hide YAML front matter. It stays in the document and is written back unchanged."
+            "Show YAML front matter as a read-only table. Edit it in the shared popup in Visual mode or in the source pane in Split View.",
+            "Show YAML front matter as a read-only code preview. Edit it in the shared popup in Visual mode or in the source pane in Split View.",
+            "Hide YAML front matter from rendered content. It remains editable in the Split View source pane and is written back unchanged."
           ],
-          "description": "How to display YAML front matter in WYSIWYG mode. The source text is never rewritten in any of these modes."
+          "description": "How to display YAML front matter in Visual mode and the Split View preview. The source text is never rewritten in any of these modes."
         }
       }
     },

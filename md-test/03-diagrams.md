@@ -100,8 +100,6 @@ erDiagram
 ### 1.6 甘特图
 
 ```mermaid
-
-
 gantt
     title Markdown 插件测试计划
     dateFormat  YYYY-MM-DD
@@ -291,3 +289,4 @@ K:C
 ```
 
 预期：显示一小段五线谱，而不是普通文本代码块。
+

@@ -230,6 +230,7 @@ function testPage() {
             theme: 'light',
             options: {
               mode: removedModeName,
+              frontMatterDisplay: 'table',
               undoDelay: 0,
               preview: { delay: 0 },
               lang: 'en_US',
@@ -533,8 +534,9 @@ function testPage() {
         );
         expect(
           getComputedStyle(codeSource).display === 'none' &&
-            getComputedStyle(codePreviewCode).display !== 'none',
-          'the idle ordinary code block did not show exactly its highlighted preview'
+            getComputedStyle(codePreviewCode).display !== 'none' &&
+            getComputedStyle(codePreview).cursor === 'text',
+          'the idle ordinary code block did not show its preview with a text cursor'
         );
 
         codeLanguageLabel.click();
@@ -717,6 +719,7 @@ function testPage() {
             ) &&
             getComputedStyle(htmlSource).display === 'none' &&
             getComputedStyle(htmlPreview).backgroundColor === 'rgba(0, 0, 0, 0)' &&
+            getComputedStyle(htmlPreview).cursor === 'text' &&
             !htmlPreview.querySelector(':scope > .vmd-source-edit-button'),
           'HTML presentation did not project alignment, transparency, direct editing, and hidden source: ' + JSON.stringify({
             heading: centeredHeading?.outerHTML,
@@ -747,18 +750,28 @@ function testPage() {
         htmlSelectableText.dispatchEvent(htmlCopy);
         htmlParagraph.click();
         await pause();
+        const htmlSelectionAfterClick = window.getSelection();
+        const htmlRangeAfterClick = htmlSelectionAfterClick?.rangeCount === 1
+          ? htmlSelectionAfterClick.getRangeAt(0)
+          : null;
         sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
         expect(
           !htmlPointerDown.defaultPrevented &&
             sourcePopover?.style.display !== 'block' &&
             htmlSelectionBeforeClick === 'Selectable HTML' &&
+            htmlSelectionAfterClick?.toString() === 'Selectable HTML' &&
+            htmlRangeAfterClick &&
+            htmlPreview.contains(htmlRangeAfterClick.startContainer) &&
+            !htmlSource.contains(htmlRangeAfterClick.startContainer) &&
             htmlCopy.defaultPrevented &&
             htmlCopyTransfer.getData('text/plain').includes('Selectable HTML'),
           'HTML preview text selection was intercepted by direct source editing: ' +
             JSON.stringify({
               prevented: htmlPointerDown.defaultPrevented,
               popover: sourcePopover?.style.display,
-              selection: htmlSelectionBeforeClick,
+              selectionBefore: htmlSelectionBeforeClick,
+              selectionAfter: htmlSelectionAfterClick?.toString(),
+              rangeContainer: htmlRangeAfterClick?.startContainer.parentElement?.outerHTML?.slice(0, 300),
               copied: htmlCopyTransfer.getData('text/plain'),
               preview: htmlPreview?.outerHTML.slice(0, 1500),
             })
@@ -1002,6 +1015,116 @@ function testPage() {
             window.__vmdMessages.filter((message) => message.command === 'open-link').at(-1).href === 'https://example.com/raw',
           'exact Ctrl/Cmd+click did not open the raw HTML linked image exactly once'
         );
+
+        rawLinkedImage.dispatchEvent(new MouseEvent('dblclick', {
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause();
+        const vditorImageViewer = document.querySelector('.vditor-img');
+        const vditorImageViewerClose = vditorImageViewer?.querySelector(
+          '.vditor-img__bar .vditor-img__btn:not([data-deg])'
+        );
+        expect(
+          vditorImageViewer && vditorImageViewerClose &&
+            document.body.style.overflow === 'hidden',
+          'double-clicking a raw HTML image did not open Vditor image preview'
+        );
+        // VS Code's Webview CSP blocks Vditor's inline onclick close handler.
+        vditorImageViewerClose.removeAttribute('onclick');
+        vditorImageViewerClose.click();
+        expect(
+          !vditorImageViewer.isConnected && document.body.style.overflow === '',
+          'the CSP-safe image-preview close handler did not remove the viewer'
+        );
+
+        await setMarkdown('- Formula at line end $x$');
+        await pause(80);
+        const terminalFormula = root().querySelector(
+          'span.vditor-wysiwyg__block[data-type="math-inline"]'
+        );
+        const terminalFormulaSource = terminalFormula.querySelector(':scope > code');
+        const terminalFormulaPreview = terminalFormula.querySelector(
+          ':scope > .vditor-wysiwyg__preview'
+        );
+        const terminalFormulaPreviewText = textNode(terminalFormulaPreview);
+        select(
+          terminalFormulaPreviewText,
+          terminalFormulaPreviewText.textContent.length,
+          terminalFormulaPreviewText,
+          terminalFormulaPreviewText.textContent.length
+        );
+        const terminalFormulaRect = terminalFormula.getBoundingClientRect();
+        terminalFormula.closest('li').dispatchEvent(new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          clientX: terminalFormulaRect.right + 24,
+          clientY: terminalFormulaRect.top + terminalFormulaRect.height / 2,
+        }));
+        await pause();
+        const terminalFormulaSelection = window.getSelection();
+        const terminalFormulaRange = terminalFormulaSelection?.rangeCount === 1
+          ? terminalFormulaSelection.getRangeAt(0)
+          : null;
+        expect(
+          terminalFormulaRange?.collapsed &&
+            terminalFormulaPreview.contains(terminalFormulaRange.startContainer) &&
+            !terminalFormulaSource.contains(terminalFormulaRange.startContainer) &&
+            document.querySelector('.vmd-source-popover')?.style.display !== 'block',
+          'clicking after a terminal inline formula moved the caret into hidden source: ' +
+            JSON.stringify({
+              container: terminalFormulaRange?.startContainer.parentElement?.outerHTML?.slice(0, 500),
+              source: terminalFormulaSource.outerHTML,
+            })
+        );
+
+        await setMarkdown(
+          '<p align="center"><img src="assets/raw.png" alt="raw image"></p>'
+        );
+        await pause(80);
+        const imageOnlyHtmlBlock = root().querySelector(
+          ':scope > .vditor-wysiwyg__block[data-type="html-block"]'
+        );
+        const imageOnlyHtmlSource = imageOnlyHtmlBlock.querySelector(
+          ':scope > pre:not(.vditor-wysiwyg__preview)'
+        );
+        const imageOnlyHtmlPreview = imageOnlyHtmlBlock.querySelector(
+          ':scope > .vditor-wysiwyg__preview'
+        );
+        const imageOnlyHtmlParagraph = imageOnlyHtmlPreview.querySelector('p');
+        const imageCaretRange = document.createRange();
+        imageCaretRange.selectNodeContents(imageOnlyHtmlParagraph);
+        imageCaretRange.collapse(false);
+        const imageCaretSelection = window.getSelection();
+        imageCaretSelection.removeAllRanges();
+        imageCaretSelection.addRange(imageCaretRange);
+        imageOnlyHtmlParagraph.click();
+        await pause();
+        const preservedImageSelection = window.getSelection();
+        const preservedImageRange = preservedImageSelection?.rangeCount === 1
+          ? preservedImageSelection.getRangeAt(0)
+          : null;
+        expect(
+          preservedImageRange?.collapsed &&
+            imageOnlyHtmlPreview.contains(preservedImageRange.startContainer) &&
+            !imageOnlyHtmlSource.contains(preservedImageRange.startContainer),
+          'clicking after an HTML image moved the caret into hidden source'
+        );
+        root().dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Backspace',
+          bubbles: true,
+          cancelable: true,
+        }));
+        expect(
+          imageOnlyHtmlBlock.classList.contains('vmd-code-block--selected'),
+          'Backspace from an HTML-preview caret did not select the complete block'
+        );
+        root().dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }));
 
         // Plain link clicks edit the raw href; only Ctrl/Cmd+click follows it.
         await setMarkdown('before [visible **link**](relative/path.md?x=1#part "old title") after');
@@ -3561,8 +3684,26 @@ function testPage() {
         await pause(40);
         expect(
           mermaidBlock.classList.contains('vmd-code-block--rich') &&
-            mermaidBlock.classList.contains('vmd-code-block--selected'),
-          'dragging a Mermaid preview did not select its complete source block'
+            !mermaidBlock.classList.contains('vmd-code-block--selected') &&
+            getComputedStyle(mermaidPreview).cursor === 'text',
+          'the Mermaid preview retained pointer styling or promoted dragging to whole-block selection'
+        );
+        mermaidPreview.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          clientX: mermaidRect.right - 2,
+          clientY: mermaidDragY,
+          pointerType: 'mouse',
+        }));
+        root().dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Backspace',
+          bubbles: true,
+          cancelable: true,
+        }));
+        expect(
+          mermaidBlock.classList.contains('vmd-code-block--selected'),
+          'Backspace from a Mermaid boundary did not retain explicit whole-block selection'
         );
         const mermaidCopyTransfer = new DataTransfer();
         const mermaidCopy = new ClipboardEvent('copy', {
@@ -3838,6 +3979,120 @@ function testPage() {
 
         await switchMode('sv');
         const svRoot = document.querySelector('.vditor-sv');
+        const splitPreviewRoot = window.vditor.vditor.preview.previewElement;
+
+        testCheckpoint = 'Split View Front Matter and GitHub Alert presentation';
+        const splitPresentationMarkdown = lines(
+          '---',
+          'title: Split document',
+          'published: true',
+          'tags:',
+          '  - first',
+          '  - second',
+          '---',
+          '',
+          '> [!NOTE] 自定义标题',
+          '> Alert **body**',
+          '',
+          '> ordinary quote',
+          '',
+          '- > [!TIP]',
+          '  > nested list Alert',
+          '',
+          '<details>',
+          '',
+          '> [!WARNING]',
+          '> details Alert',
+          '',
+          '</details>',
+          ''
+        );
+        await setMarkdown(splitPresentationMarkdown);
+        await wait(() =>
+          splitPreviewRoot.querySelector(':scope > .vmd-split-front-matter table') &&
+          splitPreviewRoot.querySelector(':scope > blockquote.vmd-alert')
+        );
+        const splitFrontMatter = splitPreviewRoot.querySelector(
+          ':scope > .vmd-split-front-matter'
+        );
+        const splitAlert = splitPreviewRoot.querySelector(
+          ':scope > blockquote.vmd-alert'
+        );
+        const splitPlainQuote = Array.from(
+          splitPreviewRoot.querySelectorAll(':scope > blockquote')
+        ).find((quote) => quote.textContent.includes('ordinary quote'));
+        expect(
+          splitFrontMatter?.dataset.vmdMode === 'table' &&
+            splitFrontMatter.querySelector('caption')?.textContent === 'Front Matter' &&
+            splitFrontMatter.textContent.includes('Split document') &&
+            splitFrontMatter.textContent.includes('published') &&
+            !splitPreviewRoot.querySelector(':scope > pre.vditor-yml-front-matter'),
+          'Split View did not replace native YAML source with the configured Front Matter table: ' +
+            splitPreviewRoot.innerHTML.slice(0, 2000)
+        );
+        expect(
+          splitAlert?.dataset.vmdAlert === 'NOTE' &&
+            splitAlert.querySelector(':scope > .vmd-alert-title')?.tagName === 'DIV' &&
+            splitAlert.querySelector(':scope > .vmd-alert-title')?.textContent === '自定义标题' &&
+            !splitAlert.querySelector(':scope > .vmd-alert-title')?.hasAttribute('aria-haspopup') &&
+            splitAlert.querySelector('strong')?.textContent === 'body' &&
+            !splitAlert.textContent.includes('[!NOTE]') &&
+            !splitPlainQuote?.classList.contains('vmd-alert') &&
+            splitPreviewRoot.querySelector('li blockquote')?.textContent.includes('[!TIP]') &&
+            splitPreviewRoot.querySelector('details blockquote')?.textContent.includes('[!WARNING]'),
+          'Split View did not render only a top-level GitHub Alert as a read-only presentation: ' +
+            splitPreviewRoot.innerHTML.slice(0, 3000)
+        );
+        expect(
+          window.vditor.getValue().replace(/\\n+$/, '') ===
+            splitPresentationMarkdown.replace(/\\n+$/, ''),
+          'Split View presentation changed Front Matter or Alert Markdown source: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
+
+        const invalidSplitFrontMatter = lines(
+          '---',
+          'metadata: [unsupported, flow]',
+          '---',
+          '',
+          'Invalid YAML body',
+          ''
+        );
+        await setMarkdown(invalidSplitFrontMatter);
+        await wait(() =>
+          splitPreviewRoot.querySelector('.vmd-front-matter--error')
+        );
+        expect(
+          splitPreviewRoot.querySelector('.vmd-front-matter__error')?.textContent.includes('解析失败') &&
+            splitPreviewRoot.querySelector('.vmd-front-matter__raw')?.textContent ===
+              'metadata: [unsupported, flow]' &&
+            window.vditor.getValue().replace(/\\n+$/, '') ===
+              invalidSplitFrontMatter.replace(/\\n+$/, ''),
+          'Split View did not show invalid Front Matter source and its parse error'
+        );
+
+        const updatedSplitPresentation = lines(
+          '---',
+          'title: Updated split document',
+          '---',
+          '',
+          '> [!CAUTION]',
+          '> Updated Alert body',
+          ''
+        );
+        await setMarkdown(updatedSplitPresentation);
+        await wait(() =>
+          splitPreviewRoot.querySelector('.vmd-front-matter')?.textContent.includes('Updated split document') &&
+          splitPreviewRoot.querySelector(':scope > blockquote.vmd-alert--caution')
+        );
+        expect(
+          splitPreviewRoot.querySelector(':scope > blockquote .vmd-alert-title')?.textContent === 'Caution' &&
+            window.vditor.getValue().replace(/\\n+$/, '') ===
+              updatedSplitPresentation.replace(/\\n+$/, ''),
+          'Split View Front Matter or Alert presentation did not refresh after a source update'
+        );
+        testCheckpoint = 'Split View toolbar shortcuts';
+
         const savedModesBeforeSvShortcuts = window.__vmdMessages.filter(
           (message) => message.command === 'save-options'
         ).length;
@@ -4128,8 +4383,75 @@ function testPage() {
           'dedenting one line also dropped the indent of the next'
         );
 
-        // Reinitialization and stale-generation handling use ordinary Markdown;
-        // Front Matter behavior is intentionally retained without test coverage.
+        // Each configured Front Matter mode must also apply when a document
+        // opens directly into Split View, before the editor is revealed.
+        const initializeSplitFrontMatterMode = async (display) => {
+          const source = lines(
+            '---',
+            'title: ' + display + ' Split View',
+            '---',
+            '',
+            '# ' + display + ' body',
+            ''
+          );
+          hostGeneration += 1;
+          window.dispatchEvent(new MessageEvent('message', {
+            data: {
+              command: 'update',
+              type: 'init',
+              content: source,
+              documentVersion: hostGeneration,
+              editorGeneration: hostGeneration,
+              theme: 'light',
+              options: {
+                mode: 'sv',
+                frontMatterDisplay: display,
+                undoDelay: 0,
+                preview: { delay: 0 },
+                lang: 'en_US',
+                cdn: location.origin,
+              },
+            },
+          }));
+          await wait(() =>
+            window.vditor?.vditor?.currentMode === 'sv' &&
+            window.vditor.vditor.preview?.previewElement?.textContent.includes(
+              display + ' body'
+            )
+          );
+          await pause(80);
+          return {
+            source,
+            preview: window.vditor.vditor.preview.previewElement,
+          };
+        };
+
+        testCheckpoint = 'Split View Front Matter code-block mode';
+        const splitCodeFrontMatter = await initializeSplitFrontMatterMode('codeBlock');
+        expect(
+          splitCodeFrontMatter.preview.querySelector(
+            ':scope > .vmd-split-front-matter[data-vmd-mode="codeBlock"] > .vmd-front-matter__code'
+          )?.textContent === 'title: codeBlock Split View' &&
+            !splitCodeFrontMatter.preview.querySelector('.vmd-front-matter') &&
+            window.vditor.getValue().replace(/\\n+$/, '') ===
+              splitCodeFrontMatter.source.replace(/\\n+$/, ''),
+          'Split View did not render Front Matter as configured read-only YAML code'
+        );
+
+        testCheckpoint = 'Split View Front Matter hidden mode';
+        const hiddenSplitFrontMatter = await initializeSplitFrontMatterMode('hide');
+        expect(
+          !hiddenSplitFrontMatter.preview.querySelector(
+            ':scope > :is(.vmd-split-front-matter, .vditor-yml-front-matter)'
+          ) &&
+            hiddenSplitFrontMatter.preview.querySelector('h1')?.textContent === 'hide body' &&
+            window.vditor.getValue().replace(/\\n+$/, '') ===
+              hiddenSplitFrontMatter.source.replace(/\\n+$/, ''),
+          'Split View hidden Front Matter leaked into the preview or changed source'
+        );
+
+        // Reinitialize once more with ordinary Markdown to cover stale host
+        // generations after the two Split View startup projections.
         await switchMode('wysiwyg');
         const reopenedSource = lines(
           '# Reinitialized body',
