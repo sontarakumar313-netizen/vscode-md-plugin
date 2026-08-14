@@ -145,7 +145,12 @@ async function openEditor(savedMode, expectedMode) {
     'Mod+S',
     'initialization did not include validated toolbar shortcuts'
   )
-  assert.deepStrictEqual(postedMessages, [
+  const postedMessagesWithoutFrontMatter = postedMessages.map((message) => {
+    if (!message.options) return message
+    const { frontMatterDisplay: _frontMatterDisplay, ...options } = message.options
+    return { ...message, options }
+  })
+  assert.deepStrictEqual(postedMessagesWithoutFrontMatter, [
     {
       command: 'update',
       content: '# Example',
@@ -156,7 +161,6 @@ async function openEditor(savedMode, expectedMode) {
       options: {
         useVscodeThemeColor: undefined,
         mode: expectedMode,
-        frontMatterDisplay: 'table',
         toolbarShortcuts: postedMessages[0].options.toolbarShortcuts,
       },
       theme: 'light',

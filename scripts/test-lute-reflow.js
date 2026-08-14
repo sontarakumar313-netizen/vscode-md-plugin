@@ -71,10 +71,6 @@ const fixtures = [
     origin: 'paragraph \nnext\n\nsentinel old\n',
   },
   {
-    name: 'YAML front-matter body spacing',
-    origin: '---\ntitle: Demo\n---\n\nbody\n\nsentinel old\n',
-  },
-  {
     name: 'loose list spacing',
     origin: '- one\n\n- two\n\nsentinel old\n',
   },

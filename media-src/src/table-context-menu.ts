@@ -1,4 +1,9 @@
 import {
+  activateFloatingPanel,
+  deactivateFloatingPanel,
+  positionFloatingPanelAtPoint,
+} from './floating-panel'
+import {
   focusVditorRange,
   getVditorInternals,
   vditorTableActions,
@@ -8,6 +13,7 @@ import { t } from './lang'
 const MENU_ID = 'vmd-table-context-menu'
 
 type TableAction =
+  | 'default'
   | 'left'
   | 'center'
   | 'right'
@@ -67,6 +73,7 @@ function createMenu(): HTMLDivElement {
   menu.setAttribute('role', 'menu')
   menu.setAttribute('aria-label', label('table', 'Table'))
   menu.innerHTML = `
+    ${item('default', t('defaultAlignment'), 'align-left')}
     ${item('left', label('alignLeft', 'Align left'), 'align-left')}
     ${item('center', label('alignCenter', 'Align center'), 'align-center')}
     ${item('right', label('alignRight', 'Align right'), 'align-right')}
@@ -88,30 +95,15 @@ function setAlignState(
   menu: HTMLElement,
   cell: HTMLTableCellElement
 ): void {
-  const align = cell.getAttribute('align') ||
-    (cell.tagName === 'TH' ? 'center' : 'left')
+  const align = cell.getAttribute('align') || 'default'
 
   menu
     .querySelectorAll<HTMLElement>(
-      '[data-type="left"], [data-type="center"], [data-type="right"]'
+      '[data-type="default"], [data-type="left"], [data-type="center"], [data-type="right"]'
     )
     .forEach((item) => {
       item.classList.toggle('vmd-table-context-menu__current', item.dataset.type === align)
     })
-}
-
-function positionMenu(menu: HTMLElement, clientX: number, clientY: number): void {
-  const margin = 8
-  menu.style.display = 'block'
-  menu.style.visibility = 'hidden'
-  menu.style.left = '0'
-  menu.style.top = '0'
-
-  const maxLeft = Math.max(margin, window.innerWidth - menu.offsetWidth - margin)
-  const maxTop = Math.max(margin, window.innerHeight - menu.offsetHeight - margin)
-  menu.style.left = `${Math.min(Math.max(clientX, margin), maxLeft)}px`
-  menu.style.top = `${Math.min(Math.max(clientY, margin), maxTop)}px`
-  menu.style.visibility = 'visible'
 }
 
 function deleteTable(
@@ -155,6 +147,7 @@ export function initTableContextMenu(): void {
   let state: MenuState | null = null
 
   const hide = () => {
+    deactivateFloatingPanel(menu)
     menu.style.display = 'none'
     menu.style.visibility = ''
     state = null
@@ -182,7 +175,8 @@ export function initTableContextMenu(): void {
       deleteRowButton.disabled = cell.tagName === 'TH'
     }
 
-    positionMenu(menu, event.clientX, event.clientY)
+    activateFloatingPanel({ panel: menu, onDismiss: hide })
+    positionFloatingPanelAtPoint(menu, event.clientX, event.clientY)
   }
 
   const execute = (action: TableAction) => {
@@ -209,6 +203,14 @@ export function initTableContextMenu(): void {
     focusVditorRange(range)
 
     switch (action) {
+      case 'default': {
+        const columnIndex = cell.cellIndex
+        Array.from(table.rows).forEach((row) => {
+          row.cells[columnIndex]?.removeAttribute('align')
+        })
+        vditorTableActions.execAfterRender(internal)
+        break
+      }
       case 'left':
       case 'center':
       case 'right': {
@@ -276,21 +278,6 @@ export function initTableContextMenu(): void {
     if (!button || button.disabled) return
     execute(button.dataset.type as TableAction)
   })
-
-  document.addEventListener(
-    'pointerdown',
-    (event) => {
-      const target = event.target instanceof Element ? event.target : null
-      if (!target?.closest(`#${MENU_ID}`)) hide()
-    },
-    true
-  )
-  document.addEventListener('scroll', hide, true)
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') hide()
-  })
-  window.addEventListener('resize', hide)
-  window.addEventListener('blur', hide)
 
   hideContextMenu = hide
 }

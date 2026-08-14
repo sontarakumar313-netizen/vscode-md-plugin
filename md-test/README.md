@@ -9,7 +9,7 @@
 
 | 文档 | 主要测试内容 |
 | --- | --- |
-| [01-basic.md](./01-basic.md) | Front Matter、标题、文本样式、链接、引用、列表、表格、脚注 |
+| [01-basic.md](./01-basic.md) | 标题、文本样式、链接、引用、列表、表格、脚注 |
 | [02-code-blocks.md](./02-code-blocks.md) | 无语言代码块及多种编程语言的语法高亮 |
 | [03-diagrams.md](./03-diagrams.md) | Mermaid、GeoJSON、TopoJSON、STL，以及 Vditor 自带的 Graphviz、ECharts、PlantUML 等扩展 |
 | [04-math-alerts.md](./04-math-alerts.md) | GitHub/插件通用数学语法、五种 GitHub Alerts |

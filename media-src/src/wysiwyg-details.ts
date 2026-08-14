@@ -1,12 +1,10 @@
-import {
-  commitVditorWysiwygDomEdit,
-  getVditorInternals,
-} from './vditor-adapter'
 import { t } from './lang'
+import { registerWysiwygDomFeature } from './wysiwyg-dom'
 import {
   closeActiveWysiwygPopover,
-  finishDetailsTitlePopover,
-  showDetailsTitlePopover,
+  createWysiwygSourceEditButton,
+  getSharedWysiwygPopover,
+  openWysiwygSourceEditSession,
 } from './wysiwyg-popover'
 
 interface DetailsGroup {
@@ -18,11 +16,6 @@ interface DetailsGroup {
 const DETAILS_SUMMARY_CLASS = 'vmd-details-summary'
 const DETAILS_TOGGLE_CLASS = 'vmd-details-toggle'
 const TITLE_BUTTON_CLASS = 'vmd-details-title-button'
-const SUMMARY_COMMIT_DEBOUNCE_MS = 300
-
-function getWysiwygRoot(): HTMLElement | null {
-  return document.querySelector('.vditor-wysiwyg .vditor-reset')
-}
 
 function getHtmlBlockCode(block: HTMLElement): HTMLElement | null {
   return block.querySelector<HTMLElement>(
@@ -139,17 +132,10 @@ export function findInnermostDetailsBlocks(
   return region ? children.slice(region.start, region.end + 1) : null
 }
 
-export function initWysiwygDetails() {
+export function initWysiwygDetails(): void {
   const openState = new WeakMap<HTMLElement, boolean>()
-  let root: HTMLElement | null = null
-  let boundRoot: HTMLElement | null = null
-  let observer: MutationObserver | null = null
-  let summaryCommitTimer: number | null = null
-  let summaryCommitPending = false
-  const queuedRoots = new WeakSet<HTMLElement>()
 
   function refresh(targetRoot: HTMLElement): void {
-    queuedRoots.delete(targetRoot)
     const children = Array.from(targetRoot.children) as HTMLElement[]
     for (const child of children) {
       child.classList.remove(
@@ -203,13 +189,14 @@ export function initWysiwygDetails() {
       prepareSummaryDisplay(group.opener, group.open)
       preview?.toggleAttribute('open', group.open)
       if (group.open) {
-        // Mark content blocks so CSS can draw a grouped border around them.
         const { contents } = group
-        for (let i = 0; i < contents.length; i += 1) {
-          const block = contents[i]
+        for (let index = 0; index < contents.length; index += 1) {
+          const block = contents[index]
           block.classList.add('vmd-details-content--open')
-          if (i === 0) block.classList.add('vmd-details-content--first')
-          if (i === contents.length - 1) block.classList.add('vmd-details-content--last')
+          if (index === 0) block.classList.add('vmd-details-content--first')
+          if (index === contents.length - 1) {
+            block.classList.add('vmd-details-content--last')
+          }
         }
       } else {
         for (const content of group.contents) {
@@ -223,164 +210,97 @@ export function initWysiwygDetails() {
     }
   }
 
-  function queueRefresh(targetRoot: HTMLElement): void {
-    if (queuedRoots.has(targetRoot)) return
-    queuedRoots.add(targetRoot)
-    queueMicrotask(() => refresh(targetRoot))
-  }
-
-  /** Returns the summary element + opener block if the event targets a summary. */
-  function getSummaryTarget(event: Event): {
-    summary: HTMLElement
-    opener: HTMLElement
-  } | null {
+  function getSummaryTarget(
+    event: Event,
+    root: HTMLElement
+  ): { summary: HTMLElement; opener: HTMLElement } | null {
     const target = event.target instanceof Element ? event.target : null
     const summary = target?.closest<HTMLElement>(`.${DETAILS_SUMMARY_CLASS}`)
     const opener = summary?.closest<HTMLElement>('.vmd-details-opener')
-    if (!summary || !opener || !root?.contains(opener)) return null
+    if (!summary || !opener || !root.contains(opener)) return null
     const preview = getPreviewDetails(opener)
     if (!preview || !preview.contains(summary)) return null
     return { summary, opener }
   }
 
-  function getTitleButtonTarget(event: Event): {
-    button: HTMLButtonElement
-    opener: HTMLElement
-  } | null {
+  function getTitleButtonTarget(
+    event: Event,
+    root: HTMLElement
+  ): { button: HTMLButtonElement; opener: HTMLElement } | null {
     const target = event.target instanceof Element ? event.target : null
     const button = target?.closest<HTMLButtonElement>(`.${TITLE_BUTTON_CLASS}`)
     const opener = button?.closest<HTMLElement>('.vmd-details-opener')
-    if (!button || !opener || !root?.contains(opener)) return null
+    if (!button || !opener || !root.contains(opener)) return null
     return { button, opener }
-  }
-
-  function getSharedPopover(): HTMLElement | null {
-    const popover = getVditorInternals()?.wysiwyg?.popover
-    return popover instanceof HTMLElement ? popover : null
   }
 
   function hideSharedPopover(): void {
     closeActiveWysiwygPopover()
-    const popover = getSharedPopover()
+    const popover = getSharedWysiwygPopover()
     if (popover) popover.style.display = 'none'
   }
 
-  function onRootClick(event: Event): void {
-    const titleButtonTarget = getTitleButtonTarget(event)
-    if (titleButtonTarget) {
+  function openTitleEditor(
+    button: HTMLButtonElement,
+    opener: HTMLElement
+  ): void {
+    const summary = getPreviewDetails(opener)
+      ?.querySelector<HTMLElement>(':scope > summary')
+    const code = getHtmlBlockCode(opener)
+    if (!summary || !code) return
+    const initialTitle = getSummaryTitleText(summary)
+    const initialSource = code.textContent || ''
+
+    openWysiwygSourceEditSession({
+      target: button,
+      focusField: 'title',
+      fields: [
+        {
+          name: 'title',
+          label: t('editDetailsTitle'),
+          value: initialTitle,
+          closeOnEnter: true,
+        },
+      ],
+      unavailableMessage: 'The Details title is no longer available',
+      isAvailable: () => opener.isConnected && code.isConnected,
+      onChange: (values) => {
+        const value = values.title ?? ''
+        if (syncTitleToSource(opener, value)) {
+          setVisibleSummaryTitle(opener, value)
+        }
+        return null
+      },
+      isSourceChanged: () => (code.textContent || '') !== initialSource,
+      afterCommit: () => registration.requestRefresh(),
+    })
+  }
+
+  const registration = registerWysiwygDomFeature({
+    refresh,
+    beforeRebind: closeActiveWysiwygPopover,
+    onClick: (event, root) => {
+      const titleTarget = getTitleButtonTarget(event, root)
+      if (titleTarget) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        openTitleEditor(titleTarget.button, titleTarget.opener)
+        return true
+      }
+
+      const detailsTarget = getSummaryTarget(event, root)
+      if (!detailsTarget) return false
       event.preventDefault()
       event.stopImmediatePropagation()
-      if (summaryCommitPending) flushSummaryCommit()
-      const summary = getPreviewDetails(titleButtonTarget.opener)
-        ?.querySelector<HTMLElement>(':scope > summary')
-      const popover = getSharedPopover()
-      if (!summary || !popover) return
-      const initialTitle = getSummaryTitleText(summary)
-      showDetailsTitlePopover({
-        popover,
-        target: titleButtonTarget.button,
-        value: initialTitle,
-        label: t('editDetailsTitle'),
-        onInput: (value, inputEvent) => {
-          if (inputEvent.isComposing) return
-          if (syncTitleToSource(titleButtonTarget.opener, value)) {
-            setVisibleSummaryTitle(titleButtonTarget.opener, value)
-            scheduleTitleCommit()
-          }
-        },
-        onCompositionEnd: (value) => {
-          if (syncTitleToSource(titleButtonTarget.opener, value)) {
-            setVisibleSummaryTitle(titleButtonTarget.opener, value)
-            scheduleTitleCommit()
-          }
-        },
-        onBlur: (value) => {
-          if (
-            value !== initialTitle &&
-            syncTitleToSource(titleButtonTarget.opener, value)
-          ) {
-            setVisibleSummaryTitle(titleButtonTarget.opener, value)
-          }
-          flushSummaryCommit()
-        },
-      })
-      return
-    }
-
-    const detailsTarget = getSummaryTarget(event)
-    if (!detailsTarget) return
-
-    event.preventDefault()
-    event.stopImmediatePropagation()
-
-    const { opener } = detailsTarget
-    if (summaryCommitPending) flushSummaryCommit()
-    hideSharedPopover()
-
-    const preview = getPreviewDetails(opener)
-    if (!preview || !root) return
-    openState.set(opener, !(openState.get(opener) ?? preview.open))
-    queueRefresh(root)
-  }
-
-  function flushSummaryCommit(): void {
-    if (summaryCommitTimer !== null) window.clearTimeout(summaryCommitTimer)
-    summaryCommitTimer = null
-    if (!summaryCommitPending) return
-    summaryCommitPending = false
-    const internal = getVditorInternals()
-    if (!internal || internal.currentMode !== 'wysiwyg') return
-    commitVditorWysiwygDomEdit(internal)
-  }
-
-  function scheduleTitleCommit(): void {
-    summaryCommitPending = true
-    if (summaryCommitTimer !== null) window.clearTimeout(summaryCommitTimer)
-    summaryCommitTimer = window.setTimeout(
-      flushSummaryCommit,
-      SUMMARY_COMMIT_DEBOUNCE_MS
-    )
-  }
-
-  function unbindRoots(): void {
-    observer?.disconnect()
-    observer = null
-    if (boundRoot) {
-      boundRoot.removeEventListener('click', onRootClick, true)
-      boundRoot = null
-    }
-  }
-
-  function rebind(): void {
-    finishDetailsTitlePopover()
-    if (summaryCommitPending) flushSummaryCommit()
-    const nextRoot = getWysiwygRoot()
-    if (nextRoot === root && boundRoot === nextRoot) {
-      if (root) queueRefresh(root)
-      return
-    }
-    if (summaryCommitTimer !== null) window.clearTimeout(summaryCommitTimer)
-    summaryCommitTimer = null
-    summaryCommitPending = false
-    unbindRoots()
-    root = nextRoot
-    if (root) {
-      const observedRoot = root
-      observedRoot.addEventListener('click', onRootClick, true)
-      boundRoot = observedRoot
-
-      observer = new MutationObserver(() => queueRefresh(observedRoot))
-      observer.observe(observedRoot, {
-        childList: true,
-        subtree: true,
-        characterData: true,
-      })
-      queueRefresh(observedRoot)
-    }
-  }
-
-  rebind()
-  return { rebind }
+      const { opener } = detailsTarget
+      hideSharedPopover()
+      const preview = getPreviewDetails(opener)
+      if (!preview) return true
+      openState.set(opener, !(openState.get(opener) ?? preview.open))
+      registration.requestRefresh()
+      return true
+    },
+  })
 }
 
 /** Adds read-only disclosure controls without exposing the HTML source. */
@@ -408,13 +328,10 @@ function prepareSummaryDisplay(opener: HTMLElement, _isOpen: boolean): void {
     `:scope > .${TITLE_BUTTON_CLASS}`
   )
   if (!titleButton) {
-    titleButton = document.createElement('button')
-    titleButton.type = 'button'
-    titleButton.className = TITLE_BUTTON_CLASS
-    titleButton.setAttribute('contenteditable', 'false')
-    titleButton.setAttribute('aria-label', t('editDetailsTitle'))
-    titleButton.innerHTML =
-      '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.7 1.8a1.4 1.4 0 0 1 2 2l-8.4 8.4-3 .6.6-3 8.8-8zM10.8 3l2.2 2.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    titleButton = createWysiwygSourceEditButton(
+      t('editDetailsTitle'),
+      TITLE_BUTTON_CLASS
+    )
     summary.append(titleButton)
   } else {
     titleButton.setAttribute('aria-label', t('editDetailsTitle'))

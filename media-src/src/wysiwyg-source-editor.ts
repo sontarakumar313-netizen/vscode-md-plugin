@@ -1,15 +1,20 @@
 import { t } from './lang'
 import {
-  commitVditorWysiwygDomEdit,
   getVditorInternals,
   refreshVditorWysiwygHtmlPreview,
   refreshVditorWysiwygMathPreview,
 } from './vditor-adapter'
-import { showWysiwygSourcePopover } from './wysiwyg-popover'
+import { registerWysiwygDomFeature } from './wysiwyg-dom'
+import {
+  hideWysiwygSerializerSource,
+  openWysiwygSourceEditSession,
+} from './wysiwyg-popover'
 
-const EDIT_BUTTON_CLASS = 'vmd-source-edit-button'
-const INLINE_CONTROL_CLASS = 'vmd-inline-source-control'
 const ZERO_WIDTH_SPACE = '\u200b'
+const INLINE_HTML_SCOPE_SELECTOR =
+  'p, h1, h2, h3, h4, h5, h6, li, td, th, figcaption, blockquote'
+const INTERACTIVE_HTML_SELECTOR =
+  'a, button, input, select, textarea, details, summary, audio, video, img, iframe, [contenteditable="true"]'
 
 type SourceKind =
   | 'math-block'
@@ -24,17 +29,6 @@ interface SourceParts {
   source: HTMLElement
   code: HTMLElement
   preview: HTMLElement | null
-}
-
-function getWysiwygRoot(): HTMLElement | null {
-  return document.querySelector<HTMLElement>(
-    '.vditor-wysiwyg .vditor-reset'
-  )
-}
-
-function getSharedPopover(): HTMLElement | null {
-  const popover = getVditorInternals()?.wysiwyg?.popover
-  return popover instanceof HTMLElement ? popover : null
 }
 
 function cleanSourceText(code: HTMLElement): string {
@@ -59,7 +53,12 @@ function sourcePartsForOwner(owner: HTMLElement): SourceParts | null {
       : null
   }
 
-  if (type !== 'math-block' && type !== 'math-inline' && type !== 'html-block' && type !== 'html-entity') {
+  if (
+    type !== 'math-block' &&
+    type !== 'math-inline' &&
+    type !== 'html-block' &&
+    type !== 'html-entity'
+  ) {
     return null
   }
   const preview = owner.querySelector<HTMLElement>(
@@ -73,27 +72,8 @@ function sourcePartsForOwner(owner: HTMLElement): SourceParts | null {
   return code ? { kind: type, owner, source, code, preview } : null
 }
 
-function createEditButton(): HTMLButtonElement {
-  const button = document.createElement('button')
-  button.type = 'button'
-  button.className = EDIT_BUTTON_CLASS
-  button.setAttribute('contenteditable', 'false')
-  button.setAttribute('data-render', '1')
-  button.setAttribute('aria-label', t('editSource') || 'Edit source')
-  button.innerHTML =
-    '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.7 1.8a1.4 1.4 0 0 1 2 2l-8.4 8.4-3 .6.6-3 8.8-8z" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>'
-  return button
-}
-
-function ensureInlineControl(source: HTMLElement): void {
-  const existing = source.nextElementSibling
-  if (existing?.classList.contains(INLINE_CONTROL_CLASS)) return
-  const control = document.createElement('span')
-  control.className = INLINE_CONTROL_CLASS
-  control.setAttribute('contenteditable', 'false')
-  control.setAttribute('data-render', '1')
-  control.appendChild(createEditButton())
-  source.insertAdjacentElement('afterend', control)
+function sourceEditLabel(): string {
+  return t('editSource') || 'Edit source'
 }
 
 function decodeHtmlEntity(value: string): string | null {
@@ -116,16 +96,11 @@ function validateInlineHtml(value: string): boolean {
 }
 
 /** Moves formula, raw HTML, inline HTML and entity source into the shared popover. */
-export function initWysiwygSourceEditors(): { rebind(): void } {
-  let root: HTMLElement | null = null
-  let boundRoot: HTMLElement | null = null
-  let observer: MutationObserver | null = null
-  let refreshQueued = false
+export function initWysiwygSourceEditors(): void {
   let writing = false
 
-  function decorate(): void {
-    refreshQueued = false
-    if (!root || writing) return
+  function refresh(root: HTMLElement): void {
+    if (writing) return
     writing = true
     try {
       root
@@ -139,29 +114,15 @@ export function initWysiwygSourceEditors(): { rebind(): void } {
         .forEach((owner) => {
           const parts = sourcePartsForOwner(owner)
           if (!parts) return
-          parts.source.style.setProperty('display', 'none', 'important')
+          hideWysiwygSerializerSource(parts.source)
           owner.classList.add('vmd-source-owned')
-          // Alert recognition projects HTML previews to determine whether a
-          // quote has a rendered body. Controls inside that clone would turn a
-          // comment-only quote into an Alert, so do not decorate quote HTML.
-          if (owner.closest('blockquote')) return
           if (parts.kind === 'html-block' && parts.preview) {
             parts.preview.classList.add('vmd-html-transparent-preview')
-            if (!parts.preview.querySelector(`:scope > .${EDIT_BUTTON_CLASS}`)) {
-              parts.preview.appendChild(createEditButton())
-            }
           }
-          if (parts.kind === 'html-inline') ensureInlineControl(parts.source)
         })
     } finally {
       writing = false
     }
-  }
-
-  function queueRefresh(): void {
-    if (refreshQueued || writing) return
-    refreshQueued = true
-    queueMicrotask(decorate)
   }
 
   function refreshPreview(parts: SourceParts, value: string): string | null {
@@ -170,22 +131,24 @@ export function initWysiwygSourceEditors(): { rebind(): void } {
       return 'The visual editor is no longer active'
     }
     if (parts.kind === 'math-block' || parts.kind === 'math-inline') {
-      return parts.preview && refreshVditorWysiwygMathPreview(
-        internal,
-        parts.source,
-        parts.preview,
-        value
-      )
+      return parts.preview &&
+        refreshVditorWysiwygMathPreview(
+          internal,
+          parts.source,
+          parts.preview,
+          value
+        )
         ? null
         : 'Unable to refresh the formula preview'
     }
     if (parts.kind === 'html-block') {
-      return parts.preview && refreshVditorWysiwygHtmlPreview(
-        internal,
-        parts.owner,
-        value,
-        parts.preview
-      )
+      return parts.preview &&
+        refreshVditorWysiwygHtmlPreview(
+          internal,
+          parts.owner,
+          value,
+          parts.preview
+        )
         ? null
         : 'HTML does not form a renderable block'
     }
@@ -200,28 +163,23 @@ export function initWysiwygSourceEditors(): { rebind(): void } {
   }
 
   function openEditor(parts: SourceParts): void {
-    const popover = getSharedPopover()
-    const internal = getVditorInternals()
-    if (!popover || !internal || internal.currentMode !== 'wysiwyg') return
     const initial = cleanSourceText(parts.code)
     const multiline = parts.kind === 'math-block' || parts.kind === 'html-block'
 
-    showWysiwygSourcePopover({
-      popover,
+    openWysiwygSourceEditSession({
       target: parts.owner,
       focusField: 'source',
       fields: [
         {
           name: 'source',
-          label: t(`edit${parts.kind}`) || t('editSource') || 'Edit source',
+          label: t(`edit${parts.kind}`) || sourceEditLabel(),
           value: initial,
           multiline,
         },
       ],
+      unavailableMessage: 'The source element is no longer available',
+      isAvailable: () => parts.code.isConnected,
       onChange: (values) => {
-        if (!parts.owner.isConnected || !parts.code.isConnected) {
-          return 'The source element is no longer available'
-        }
         const value = values.source ?? ''
         if (parts.kind === 'html-entity' && decodeHtmlEntity(value) === null) {
           return 'Enter one complete HTML entity'
@@ -230,129 +188,124 @@ export function initWysiwygSourceEditors(): { rebind(): void } {
           return 'Enter one complete inline HTML tag'
         }
         writeSourceText(parts.code, value)
-        parts.source.style.setProperty('display', 'none', 'important')
+        hideWysiwygSerializerSource(parts.source)
         const error = refreshPreview(parts, value)
-        queueRefresh()
+        registration.requestRefresh()
         return error
       },
-      onFinish: (_values, changed) => {
-        if (
-          !changed ||
-          !parts.owner.isConnected ||
-          !parts.code.isConnected ||
-          cleanSourceText(parts.code) === initial
-        ) {
-          return
-        }
-        parts.source.style.setProperty('display', 'none', 'important')
-        commitVditorWysiwygDomEdit(internal)
-        queueRefresh()
-      },
+      isSourceChanged: () => cleanSourceText(parts.code) !== initial,
+      beforeCommit: () => hideWysiwygSerializerSource(parts.source),
+      afterCommit: () => registration.requestRefresh(),
     })
   }
 
-  function eventParts(target: Element): SourceParts | null {
-    const inlineControl = target.closest(`.${INLINE_CONTROL_CLASS}`)
-    if (inlineControl?.previousElementSibling instanceof HTMLElement) {
-      return sourcePartsForOwner(inlineControl.previousElementSibling)
+  function textOffsetAt(
+    scope: HTMLElement,
+    node: Node,
+    offset: number
+  ): number | null {
+    if (node !== scope && !scope.contains(node)) return null
+    const range = document.createRange()
+    range.selectNodeContents(scope)
+    try {
+      range.setEnd(node, offset)
+      return range.toString().length
+    } catch {
+      return null
     }
+  }
+
+  function nearestInlineHtmlParts(
+    event: MouseEvent,
+    target: Element
+  ): SourceParts | null {
+    const scope = target.closest<HTMLElement>(INLINE_HTML_SCOPE_SELECTOR)
+    if (!scope) return null
+    const tokens = Array.from(
+      scope.querySelectorAll<HTMLElement>('code[data-type="html-inline"]')
+    )
+    if (tokens.length === 0) return null
+
+    const pointRange = document.caretRangeFromPoint?.(
+      event.clientX,
+      event.clientY
+    )
+    const selection = window.getSelection()
+    const selectedRange = selection?.rangeCount ? selection.getRangeAt(0) : null
+    const referenceRange =
+      pointRange && scope.contains(pointRange.startContainer)
+        ? pointRange
+        : selectedRange && scope.contains(selectedRange.startContainer)
+          ? selectedRange
+          : null
+    const referenceOffset = referenceRange
+      ? textOffsetAt(
+          scope,
+          referenceRange.startContainer,
+          referenceRange.startOffset
+        )
+      : null
+    if (referenceOffset === null) return sourcePartsForOwner(tokens[0])
+
+    let nearest = tokens[0]
+    let nearestDistance = Number.POSITIVE_INFINITY
+    for (const token of tokens) {
+      const parent = token.parentNode
+      if (!parent) continue
+      const index = Array.from(parent.childNodes).indexOf(token)
+      const before = textOffsetAt(scope, parent, index)
+      const after = textOffsetAt(scope, parent, index + 1)
+      if (before === null || after === null) continue
+      const distance = Math.abs(referenceOffset - (before + after) / 2)
+      if (distance < nearestDistance) {
+        nearest = token
+        nearestDistance = distance
+      }
+    }
+    return sourcePartsForOwner(nearest)
+  }
+
+  function eventParts(event: MouseEvent, target: Element): SourceParts | null {
     const owner = target.closest<HTMLElement>(
       '.vditor-wysiwyg__block[data-type="math-block"], ' +
         '.vditor-wysiwyg__block[data-type="html-block"], ' +
         'span.vditor-wysiwyg__block[data-type="math-inline"], ' +
         'span.vditor-wysiwyg__block[data-type="html-entity"]'
     )
-    return owner ? sourcePartsForOwner(owner) : null
+    return owner
+      ? sourcePartsForOwner(owner)
+      : nearestInlineHtmlParts(event, target)
   }
 
   function shouldOpen(parts: SourceParts, target: Element): boolean {
-    if (target.closest(`.${INLINE_CONTROL_CLASS}`)) return true
-    if (parts.kind === 'html-block') {
-      return !!target.closest(`.${EDIT_BUTTON_CLASS}`)
+    if (parts.kind === 'html-block' || parts.kind === 'html-inline') {
+      const interactive = target.closest(INTERACTIVE_HTML_SELECTOR)
+      const interactionScope = parts.kind === 'html-block'
+        ? parts.preview
+        : target.closest<HTMLElement>(INLINE_HTML_SCOPE_SELECTOR)
+      if (interactive && interactionScope?.contains(interactive)) return false
     }
-    return !!parts.preview?.contains(target)
+    return parts.kind === 'html-inline' || !!parts.preview?.contains(target)
   }
 
-  function onSelectionChange(): void {
-    if (
-      !root ||
-      document.activeElement?.closest('.vmd-source-popover')
-    ) {
-      return
-    }
-    const selection = window.getSelection()
-    if (!selection?.rangeCount) return
-    const node = selection.getRangeAt(0).startContainer
-    const element = node instanceof Element ? node : node.parentElement
-    const owner = element?.closest<HTMLElement>(
-      '.vditor-wysiwyg__block[data-type="math-block"], ' +
-        '.vditor-wysiwyg__block[data-type="html-block"], ' +
-        'span.vditor-wysiwyg__block[data-type="math-inline"], ' +
-        'span.vditor-wysiwyg__block[data-type="html-entity"], ' +
-        'code[data-type="html-inline"]'
-    )
-    const parts = owner ? sourcePartsForOwner(owner) : null
-    if (!parts || !parts.source.contains(node)) return
-    parts.source.style.setProperty('display', 'none', 'important')
-    openEditor(parts)
-  }
-
-  function onRootPointerDown(event: PointerEvent): void {
-    const target = event.target instanceof Element ? event.target : null
-    const parts = target ? eventParts(target) : null
-    if (!target || !parts || !shouldOpen(parts, target)) return
-    event.preventDefault()
-    event.stopImmediatePropagation()
-  }
-
-  function onRootClick(event: MouseEvent): void {
-    const target = event.target instanceof Element ? event.target : null
-    const parts = target ? eventParts(target) : null
-    if (!target || !parts) return
-    if (!shouldOpen(parts, target)) {
-      if (parts.kind === 'html-block' && parts.preview?.contains(target)) {
-        // Preserve links, details, media, and form defaults while stopping
-        // Vditor's bubbling handler from moving the caret into hidden HTML.
-        event.stopImmediatePropagation()
-      }
-      return
-    }
-    event.preventDefault()
-    event.stopImmediatePropagation()
-    openEditor(parts)
-  }
-
-  function unbindRoot(): void {
-    observer?.disconnect()
-    observer = null
-    if (!boundRoot) return
-    boundRoot.removeEventListener('pointerdown', onRootPointerDown, true)
-    boundRoot.removeEventListener('click', onRootClick, true)
-    boundRoot = null
-  }
-
-  function rebind(): void {
-    const nextRoot = getWysiwygRoot()
-    if (nextRoot === root && boundRoot === nextRoot) {
-      queueRefresh()
-      return
-    }
-    unbindRoot()
-    root = nextRoot
-    if (!root) return
-    boundRoot = root
-    root.addEventListener('pointerdown', onRootPointerDown, true)
-    root.addEventListener('click', onRootClick, true)
-    observer = new MutationObserver(queueRefresh)
-    observer.observe(root, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-    })
-    queueRefresh()
-  }
-
-  document.addEventListener('selectionchange', onSelectionChange)
-  rebind()
-  return { rebind }
+  const registration = registerWysiwygDomFeature({
+    refresh,
+    onPointerDown: (event) => {
+      const target = event.target instanceof Element ? event.target : null
+      const parts = target ? eventParts(event, target) : null
+      if (!target || !parts || !shouldOpen(parts, target)) return false
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      return true
+    },
+    onClick: (event) => {
+      const target = event.target instanceof Element ? event.target : null
+      const parts = target ? eventParts(event, target) : null
+      if (!target || !parts || !shouldOpen(parts, target)) return false
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      openEditor(parts)
+      return true
+    },
+  })
 }

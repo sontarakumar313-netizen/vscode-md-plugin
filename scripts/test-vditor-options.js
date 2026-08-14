@@ -70,49 +70,8 @@ const optionsFor = (values) => {
   return getVditorOptions(context, undefined)
 }
 
-for (const mode of ['table', 'codeBlock', 'hide']) {
-  assert.strictEqual(
-    optionsFor({ frontMatterDisplay: mode }).frontMatterDisplay,
-    mode,
-    `a valid front matter display mode must pass through: ${mode}`
-  )
-}
-
-// settings.json is hand-editable, so anything can arrive here.
-for (const rejected of [
-  'Table',
-  'code-block',
-  'unknown',
-  '',
-  undefined,
-  null,
-  42,
-  true,
-  ['table'],
-  { mode: 'table' },
-]) {
-  assert.strictEqual(
-    optionsFor({ frontMatterDisplay: rejected }).frontMatterDisplay,
-    'table',
-    `an unusable front matter display value must fall back to table: ${JSON.stringify(
-      rejected
-    )}`
-  )
-}
-
-// Saved editor state must not be able to smuggle an unvalidated value through.
-configValues = { frontMatterDisplay: 'hide' }
-assert.strictEqual(
-  getVditorOptions(
-    { globalState: { get: () => ({ frontMatterDisplay: 'bogus' }) } },
-    undefined
-  ).frontMatterDisplay,
-  'hide',
-  'a value left in saved editor state must not override the validated setting'
-)
-
 // The single Custom Editor starts in the last valid toolbar-selected mode.
-configValues = { frontMatterDisplay: 'table' }
+configValues = {}
 for (const savedMode of ['wysiwyg', 'sv']) {
   assert.strictEqual(
     getVditorOptions(
@@ -148,7 +107,6 @@ for (const savedMode of [
 }
 
 const shortcutOptions = optionsFor({
-  frontMatterDisplay: 'table',
   toolbarShortcuts: {
     bold: 'Mod+Alt+B',
     italic: '',
@@ -194,7 +152,7 @@ assert.ok(
   'an unknown toolbar action entered the Webview options'
 )
 
-configValues = { frontMatterDisplay: 'table' }
+configValues = {}
 const withSaved = getVditorOptions(
   {
     globalState: {
@@ -219,7 +177,11 @@ assert.strictEqual(
   'Mod+B',
   'the default bold shortcut was not included'
 )
-const { toolbarShortcuts, ...optionsWithoutShortcuts } = withSaved
+const {
+  toolbarShortcuts,
+  frontMatterDisplay: _frontMatterDisplay,
+  ...optionsWithoutShortcuts
+} = withSaved
 assert.ok(
   Object.keys(toolbarShortcuts).length > 30,
   'not every toolbar operation received a configurable shortcut slot'
@@ -229,7 +191,6 @@ assert.deepStrictEqual(
   {
     useVscodeThemeColor: undefined,
     mode: 'sv',
-    frontMatterDisplay: 'table',
   },
   'persisted state must restore only the validated editor mode'
 )

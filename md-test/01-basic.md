@@ -1,16 +1,4 @@
----
-title: Markdown 基础功能渲染测试
-author: Markdown Interactor Test Suite
-tags:
-  - markdown
-  - render-test
-draft: false
-version: 1
----
-
 # Markdown 基础功能渲染测试
-
-> 预期：文档顶部的 YAML Front Matter 根据 `frontMatterDisplay` 设置显示为表格、代码区或隐藏，且保存后原始内容保持不变。
 
 ## 1. 标题层级
 

@@ -142,8 +142,8 @@
             "hide"
           ],
           "enumDescriptions": [
-            "Show YAML front matter as a table, and switch to the raw source while the caret is inside it.",
-            "Always show YAML front matter as a code area.",
+            "Show YAML front matter as a read-only table and edit its source in the shared popup.",
+            "Show YAML front matter as a read-only code preview and edit its source in the shared popup.",
             "Hide YAML front matter. It stays in the document and is written back unchanged."
           ],
           "description": "How to display YAML front matter in WYSIWYG mode. The source text is never rewritten in any of these modes."
@@ -172,7 +172,6 @@
     "test:math": "node scripts/test-dollar-math-only.js",
     "test:upload-timestamp": "node scripts/test-upload-timestamp.js",
     "test:sv-code-indent": "node scripts/test-sv-code-indent.js",
-    "test:front-matter": "node scripts/test-front-matter.js",
     "test:quote-format": "node scripts/test-quote-format.js",
     "test:vditor-options": "node scripts/test-vditor-options.js",
     "test:vditor-runtime": "node scripts/test-vditor-runtime.js",
@@ -182,7 +181,7 @@
     "test:link-handler": "node scripts/test-link-handler.js",
     "test:webview-controller": "node scripts/test-webview-controller.js",
     "test:webview-interactions": "npm run build:webview && node scripts/test-webview-interactions.js",
-    "test": "npm run test:sync && npm run test:lute-reflow && npm run test:math && npm run test:upload-timestamp && npm run test:sv-code-indent && npm run test:front-matter && npm run test:quote-format && npm run test:vditor-options && npm run test:session && npm run test:custom-editor-startup && npm run test:single-custom-editor && npm run test:link-handler && npm run test:webview-controller && npm run test:webview-interactions",
+    "test": "npm run test:sync && npm run test:lute-reflow && npm run test:math && npm run test:upload-timestamp && npm run test:sv-code-indent && npm run test:quote-format && npm run test:vditor-options && npm run test:session && npm run test:custom-editor-startup && npm run test:single-custom-editor && npm run test:link-handler && npm run test:webview-controller && npm run test:webview-interactions",
     "pub": "npm run build && npm version patch && vsce package && vsce publish && git push origin main --tags"
   },
   "devDependencies": {

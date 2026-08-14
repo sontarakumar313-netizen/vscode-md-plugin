@@ -1,4 +1,8 @@
-import { cancelPendingVditorWysiwygToolbar } from './vditor-adapter'
+import {
+  cancelPendingVditorWysiwygToolbar,
+  commitVditorWysiwygDomEdit,
+  getVditorInternals,
+} from './vditor-adapter'
 
 let pendingPopoverTarget: HTMLElement | null = null
 let activePopoverPosition: {
@@ -13,28 +17,18 @@ let activeCustomPopover: {
 } | null = null
 let popoverPositionListenersInstalled = false
 let popoverPositionQueued = false
-let activeDetailsTitleFinish: (() => void) | null = null
 const POPOVER_POSITIONING_CLASS = 'vmd-url-popover--positioning'
 const PERSISTENT_POPOVER_CLASS = 'vmd-url-popover--persistent'
-const DETAILS_TITLE_POPOVER_CLASS = 'vmd-details-title-popover'
 const SOURCE_POPOVER_CLASS = 'vmd-source-popover'
+export const WYSIWYG_SOURCE_EDIT_BUTTON_CLASS = 'vmd-source-edit-button'
 
-interface DetailsTitlePopoverOptions {
-  popover: HTMLElement
-  target: HTMLElement
-  value: string
-  label: string
-  onInput: (value: string, event: InputEvent) => void
-  onCompositionEnd: (value: string) => void
-  onBlur: (value: string) => void
-}
-
-export interface WysiwygSourcePopoverField {
+interface WysiwygSourcePopoverField {
   name: string
   label: string
   value: string
   multiline?: boolean
   spellcheck?: boolean
+  closeOnEnter?: boolean
 }
 
 interface WysiwygSourcePopoverOptions {
@@ -44,6 +38,18 @@ interface WysiwygSourcePopoverOptions {
   focusField?: string
   onChange: (values: Readonly<Record<string, string>>) => string | null
   onFinish: (values: Readonly<Record<string, string>>, changed: boolean) => void
+}
+
+interface WysiwygSourceEditSessionOptions {
+  target: HTMLElement
+  fields: WysiwygSourcePopoverField[]
+  focusField?: string
+  unavailableMessage: string
+  isAvailable?: () => boolean
+  onChange: (values: Readonly<Record<string, string>>) => string | null
+  isSourceChanged: () => boolean
+  beforeCommit?: () => void
+  afterCommit?: () => void
 }
 
 /** Records a click target before Vditor constructs its shared popover. */
@@ -128,10 +134,21 @@ export function closeActiveWysiwygPopover(restoreFocus = false): void {
     }
     if (pendingPopoverTarget === active.target) pendingPopoverTarget = null
   }
-  finishDetailsTitlePopover()
   if (active && restoreFocus) {
     restorePopoverFocus(active.target, active.editorRoot)
   }
+}
+
+export function disposeWysiwygPopover(): void {
+  closeActiveWysiwygPopover()
+  if (popoverPositionListenersInstalled) {
+    document.removeEventListener('scroll', queueActivePopoverPosition, true)
+    window.removeEventListener('resize', queueActivePopoverPosition)
+    popoverPositionListenersInstalled = false
+  }
+  activePopoverPosition = null
+  pendingPopoverTarget = null
+  popoverPositionQueued = false
 }
 
 function closePopover(popover: HTMLElement): void {
@@ -405,99 +422,21 @@ function installPopoverTabOrder(elements: HTMLElement[]): void {
   })
 }
 
-export function finishDetailsTitlePopover(): void {
-  const finish = activeDetailsTitleFinish
-  activeDetailsTitleFinish = null
-  finish?.()
-}
-
-/** Opens a single-line details-title editor in Vditor's shared URL popover. */
-export function showDetailsTitlePopover({
-  popover,
-  target,
-  value,
-  label,
-  onInput,
-  onCompositionEnd,
-  onBlur,
-}: DetailsTitlePopoverOptions): HTMLInputElement {
-  finishDetailsTitlePopover()
-  deactivateAndFinishCustomPopover()
-  activePopoverPosition = null
-  popover.replaceChildren()
-  popover.classList.remove(
-    'vmd-url-popover--image',
-    'vmd-wysiwyg-popover--empty',
-    SOURCE_POPOVER_CLASS,
-    POPOVER_POSITIONING_CLASS,
-    PERSISTENT_POPOVER_CLASS
-  )
-  popover.classList.add('vmd-url-popover', DETAILS_TITLE_POPOVER_CLASS)
-  delete popover.dataset.vmdPosition
-
-  const inputWrap = document.createElement('span')
-  inputWrap.className = 'vditor-tooltipped vditor-tooltipped__n vmd-url-popover__url'
-  inputWrap.setAttribute('aria-label', label)
-  const input = document.createElement('input')
-  input.className = 'vditor-input vmd-url-popover__url-input'
-  input.type = 'text'
-  input.value = value
-  input.placeholder = label
-  input.setAttribute('aria-label', label)
-  let finished = false
-  const finish = () => {
-    if (finished) return
-    finished = true
-    if (activeDetailsTitleFinish === finish) activeDetailsTitleFinish = null
-    onBlur(input.value)
-  }
-  activeDetailsTitleFinish = finish
-  input.addEventListener('input', (event) => {
-    if (event instanceof InputEvent) onInput(input.value, event)
-  })
-  input.addEventListener('compositionend', () => onCompositionEnd(input.value))
-  input.addEventListener('blur', finish)
-  input.addEventListener('keydown', (event) => {
-    if (event.isComposing || event.keyCode === 229) {
-      event.stopImmediatePropagation()
-      return
-    }
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      input.blur()
-    }
-    event.stopPropagation()
-  })
-  inputWrap.appendChild(input)
-  popover.appendChild(inputWrap)
-  const closeButton = addPopoverCloseButton(popover, inputWrap)
-  installPopoverTabOrder([input, closeButton])
-
-  positionAboveTarget(popover, target)
-  popover.style.display = 'block'
-  activateCustomPopover(popover, target)
-  input.focus()
-  input.select()
-  return input
-}
-
 /** Opens serializer-owned source fields without exposing them in the document. */
-export function showWysiwygSourcePopover({
+function showWysiwygSourcePopover({
   popover,
   target,
   fields,
   focusField,
   onChange,
   onFinish,
-}: WysiwygSourcePopoverOptions): Readonly<Record<string, HTMLInputElement | HTMLTextAreaElement>> {
-  finishDetailsTitlePopover()
+}: WysiwygSourcePopoverOptions): void {
   deactivateAndFinishCustomPopover()
   activePopoverPosition = null
   popover.replaceChildren()
   popover.classList.remove(
     'vmd-url-popover--image',
     'vmd-wysiwyg-popover--empty',
-    DETAILS_TITLE_POPOVER_CLASS,
     POPOVER_POSITIONING_CLASS,
     PERSISTENT_POPOVER_CLASS
   )
@@ -546,7 +485,7 @@ export function showWysiwygSourcePopover({
     control.spellcheck = field.spellcheck ?? false
     control.setAttribute('aria-label', field.label)
     if (control instanceof HTMLTextAreaElement) {
-      control.rows = 8
+      control.rows = 4
       control.wrap = 'off'
     } else {
       control.type = 'text'
@@ -563,9 +502,10 @@ export function showWysiwygSourcePopover({
       }
       if (
         event.key === 'Enter' &&
-        (event.ctrlKey || event.metaKey) &&
-        !event.altKey &&
-        !event.shiftKey
+        (field.closeOnEnter ||
+          ((event.ctrlKey || event.metaKey) &&
+            !event.altKey &&
+            !event.shiftKey))
       ) {
         event.preventDefault()
         event.stopImmediatePropagation()
@@ -607,7 +547,74 @@ export function showWysiwygSourcePopover({
   // Vditor's originating click may restore the editor selection after the
   // capture listener returns. Re-assert the requested field once that work ends.
   window.setTimeout(focusPreferredField, 0)
-  return controls
+}
+
+export function getSharedWysiwygPopover(): HTMLElement | null {
+  const popover = getVditorInternals()?.wysiwyg?.popover
+  return popover instanceof HTMLElement ? popover : null
+}
+
+export function hideWysiwygSerializerSource(source: HTMLElement): void {
+  source.style.setProperty('display', 'none', 'important')
+}
+
+export function createWysiwygSourceEditButton(
+  label: string,
+  className = WYSIWYG_SOURCE_EDIT_BUTTON_CLASS
+): HTMLButtonElement {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = className
+  button.setAttribute('contenteditable', 'false')
+  button.setAttribute('data-render', '1')
+  button.setAttribute('aria-label', label)
+  button.innerHTML =
+    '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.7 1.8a1.4 1.4 0 0 1 2 2l-8.4 8.4-3 .6.6-3 8.8-8z" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>'
+  return button
+}
+
+/** Runs one serializer-owned source editing session and commits it once. */
+export function openWysiwygSourceEditSession({
+  target,
+  fields,
+  focusField,
+  unavailableMessage,
+  isAvailable,
+  onChange,
+  isSourceChanged,
+  beforeCommit,
+  afterCommit,
+}: WysiwygSourceEditSessionOptions): boolean {
+  const popover = getSharedWysiwygPopover()
+  const internal = getVditorInternals()
+  if (!popover || !internal || internal.currentMode !== 'wysiwyg') return false
+
+  showWysiwygSourcePopover({
+    popover,
+    target,
+    fields,
+    focusField,
+    onChange: (values) => {
+      if (!target.isConnected || (isAvailable && !isAvailable())) {
+        return unavailableMessage
+      }
+      return onChange(values)
+    },
+    onFinish: (_values, changed) => {
+      if (
+        !changed ||
+        !target.isConnected ||
+        (isAvailable && !isAvailable()) ||
+        !isSourceChanged()
+      ) {
+        return
+      }
+      beforeCommit?.()
+      commitVditorWysiwygDomEdit(internal)
+      afterCommit?.()
+    },
+  })
+  return true
 }
 
 /**
@@ -618,13 +625,11 @@ export function customizeWysiwygPopover(
   type: string,
   popover: HTMLElement
 ): void {
-  finishDetailsTitlePopover()
   deactivateAndFinishCustomPopover()
   // Vditor reuses one popover element for every context.
   popover.classList.remove(
     'vmd-url-popover',
     'vmd-url-popover--image',
-    DETAILS_TITLE_POPOVER_CLASS,
     SOURCE_POPOVER_CLASS,
     POPOVER_POSITIONING_CLASS,
     PERSISTENT_POPOVER_CLASS

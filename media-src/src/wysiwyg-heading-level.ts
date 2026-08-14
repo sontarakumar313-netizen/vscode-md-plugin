@@ -1,5 +1,11 @@
+import {
+  activateFloatingPanel,
+  deactivateFloatingPanel,
+  positionFloatingPanelAtTarget,
+} from './floating-panel'
 import { t } from './lang'
 import { commitVditorWysiwygHeadingEdit } from './vditor-adapter'
+import { registerWysiwygDomFeature } from './wysiwyg-dom'
 
 const BUTTON_CLASS = 'vmd-heading-level-button'
 const DECORATED_CLASS = 'vmd-heading-level--decorated'
@@ -12,12 +18,6 @@ interface MenuState {
   caretOffset: number
   heading: HTMLHeadingElement
   level: number
-}
-
-function getWysiwygRoot(): HTMLElement | null {
-  return document.querySelector<HTMLElement>(
-    '.vditor-wysiwyg .vditor-reset'
-  )
 }
 
 function headingLevel(heading: Element): number | null {
@@ -98,39 +98,14 @@ function createMenu(): HTMLDivElement {
   return menu
 }
 
-function positionMenu(menu: HTMLElement, target: HTMLElement): void {
-  const margin = 8
-  const gap = 4
-  menu.style.display = 'block'
-  menu.style.visibility = 'hidden'
-  menu.style.left = '0'
-  menu.style.top = '0'
-
-  const targetRect = target.getBoundingClientRect()
-  const maxLeft = Math.max(margin, window.innerWidth - menu.offsetWidth - margin)
-  const left = Math.min(Math.max(targetRect.left, margin), maxLeft)
-  const below = targetRect.bottom + gap
-  const above = targetRect.top - menu.offsetHeight - gap
-  const maxTop = Math.max(margin, window.innerHeight - menu.offsetHeight - margin)
-  const top = below <= maxTop || above < margin ? Math.min(below, maxTop) : above
-  menu.style.left = `${left}px`
-  menu.style.top = `${Math.max(margin, top)}px`
-  menu.style.visibility = 'visible'
-}
-
 /** Adds an accessible H1-H6 menu to rendered WYSIWYG heading gutter labels. */
-export function initWysiwygHeadingLevels(): {
-  dispose(): void
-  rebind(): void
-} {
+export function initWysiwygHeadingLevels(): void {
   const menu = createMenu()
   let root: HTMLElement | null = null
-  let boundRoot: HTMLElement | null = null
-  let observer: MutationObserver | null = null
-  let refreshQueued = false
   let state: MenuState | null = null
 
   const hideMenu = (restoreFocus = false): void => {
+    deactivateFloatingPanel(menu)
     const previous = state
     state = null
     menu.style.display = 'none'
@@ -162,26 +137,17 @@ export function initWysiwygHeadingLevels(): {
     if (button.childNodes.length > 0) button.replaceChildren()
     button.dataset.label = label
     button.dataset.headingLevel = String(level)
-    button.setAttribute(
-      'aria-label',
-      `${t('changeHeadingLevel')}: H${level}`
-    )
+    button.setAttribute('aria-label', `${t('changeHeadingLevel')}: H${level}`)
   }
 
-  const refresh = (): void => {
-    refreshQueued = false
-    root?.querySelectorAll<HTMLHeadingElement>(HEADING_SELECTOR).forEach(
+  const refresh = (targetRoot: HTMLElement): void => {
+    root = targetRoot
+    targetRoot.querySelectorAll<HTMLHeadingElement>(HEADING_SELECTOR).forEach(
       decorateHeading
     )
     if (state && (!state.heading.isConnected || !state.button.isConnected)) {
       hideMenu()
     }
-  }
-
-  const queueRefresh = (): void => {
-    if (refreshQueued) return
-    refreshQueued = true
-    queueMicrotask(refresh)
   }
 
   const showMenu = (
@@ -209,7 +175,12 @@ export function initWysiwygHeadingLevels(): {
         item.setAttribute('aria-checked', String(current))
       })
     button.setAttribute('aria-expanded', 'true')
-    positionMenu(menu, button)
+    activateFloatingPanel({
+      panel: menu,
+      safeTargets: [button],
+      onDismiss: (reason) => hideMenu(reason === 'escape'),
+    })
+    positionFloatingPanelAtTarget(menu, button)
     if (focusCurrent) {
       requestAnimationFrame(() => {
         menu.querySelector<HTMLButtonElement>(`.${CURRENT_CLASS}`)?.focus()
@@ -251,44 +222,8 @@ export function initWysiwygHeadingLevels(): {
       root?.focus({ preventScroll: true })
       restoreCaretOffset(replacement, current.caretOffset)
     }
-    // Restore immediately for hidden Webviews where animation frames can be
-    // suspended, then once more after Vditor's synchronous click work settles.
     restoreCaret()
     window.setTimeout(restoreCaret, 0)
-  }
-
-  const onRootPointerDown = (event: PointerEvent): void => {
-    const target = event.target instanceof Element
-      ? event.target.closest<HTMLButtonElement>(`.${BUTTON_CLASS}`)
-      : null
-    if (!target) return
-    event.preventDefault()
-    event.stopImmediatePropagation()
-  }
-
-  const onRootClick = (event: MouseEvent): void => {
-    const button = event.target instanceof Element
-      ? event.target.closest<HTMLButtonElement>(`.${BUTTON_CLASS}`)
-      : null
-    const heading = button?.closest<HTMLHeadingElement>(HEADING_SELECTOR)
-    if (!button || !heading) return
-    event.preventDefault()
-    event.stopImmediatePropagation()
-    showMenu(heading, button)
-  }
-
-  const onRootKeydown = (event: KeyboardEvent): void => {
-    const button = event.target instanceof Element
-      ? event.target.closest<HTMLButtonElement>(`.${BUTTON_CLASS}`)
-      : null
-    const heading = button?.closest<HTMLHeadingElement>(HEADING_SELECTOR)
-    if (!button || !heading) return
-    if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'ArrowDown') {
-      return
-    }
-    event.preventDefault()
-    event.stopImmediatePropagation()
-    showMenu(heading, button, true)
   }
 
   const onMenuKeydown = (event: KeyboardEvent): void => {
@@ -319,43 +254,6 @@ export function initWysiwygHeadingLevels(): {
     buttons[nextIndex]?.focus()
   }
 
-  const onDocumentPointerDown = (event: PointerEvent): void => {
-    const target = event.target instanceof Element ? event.target : null
-    if (target?.closest(`#${MENU_ID}, .${BUTTON_CLASS}`)) return
-    hideMenu()
-  }
-  const onDocumentScroll = (): void => hideMenu()
-  const onWindowResize = (): void => hideMenu()
-
-  const unbindRoot = (): void => {
-    observer?.disconnect()
-    observer = null
-    if (!boundRoot) return
-    boundRoot.removeEventListener('pointerdown', onRootPointerDown, true)
-    boundRoot.removeEventListener('click', onRootClick, true)
-    boundRoot.removeEventListener('keydown', onRootKeydown, true)
-    boundRoot = null
-  }
-
-  const rebind = (): void => {
-    hideMenu()
-    const nextRoot = getWysiwygRoot()
-    if (nextRoot === root && boundRoot === nextRoot) {
-      queueRefresh()
-      return
-    }
-    unbindRoot()
-    root = nextRoot
-    if (!root) return
-    boundRoot = root
-    root.addEventListener('pointerdown', onRootPointerDown, true)
-    root.addEventListener('click', onRootClick, true)
-    root.addEventListener('keydown', onRootKeydown, true)
-    observer = new MutationObserver(queueRefresh)
-    observer.observe(root, { childList: true, subtree: true })
-    queueRefresh()
-  }
-
   menu.addEventListener('pointerdown', (event) => event.preventDefault())
   menu.addEventListener('click', (event) => {
     event.preventDefault()
@@ -367,21 +265,52 @@ export function initWysiwygHeadingLevels(): {
     if (Number.isInteger(level)) applyLevel(level)
   })
   menu.addEventListener('keydown', onMenuKeydown)
-  document.addEventListener('pointerdown', onDocumentPointerDown, true)
-  document.addEventListener('scroll', onDocumentScroll, true)
-  window.addEventListener('resize', onWindowResize)
 
-  rebind()
-  return {
-    dispose(): void {
+  registerWysiwygDomFeature({
+    refresh,
+    beforeRebind: () => hideMenu(),
+    onPointerDown: (event) => {
+      const target = event.target instanceof Element
+        ? event.target.closest<HTMLButtonElement>(`.${BUTTON_CLASS}`)
+        : null
+      if (!target) return false
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      return true
+    },
+    onClick: (event) => {
+      const button = event.target instanceof Element
+        ? event.target.closest<HTMLButtonElement>(`.${BUTTON_CLASS}`)
+        : null
+      const heading = button?.closest<HTMLHeadingElement>(HEADING_SELECTOR)
+      if (!button || !heading) return false
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      showMenu(heading, button)
+      return true
+    },
+    onKeydown: (event) => {
+      const button = event.target instanceof Element
+        ? event.target.closest<HTMLButtonElement>(`.${BUTTON_CLASS}`)
+        : null
+      const heading = button?.closest<HTMLHeadingElement>(HEADING_SELECTOR)
+      if (!button || !heading) return false
+      if (
+        event.key !== 'Enter' &&
+        event.key !== ' ' &&
+        event.key !== 'ArrowDown'
+      ) {
+        return false
+      }
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      showMenu(heading, button, true)
+      return true
+    },
+    dispose: () => {
       hideMenu()
-      unbindRoot()
-      document.removeEventListener('pointerdown', onDocumentPointerDown, true)
-      document.removeEventListener('scroll', onDocumentScroll, true)
-      window.removeEventListener('resize', onWindowResize)
       menu.remove()
       root = null
     },
-    rebind,
-  }
+  })
 }

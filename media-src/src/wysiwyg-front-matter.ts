@@ -4,14 +4,11 @@ import {
   restoreFrontMatterSeparator,
 } from './front-matter'
 import type { FrontMatterEntry, FrontMatterValue } from './front-matter'
-import { t } from './lang'
-import {
-  commitVditorWysiwygDomEdit,
-  getVditorInternals,
-} from './vditor-adapter'
+import { registerWysiwygDomFeature } from './wysiwyg-dom'
 import {
   closeActiveWysiwygPopover,
-  showWysiwygSourcePopover,
+  hideWysiwygSerializerSource,
+  openWysiwygSourceEditSession,
 } from './wysiwyg-popover'
 
 /**
@@ -58,10 +55,6 @@ const BLOCK_SELECTOR =
   '.vditor-wysiwyg__block[data-type="yaml-front-matter"]'
 const PREVIEW_CLASS = 'vditor-wysiwyg__preview'
 const TABLE_CLASS = 'vmd-front-matter'
-
-function getWysiwygRoot(): HTMLElement | null {
-  return document.querySelector('.vditor-wysiwyg .vditor-reset')
-}
 
 /** The `<pre><code>` Vditor rendered, i.e. the editable source. */
 function getSourcePre(block: HTMLElement): HTMLElement | null {
@@ -161,8 +154,8 @@ function buildTable(source: string): HTMLElement {
   const { entries, error } = parseFrontMatter(source)
 
   if (error) {
-    // test07: invalid YAML must say so clearly and keep the source visible,
-    // never silently show an empty or half-filled table.
+    // Invalid YAML must show its raw projection clearly rather than silently
+    // presenting an empty or partially parsed table.
     const notice = document.createElement('div')
     notice.className = `${TABLE_CLASS} ${TABLE_CLASS}--error`
     const heading = document.createElement('div')
@@ -196,26 +189,10 @@ function buildTable(source: string): HTMLElement {
 
 export function initWysiwygFrontMatter(display: FrontMatterDisplay = 'table') {
   let mode: FrontMatterDisplay = display
-  let root: HTMLElement | null = null
-  let boundRoot: HTMLElement | null = null
-  let observer: MutationObserver | null = null
-  let refreshQueued = false
   let writing = false
 
   function clearPreview(block: HTMLElement): void {
     getPreview(block)?.remove()
-  }
-
-  function createEditButton(): HTMLButtonElement {
-    const button = document.createElement('button')
-    button.type = 'button'
-    button.className = 'vmd-source-edit-button'
-    button.setAttribute('contenteditable', 'false')
-    button.setAttribute('data-render', '1')
-    button.setAttribute('aria-label', t('editSource') || 'Edit source')
-    button.innerHTML =
-      '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.7 1.8a1.4 1.4 0 0 1 2 2l-8.4 8.4-3 .6.6-3 8.8-8z" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>'
-    return button
   }
 
   function renderPreview(block: HTMLElement): void {
@@ -226,7 +203,8 @@ export function initWysiwygFrontMatter(display: FrontMatterDisplay = 'table') {
       existing.getAttribute('data-vmd-mode') === mode
     ) {
       block.classList.add('vmd-front-matter-block--rendered')
-      getSourcePre(block)?.style.setProperty('display', 'none', 'important')
+      const sourcePre = getSourcePre(block)
+      if (sourcePre) hideWysiwygSerializerSource(sourcePre)
       return
     }
     existing?.remove()
@@ -244,21 +222,21 @@ export function initWysiwygFrontMatter(display: FrontMatterDisplay = 'table') {
     } else {
       preview.appendChild(buildTable(source))
     }
-    preview.appendChild(createEditButton())
     block.appendChild(preview)
     block.classList.add('vmd-front-matter-block--rendered')
-    getSourcePre(block)?.style.setProperty('display', 'none', 'important')
+    const sourcePre = getSourcePre(block)
+    if (sourcePre) hideWysiwygSerializerSource(sourcePre)
   }
 
-  function refresh(): void {
-    refreshQueued = false
-    if (writing || !root) return
+  function refresh(root: HTMLElement): void {
+    if (writing) return
     const block = findBlock(root)
     if (!block) return
 
     writing = true
     try {
-      getSourcePre(block)?.style.setProperty('display', 'none', 'important')
+      const sourcePre = getSourcePre(block)
+      if (sourcePre) hideWysiwygSerializerSource(sourcePre)
       if (mode === 'hide') {
         clearPreview(block)
         block.classList.remove('vmd-front-matter-block--rendered')
@@ -272,29 +250,13 @@ export function initWysiwygFrontMatter(display: FrontMatterDisplay = 'table') {
     }
   }
 
-  function queueRefresh(): void {
-    if (refreshQueued || writing) return
-    refreshQueued = true
-    queueMicrotask(refresh)
-  }
-
   function openEditor(block: HTMLElement): void {
     const sourcePre = getSourcePre(block)
     const sourceCode = sourcePre?.querySelector<HTMLElement>(':scope > code')
-    const popover = getVditorInternals()?.wysiwyg?.popover
-    const internal = getVditorInternals()
-    if (
-      !sourcePre ||
-      !sourceCode ||
-      !(popover instanceof HTMLElement) ||
-      !internal ||
-      internal.currentMode !== 'wysiwyg'
-    ) {
-      return
-    }
+    if (!sourcePre || !sourceCode) return
     const initial = sourceCode.textContent || ''
-    showWysiwygSourcePopover({
-      popover,
+
+    openWysiwygSourceEditSession({
       target: block,
       focusField: 'source',
       fields: [
@@ -305,12 +267,11 @@ export function initWysiwygFrontMatter(display: FrontMatterDisplay = 'table') {
           multiline: true,
         },
       ],
+      unavailableMessage: 'The Front Matter block is no longer available',
+      isAvailable: () => sourceCode.isConnected,
       onChange: (values) => {
-        if (!block.isConnected || !sourceCode.isConnected) {
-          return 'The Front Matter block is no longer available'
-        }
         sourceCode.textContent = values.source ?? ''
-        sourcePre.style.setProperty('display', 'none', 'important')
+        hideWysiwygSerializerSource(sourcePre)
         writing = true
         try {
           renderPreview(block)
@@ -319,86 +280,43 @@ export function initWysiwygFrontMatter(display: FrontMatterDisplay = 'table') {
         }
         return null
       },
-      onFinish: (_values, changed) => {
-        if (
-          !changed ||
-          !block.isConnected ||
-          !sourceCode.isConnected ||
-          sourceCode.textContent === initial
-        ) {
-          return
-        }
-        sourcePre.style.setProperty('display', 'none', 'important')
-        commitVditorWysiwygDomEdit(internal)
-        queueRefresh()
-      },
+      isSourceChanged: () => sourceCode.textContent !== initial,
+      beforeCommit: () => hideWysiwygSerializerSource(sourcePre),
+      afterCommit: () => registration.requestRefresh(),
     })
   }
 
-  function onRootPointerDown(event: PointerEvent): void {
-    if (!root || mode === 'hide') return
-    const target = event.target instanceof Element ? event.target : null
-    const block = findBlock(root)
-    const preview = block ? getPreview(block) : null
-    if (!target || !preview?.contains(target)) return
-    event.preventDefault()
-    event.stopImmediatePropagation()
-  }
+  const registration = registerWysiwygDomFeature({
+    refresh,
+    onPointerDown: (event, root) => {
+      if (mode === 'hide') return false
+      const target = event.target instanceof Element ? event.target : null
+      const block = findBlock(root)
+      const preview = block ? getPreview(block) : null
+      if (!target || !preview?.contains(target)) return false
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      return true
+    },
+    onClick: (event, root) => {
+      if (mode === 'hide') return false
+      const block = findBlock(root)
+      const preview = block ? getPreview(block) : null
+      const target = event.target instanceof Element ? event.target : null
+      if (!block || !target || !preview?.contains(target)) return false
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      openEditor(block)
+      return true
+    },
+  })
 
-  function onRootClick(event: MouseEvent): void {
-    if (!root || mode === 'hide') return
-    const block = findBlock(root)
-    const preview = block ? getPreview(block) : null
-    const target = event.target instanceof Element ? event.target : null
-    if (!block || !target || !preview?.contains(target)) return
-    event.preventDefault()
-    event.stopImmediatePropagation()
-    openEditor(block)
-  }
-
-  function unbindRoot(): void {
-    observer?.disconnect()
-    observer = null
-    if (!boundRoot) return
-    boundRoot.removeEventListener('pointerdown', onRootPointerDown, true)
-    boundRoot.removeEventListener('click', onRootClick, true)
-    boundRoot = null
-  }
-
-  function rebind(): void {
-    const nextRoot = getWysiwygRoot()
-    if (nextRoot === root && boundRoot === nextRoot) {
-      queueRefresh()
-      return
-    }
-    unbindRoot()
-    root = nextRoot
-    if (!root) return
-    boundRoot = root
-    root.addEventListener('pointerdown', onRootPointerDown, true)
-    root.addEventListener('click', onRootClick, true)
-    observer = new MutationObserver(queueRefresh)
-    observer.observe(root, { childList: true, subtree: true, characterData: true })
-    queueRefresh()
-  }
-
-  rebind()
   return {
-    rebind,
-    setDisplay(next: FrontMatterDisplay) {
+    setDisplay(next: FrontMatterDisplay): void {
       if (mode === next) return
       closeActiveWysiwygPopover()
       mode = next
-      const block = root ? findBlock(root) : null
-      if (block) {
-        writing = true
-        try {
-          clearPreview(block)
-        } finally {
-          writing = false
-        }
-      }
-      queueRefresh()
+      registration.requestRefresh()
     },
   }
 }

@@ -1,14 +1,10 @@
+import { registerWysiwygDomFeature } from './wysiwyg-dom'
+
 const ALIGNMENTS = ['left', 'center', 'right', 'justify'] as const
 type HtmlAlignment = (typeof ALIGNMENTS)[number]
 const ALIGN_CLASS_PREFIX = 'vmd-html-align-'
 const SOURCE_TOKEN_CLASS = 'vmd-html-inline-projected-source'
 const ZERO_WIDTH_SPACE = '\u200b'
-
-function getWysiwygRoot(): HTMLElement | null {
-  return document.querySelector<HTMLElement>(
-    '.vditor-wysiwyg .vditor-reset'
-  )
-}
 
 function tokenText(token: HTMLElement): string {
   return (token.textContent || '').replaceAll(ZERO_WIDTH_SPACE, '').trim()
@@ -78,50 +74,19 @@ function decorateHeading(heading: HTMLElement): void {
 }
 
 /** Adds safe display-only classes to raw HTML previews and heading wrappers. */
-export function initWysiwygHtmlPresentation(): { rebind(): void } {
-  let root: HTMLElement | null = null
-  let observer: MutationObserver | null = null
-  let refreshQueued = false
-
-  function refresh(): void {
-    refreshQueued = false
-    if (!root) return
-    root
-      .querySelectorAll<HTMLElement>(
-        '.vditor-wysiwyg__block[data-type="html-block"] > .vditor-wysiwyg__preview'
-      )
-      .forEach((preview) => {
-        preview.classList.add('vmd-html-transparent-preview')
-      })
-    root
-      .querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6')
-      .forEach(decorateHeading)
-  }
-
-  function queueRefresh(): void {
-    if (refreshQueued) return
-    refreshQueued = true
-    queueMicrotask(refresh)
-  }
-
-  function rebind(): void {
-    const nextRoot = getWysiwygRoot()
-    if (nextRoot === root) {
-      queueRefresh()
-      return
-    }
-    observer?.disconnect()
-    root = nextRoot
-    if (!root) return
-    observer = new MutationObserver(queueRefresh)
-    observer.observe(root, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-    })
-    queueRefresh()
-  }
-
-  rebind()
-  return { rebind }
+export function initWysiwygHtmlPresentation(): void {
+  registerWysiwygDomFeature({
+    refresh(root) {
+      root
+        .querySelectorAll<HTMLElement>(
+          '.vditor-wysiwyg__block[data-type="html-block"] > .vditor-wysiwyg__preview'
+        )
+        .forEach((preview) => {
+          preview.classList.add('vmd-html-transparent-preview')
+        })
+      root
+        .querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6')
+        .forEach(decorateHeading)
+    },
+  })
 }

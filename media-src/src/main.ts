@@ -19,9 +19,11 @@ import {
 } from './toolbar'
 import { initTableContextMenu } from './table-context-menu'
 import { initBlockContextMenu } from './block-context-menu'
+import { disposeFloatingPanels } from './floating-panel'
 import {
   closeActiveWysiwygPopover,
   customizeWysiwygPopover,
+  disposeWysiwygPopover,
 } from './wysiwyg-popover'
 import {
   handleRenderedListTab,
@@ -52,7 +54,10 @@ import { initSplitScrollSync } from './split-scroll-sync'
 import { getScrollElement } from './scroll-target'
 import { installSvCodeIndentRepair } from './sv-code-indent'
 import { formatUploadTimestamp } from './upload-timestamp'
-import { installWysiwygSourcePanelAutoClose } from './wysiwyg-source-panel'
+import {
+  disposeWysiwygDom,
+  rebindWysiwygDom,
+} from './wysiwyg-dom'
 import { installToolbarShortcutController } from './toolbar-shortcuts'
 import { installEditorClipboard } from './editor-clipboard'
 import { vditorI18n } from 'virtual:vditor-i18n'
@@ -221,17 +226,37 @@ const toolbarShortcutController = installToolbarShortcutController()
 installEditorModeShortcutGuard()
 const editorClipboardController = installEditorClipboard()
 const codeCopyController = installCodeCopyHandler()
+let wysiwygFeaturesInitialized = false
+let frontMatterController: ReturnType<typeof initWysiwygFrontMatter> | null = null
+
+function initializeWysiwygFeatures(display: FrontMatterDisplay): void {
+  if (!wysiwygFeaturesInitialized) {
+    initWysiwygDetails()
+    initWysiwygAlerts()
+    initWysiwygCodeBlocks()
+    initWysiwygSourceEditors()
+    initWysiwygHtmlPresentation()
+    initWysiwygHeadingLevels()
+    frontMatterController = initWysiwygFrontMatter(display)
+    wysiwygFeaturesInitialized = true
+  } else {
+    frontMatterController?.setDisplay(display)
+  }
+  rebindWysiwygDom()
+}
+
 window.addEventListener(
   'pagehide',
   () => {
     toolbarShortcutController.dispose()
     editorClipboardController.dispose()
     codeCopyController.dispose()
-    window.__vmdHeadingLevels?.dispose()
+    disposeWysiwygDom()
+    disposeFloatingPanels()
+    disposeWysiwygPopover()
   },
   { once: true }
 )
-installWysiwygSourcePanelAutoClose()
 
 // Reports the current scroll position to the extension host so it can be restored
 // later. This matters because the extension host disposes and recreates the whole
@@ -590,13 +615,7 @@ function flushEditorContent(): void {
 
 function refreshModeDependentFeatures(): void {
   toolbarShortcutController.rebind()
-  window.__vmdDetails?.rebind?.()
-  window.__vmdAlerts?.rebind?.()
-  window.__vmdCodeBlocks?.rebind?.()
-  window.__vmdSourceEditors?.rebind?.()
-  window.__vmdHtmlPresentation?.rebind?.()
-  window.__vmdHeadingLevels?.rebind?.()
-  window.__vmdFrontMatter?.rebind?.()
+  rebindWysiwygDom()
   window.__vmdSplitScrollSync?.rebind?.(window.vditor)
 }
 
@@ -847,47 +866,9 @@ function initVditor(msg) {
       syncEditorModeToolbar(vditor)
       toolbarShortcutController.rebind()
       installWysiwygListCommands(vditor)
-      if (!(window as any).__vmdDetails) {
-        ;(window as any).__vmdDetails = initWysiwygDetails()
-      } else {
-        ;(window as any).__vmdDetails.rebind?.()
-      }
-      if (!(window as any).__vmdAlerts) {
-        ;(window as any).__vmdAlerts = initWysiwygAlerts()
-      } else {
-        ;(window as any).__vmdAlerts.rebind?.()
-      }
-      if (!(window as any).__vmdCodeBlocks) {
-        ;(window as any).__vmdCodeBlocks = initWysiwygCodeBlocks()
-      } else {
-        ;(window as any).__vmdCodeBlocks.rebind?.()
-      }
-      if (!window.__vmdSourceEditors) {
-        window.__vmdSourceEditors = initWysiwygSourceEditors()
-      } else {
-        window.__vmdSourceEditors.rebind?.()
-      }
-      if (!window.__vmdHtmlPresentation) {
-        window.__vmdHtmlPresentation = initWysiwygHtmlPresentation()
-      } else {
-        window.__vmdHtmlPresentation.rebind?.()
-      }
-      if (!window.__vmdHeadingLevels) {
-        window.__vmdHeadingLevels = initWysiwygHeadingLevels()
-      } else {
-        window.__vmdHeadingLevels.rebind()
-      }
       // Unknown values were already rejected by the host, so this only has to
       // cover the case of an older host that sends no value at all.
-      const frontMatterDisplay: FrontMatterDisplay =
-        msg.options?.frontMatterDisplay ?? 'table'
-      if (!(window as any).__vmdFrontMatter) {
-        ;(window as any).__vmdFrontMatter =
-          initWysiwygFrontMatter(frontMatterDisplay)
-      } else {
-        ;(window as any).__vmdFrontMatter.setDisplay?.(frontMatterDisplay)
-        ;(window as any).__vmdFrontMatter.rebind?.()
-      }
+      initializeWysiwygFeatures(msg.options?.frontMatterDisplay ?? 'table')
       initTableContextMenu()
       initBlockContextMenu()
       vditor.focus()

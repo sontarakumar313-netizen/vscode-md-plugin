@@ -3,6 +3,12 @@ import { ALERT_TYPES, normalizeAlertType } from './quote-format'
 import type { AlertType } from './quote-format'
 import { findInnermostDetailsBlocks } from './wysiwyg-details'
 import {
+  activateFloatingPanel,
+  deactivateFloatingPanel,
+  positionFloatingPanelAtTarget,
+} from './floating-panel'
+import { registerWysiwygDomFeature } from './wysiwyg-dom'
+import {
   commitVditorWysiwygDomEdit,
   getVditorInternals,
 } from './vditor-adapter'
@@ -31,10 +37,6 @@ interface AlertMenuState {
   marker: HTMLElement
   title: HTMLElement
   type: AlertType
-}
-
-function getWysiwygRoot(): HTMLElement | null {
-  return document.querySelector('.vditor-wysiwyg .vditor-reset')
 }
 
 function alertType(value: unknown): AlertType | null {
@@ -258,37 +260,14 @@ function createAlertTypeMenu(): HTMLDivElement {
   return menu
 }
 
-function positionAlertTypeMenu(menu: HTMLElement, target: HTMLElement): void {
-  const margin = 8
-  const gap = 4
-  menu.style.display = 'block'
-  menu.style.visibility = 'hidden'
-  menu.style.left = '0'
-  menu.style.top = '0'
-
-  const targetRect = target.getBoundingClientRect()
-  const maxLeft = Math.max(margin, window.innerWidth - menu.offsetWidth - margin)
-  const left = Math.min(Math.max(targetRect.left, margin), maxLeft)
-  const below = targetRect.bottom + gap
-  const above = targetRect.top - menu.offsetHeight - gap
-  const maxTop = Math.max(margin, window.innerHeight - menu.offsetHeight - margin)
-  const top = below <= maxTop || above < margin ? Math.min(below, maxTop) : above
-
-  menu.style.left = `${left}px`
-  menu.style.top = `${Math.max(margin, top)}px`
-  menu.style.visibility = 'visible'
-}
-
 /** Adds GitHub Alert presentation and an in-place type picker. */
-export function initWysiwygAlerts() {
+export function initWysiwygAlerts(): void {
   const menu = createAlertTypeMenu()
   let state: AlertMenuState | null = null
   let root: HTMLElement | null = null
-  let boundRoot: HTMLElement | null = null
-  let observer: MutationObserver | null = null
-  const queuedRoots = new WeakSet<HTMLElement>()
 
   function hideMenu(): void {
+    deactivateFloatingPanel(menu)
     state?.title.setAttribute('aria-expanded', 'false')
     state = null
     menu.style.display = 'none'
@@ -306,10 +285,7 @@ export function initWysiwygAlerts() {
   }
 
   function showMenu(nextState: AlertMenuState): void {
-    if (
-      state?.title === nextState.title &&
-      menu.style.display === 'block'
-    ) {
+    if (state?.title === nextState.title && menu.style.display === 'block') {
       hideMenu()
       return
     }
@@ -318,11 +294,16 @@ export function initWysiwygAlerts() {
     state = nextState
     state.title.setAttribute('aria-expanded', 'true')
     setCurrentType(state.type)
-    positionAlertTypeMenu(menu, state.title)
+    activateFloatingPanel({
+      panel: menu,
+      safeTargets: [state.title],
+      onDismiss: hideMenu,
+    })
+    positionFloatingPanelAtTarget(menu, state.title)
   }
 
   function refresh(targetRoot: HTMLElement): void {
-    queuedRoots.delete(targetRoot)
+    root = targetRoot
     targetRoot.querySelectorAll<HTMLElement>('blockquote').forEach(
       (blockquote) => decorateAlert(blockquote, targetRoot)
     )
@@ -337,17 +318,13 @@ export function initWysiwygAlerts() {
     setCurrentType(type)
   }
 
-  function queueRefresh(targetRoot: HTMLElement): void {
-    if (queuedRoots.has(targetRoot)) return
-    queuedRoots.add(targetRoot)
-    queueMicrotask(() => refresh(targetRoot))
-  }
-
   function titleTarget(event: Event): AlertMenuState | null {
     const target = event.target instanceof Element ? event.target : null
     const title = target?.closest<HTMLElement>(`.${ALERT_TITLE_CLASS}`) || null
     const blockquote = title?.closest<HTMLElement>('blockquote') || null
-    const paragraph = blockquote?.querySelector<HTMLElement>(':scope > p:first-of-type') || null
+    const paragraph = blockquote?.querySelector<HTMLElement>(
+      ':scope > p:first-of-type'
+    ) || null
     const marker = paragraph?.querySelector<HTMLElement>(
       `:scope > .${ALERT_MARKER_CLASS}`
     ) || null
@@ -363,21 +340,6 @@ export function initWysiwygAlerts() {
       return null
     }
     return { blockquote, marker, title, type }
-  }
-
-  function onRootPointerDown(event: PointerEvent): void {
-    if (!titleTarget(event)) return
-    // Keep the editable body selection while the non-editable title is clicked.
-    event.preventDefault()
-    event.stopImmediatePropagation()
-  }
-
-  function onRootClick(event: MouseEvent): void {
-    const nextState = titleTarget(event)
-    if (!nextState) return
-    event.preventDefault()
-    event.stopImmediatePropagation()
-    showMenu(nextState)
   }
 
   function applyType(type: AlertType): void {
@@ -399,49 +361,12 @@ export function initWysiwygAlerts() {
     const previousType = markerType(current.marker)
     if (!previousType || previousType === type) return
     const marker = current.marker.textContent || ''
-    const replacement = marker.replace(
-      ALERT_MARKER_TYPE_PATTERN,
-      `[!${type}]`
-    )
+    const replacement = marker.replace(ALERT_MARKER_TYPE_PATTERN, `[!${type}]`)
     if (replacement === marker) return
 
     current.marker.textContent = replacement
     decorateAlert(current.blockquote, root)
     commitVditorWysiwygDomEdit(internal)
-  }
-
-  function unbindRoot(): void {
-    observer?.disconnect()
-    observer = null
-    if (!boundRoot) return
-    boundRoot.removeEventListener('pointerdown', onRootPointerDown, true)
-    boundRoot.removeEventListener('click', onRootClick, true)
-    boundRoot = null
-  }
-
-  function rebind(): void {
-    hideMenu()
-    const nextRoot = getWysiwygRoot()
-    if (nextRoot === root && boundRoot === nextRoot) {
-      if (root) queueRefresh(root)
-      return
-    }
-
-    unbindRoot()
-    root = nextRoot
-    if (!root) return
-
-    const observedRoot = root
-    observedRoot.addEventListener('pointerdown', onRootPointerDown, true)
-    observedRoot.addEventListener('click', onRootClick, true)
-    boundRoot = observedRoot
-    observer = new MutationObserver(() => queueRefresh(observedRoot))
-    observer.observe(observedRoot, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-    })
-    queueRefresh(observedRoot)
   }
 
   menu.addEventListener('pointerdown', (event) => {
@@ -486,27 +411,28 @@ export function initWysiwygAlerts() {
     buttons[nextIndex]?.focus()
   })
 
-  document.addEventListener(
-    'pointerdown',
-    (event) => {
-      const target = event.target instanceof Element ? event.target : null
-      if (
-        target?.closest(`#${ALERT_MENU_ID}`) ||
-        target?.closest(`.${ALERT_TITLE_CLASS}`)
-      ) {
-        return
-      }
-      hideMenu()
+  registerWysiwygDomFeature({
+    refresh,
+    beforeRebind: hideMenu,
+    onPointerDown: (event) => {
+      if (!titleTarget(event)) return false
+      // Keep the editable body selection while the non-editable title is clicked.
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      return true
     },
-    true
-  )
-  document.addEventListener('scroll', hideMenu, true)
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && menu.style.display === 'block') hideMenu()
+    onClick: (event) => {
+      const nextState = titleTarget(event)
+      if (!nextState) return false
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      showMenu(nextState)
+      return true
+    },
+    dispose: () => {
+      hideMenu()
+      menu.remove()
+      root = null
+    },
   })
-  window.addEventListener('resize', hideMenu)
-  window.addEventListener('blur', hideMenu)
-
-  rebind()
-  return { rebind }
 }

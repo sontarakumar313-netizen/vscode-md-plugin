@@ -1,9 +1,15 @@
 import {
+  activateFloatingPanel,
+  deactivateFloatingPanel,
+  positionFloatingPanelAtPoint,
+} from './floating-panel'
+import {
   commitVditorWysiwygDomEdit,
   focusVditorRange,
   getVditorInternals,
 } from './vditor-adapter'
 import { t } from './lang'
+import { getWysiwygRoot } from './wysiwyg-dom'
 import { findInnermostDetailsBlocks } from './wysiwyg-details'
 import { closeActiveWysiwygPopover } from './wysiwyg-popover'
 
@@ -73,26 +79,6 @@ function createMenu(): HTMLDivElement {
   menu.appendChild(button)
   document.body.appendChild(menu)
   return menu
-}
-
-function positionMenu(menu: HTMLElement, clientX: number, clientY: number): void {
-  const margin = 8
-  menu.style.display = 'block'
-  menu.style.visibility = 'hidden'
-  menu.style.left = '0'
-  menu.style.top = '0'
-
-  const maxLeft = Math.max(margin, window.innerWidth - menu.offsetWidth - margin)
-  const maxTop = Math.max(margin, window.innerHeight - menu.offsetHeight - margin)
-  menu.style.left = `${Math.min(Math.max(clientX, margin), maxLeft)}px`
-  menu.style.top = `${Math.min(Math.max(clientY, margin), maxTop)}px`
-  menu.style.visibility = 'visible'
-}
-
-function getWysiwygRoot(): HTMLElement | null {
-  return document.querySelector<HTMLElement>(
-    '.vditor-wysiwyg .vditor-reset'
-  )
 }
 
 function directBlockKind(block: HTMLElement): DeletableBlockKind | null {
@@ -226,6 +212,7 @@ export function initBlockContextMenu(): void {
   let state: DeletableBlock | null = null
 
   const hide = () => {
+    deactivateFloatingPanel(menu)
     menu.style.display = 'none'
     menu.style.visibility = ''
     menu.removeAttribute('data-kind')
@@ -238,7 +225,8 @@ export function initBlockContextMenu(): void {
     if (label) label.textContent = text
     menu.setAttribute('aria-label', text)
     menu.dataset.kind = target.kind
-    positionMenu(menu, event.clientX, event.clientY)
+    activateFloatingPanel({ panel: menu, onDismiss: hide })
+    positionFloatingPanelAtPoint(menu, event.clientX, event.clientY)
   }
 
   document.addEventListener(
@@ -284,22 +272,6 @@ export function initBlockContextMenu(): void {
     hide()
     deleteBlock(current)
   })
-
-  document.addEventListener(
-    'pointerdown',
-    (event) => {
-      const eventTarget =
-        event.target instanceof Element ? event.target : null
-      if (!eventTarget?.closest(`#${MENU_ID}`)) hide()
-    },
-    true
-  )
-  document.addEventListener('scroll', hide, true)
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') hide()
-  })
-  window.addEventListener('resize', hide)
-  window.addEventListener('blur', hide)
 
   hideContextMenu = hide
 }

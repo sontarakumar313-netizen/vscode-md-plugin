@@ -161,40 +161,41 @@ body,
 
 .vditor-wysiwyg > .vmd-source-popover {
   width: min(720px, calc(100vw - 24px));
-  max-height: min(70vh, 620px);
-  padding: 8px;
+  max-height: min(35vh, 310px);
+  padding: 6px;
   overflow: auto;
 }
 .vmd-source-popover__field {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   width: 100%;
-  margin-bottom: 7px;
+  margin-bottom: 4px;
 }
 .vmd-source-popover__label {
   color: var(--vscode-descriptionForeground, var(--second-color));
-  font: 11px/1.4 var(--vscode-font-family, sans-serif);
+  font: 10px/1.2 var(--vscode-font-family, sans-serif);
 }
 .vmd-source-popover__input {
   box-sizing: border-box;
   width: 100% !important;
   min-width: 0;
+  padding: 3px 6px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  line-height: 1.3;
 }
 textarea.vmd-source-popover__input {
-  min-height: 9em;
-  max-height: 52vh;
+  min-height: 4.5em;
+  max-height: 26vh;
   resize: vertical;
   tab-size: 2;
   white-space: pre;
-  font-family: var(--vscode-editor-font-family, monospace);
-  font-size: var(--vscode-editor-font-size, 13px);
-  line-height: 1.5;
 }
 .vmd-source-popover__error {
-  margin: 2px 28px 0 0;
+  margin: 1px 28px 0 0;
   color: var(--vscode-inputValidation-errorForeground, var(--vscode-errorForeground, #f14c4c));
-  font: 12px/1.4 var(--vscode-font-family, sans-serif);
+  font: 11px/1.3 var(--vscode-font-family, sans-serif);
 }
 .vmd-source-popover > .vmd-popover-close {
   position: absolute;
@@ -227,7 +228,7 @@ textarea.vmd-source-popover__input {
   font-family: inherit;
 }
 .vditor-wysiwyg .vditor-reset [data-type='html-block']
-  > .vmd-html-transparent-preview > :not(.vmd-source-edit-button) {
+  > .vmd-html-transparent-preview > * {
   max-width: 100%;
 }
 .vditor-wysiwyg .vditor-reset .vmd-html-align-left { text-align: left; }
@@ -251,20 +252,6 @@ textarea.vmd-source-popover__input {
   cursor: pointer;
   opacity: 0;
 }
-.vditor-wysiwyg .vditor-reset :is(
-  [data-type='html-block'] > .vditor-wysiwyg__preview,
-  .vmd-code-block--rich > .vditor-wysiwyg__preview,
-  [data-type='yaml-front-matter'] > .vditor-wysiwyg__preview
-) > .vmd-source-edit-button {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-}
-.vditor-wysiwyg .vditor-reset :is(
-  [data-type='html-block'] > .vditor-wysiwyg__preview,
-  .vmd-code-block--rich > .vditor-wysiwyg__preview,
-  [data-type='yaml-front-matter'] > .vditor-wysiwyg__preview
-):hover > .vmd-source-edit-button,
 .vditor-wysiwyg .vditor-reset .vmd-source-edit-button:focus-visible,
 .vditor-wysiwyg .vditor-reset .vmd-code-toolbar .vmd-source-edit-button {
   opacity: 1;
@@ -278,24 +265,6 @@ textarea.vmd-source-popover__input {
   border-color: var(--vscode-focusBorder, #007fd4);
   outline: none;
 }
-.vditor-wysiwyg .vditor-reset .vmd-inline-source-control {
-  position: relative;
-  display: inline-block;
-  width: 0;
-  height: 1em;
-  overflow: visible;
-  vertical-align: text-top;
-}
-.vditor-wysiwyg .vditor-reset .vmd-inline-source-control > .vmd-source-edit-button {
-  position: absolute;
-  right: -11px;
-  bottom: 100%;
-}
-.vditor-wysiwyg .vditor-reset :is(p, h1, h2, h3, h4, h5, h6):hover
-  > .vmd-inline-source-control > .vmd-source-edit-button {
-  opacity: 1;
-}
-
 /* Vditor's pointer cursor implies that an ordinary click opens a link. This
    editor instead treats links as text until the exact platform modifier is held. */
 .vditor-wysiwyg .vditor-reset a {
@@ -404,10 +373,6 @@ textarea.vmd-source-popover__input {
   width: 16px;
   height: 16px;
 }
-.vditor-wysiwyg > .vmd-details-title-popover .vmd-url-popover__url {
-  width: calc(100% - 27px);
-}
-
 /* ── Details open-content border ───────────────────────────────────────────
    Content blocks belonging to an open details group are marked with
    vmd-details-content--open/first/last so a grouped border can be drawn
@@ -687,7 +652,6 @@ textarea.vmd-source-popover__input {
 .vditor-wysiwyg .vditor-reset .vmd-code-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   min-height: 28px;
   padding: 3px 8px;
@@ -702,40 +666,51 @@ textarea.vmd-source-popover__input {
   font: 11px/1.4 var(--vscode-editor-font-family, monospace);
   user-select: none;
 }
-.vditor-wysiwyg .vditor-reset .vmd-code-language-button {
+.vditor-wysiwyg .vditor-reset .vmd-code-language {
   min-width: 0;
-  padding: 1px 4px;
+  padding: 1px 0;
   overflow: hidden;
-  border: 1px solid transparent;
-  border-radius: 3px;
   color: inherit;
-  background: transparent;
   font: inherit;
   text-overflow: ellipsis;
   white-space: nowrap;
-  cursor: pointer;
-  appearance: none;
 }
-.vditor-wysiwyg .vditor-reset .vmd-code-language-button::after {
-  margin-left: 5px;
-  content: '▾';
-  font-size: 9px;
+.vditor-wysiwyg .vditor-reset .vmd-code-toolbar__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
 }
-.vditor-wysiwyg .vditor-reset .vmd-code-language-button:hover,
-.vditor-wysiwyg .vditor-reset .vmd-code-language-button:focus-visible {
-  border-color: var(--vscode-focusBorder, #007fd4);
-  outline: none;
-}
-.vditor-wysiwyg .vditor-reset .vmd-code-toolbar > .vditor-copy {
+.vditor-wysiwyg .vditor-reset .vmd-code-toolbar__actions > .vditor-copy {
   position: static !important;
   display: flex !important;
   flex: 0 0 auto;
   align-items: center;
 }
-.vditor-wysiwyg .vditor-reset .vmd-code-toolbar > .vditor-copy > span {
+.vditor-wysiwyg .vditor-reset .vmd-code-toolbar__actions > .vditor-copy > span,
+.vditor-wysiwyg .vditor-reset .vmd-code-toolbar__actions > .vmd-source-edit-button {
   position: static !important;
-  display: flex;
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 3px;
   align-items: center;
+  justify-content: center;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.vditor-wysiwyg .vditor-reset .vmd-code-toolbar__actions > .vditor-copy > span:hover,
+.vditor-wysiwyg .vditor-reset .vmd-code-toolbar__actions > .vditor-copy > span:focus-visible,
+.vditor-wysiwyg .vditor-reset .vmd-code-toolbar__actions > .vmd-source-edit-button:hover,
+.vditor-wysiwyg .vditor-reset .vmd-code-toolbar__actions > .vmd-source-edit-button:focus-visible {
+  border-color: var(--vscode-focusBorder, #007fd4);
+  background: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.15));
+  outline: none;
 }
 .vditor-wysiwyg .vditor-reset .vmd-code-block--rich
   > .vditor-wysiwyg__preview {

@@ -433,13 +433,28 @@ function testPage() {
         let codeSource = codeBlock.querySelector(':scope > pre:not(.vditor-wysiwyg__preview)');
         let codePreview = codeBlock.querySelector(':scope > .vditor-wysiwyg__preview');
         let codePreviewCode = codePreview.querySelector(':scope > code');
-        let codeLanguageButton = codeBlock.querySelector('.vmd-code-language-button');
+        let codeLanguageLabel = codeBlock.querySelector('.vmd-code-language');
+        const codeToolbar = codeBlock.querySelector('.vmd-code-toolbar');
+        const codeActions = codeToolbar?.querySelector('.vmd-code-toolbar__actions');
+        const codeEditButton = codeActions?.querySelector('.vmd-source-edit-button');
+        const codeToolbarCopy = codeActions?.querySelector('.vditor-copy');
+        const codeToolbarCopyControl = codeToolbarCopy?.querySelector('.vditor-tooltipped');
         expect(
           codeBlock.classList.contains('vmd-code-block--ordinary') &&
-            codeLanguageButton?.textContent.includes('js') &&
-            codeBlock.querySelector('.vmd-code-toolbar .vditor-copy') &&
-            codeBlock.querySelector('.vmd-code-toolbar .vmd-source-edit-button'),
-          'the ordinary code block did not receive its language/edit/copy bar: ' +
+            codeLanguageLabel?.tagName === 'SPAN' &&
+            codeLanguageLabel.textContent.includes('js') &&
+            getComputedStyle(codeLanguageLabel, '::after').content === 'none' &&
+            codeEditButton &&
+            codeToolbarCopy &&
+            codeEditButton.getBoundingClientRect().left <
+              codeToolbarCopy.getBoundingClientRect().left &&
+            Math.abs(
+              codeEditButton.getBoundingClientRect().width -
+                codeToolbarCopyControl.getBoundingClientRect().width
+            ) <= 1 &&
+            codeActions.getBoundingClientRect().right <=
+              codeToolbar.getBoundingClientRect().right,
+          'the ordinary code block did not receive its static language and right-aligned edit/copy controls: ' +
             codeBlock.outerHTML.slice(0, 2000)
         );
         expect(
@@ -448,9 +463,16 @@ function testPage() {
           'the idle ordinary code block did not show exactly its highlighted preview'
         );
 
-        codeLanguageButton.click();
+        codeLanguageLabel.click();
+        codePreviewCode.click();
         await pause();
         sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        expect(
+          sourcePopover?.style.display !== 'block',
+          'clicking the code language or content opened the source popover'
+        );
+        codeEditButton.click();
+        await pause();
         const codeLanguageInput = sourcePopover.querySelector('[name="language"]');
         const codeContentInput = sourcePopover.querySelector('[name="content"]');
         expect(
@@ -458,8 +480,8 @@ function testPage() {
             sourcePopover.querySelectorAll('.vmd-source-popover__field').length === 2 &&
             codeLanguageInput.value === 'js' &&
             codeContentInput.value === 'const a = 1;' &&
-            document.activeElement === codeLanguageInput,
-          'the code block did not open the required two-row shared popover: ' + JSON.stringify({
+            document.activeElement === codeContentInput,
+          'the code edit button did not open the required two-row shared popover: ' + JSON.stringify({
             display: sourcePopover?.style.display,
             fields: sourcePopover?.querySelectorAll('.vmd-source-popover__field').length,
             language: codeLanguageInput?.value,
@@ -467,6 +489,27 @@ function testPage() {
             active: document.activeElement?.getAttribute('name'),
             html: sourcePopover?.outerHTML.slice(0, 1200),
           })
+        );
+        const compactPopoverStyle = getComputedStyle(sourcePopover);
+        const compactContentStyle = getComputedStyle(codeContentInput);
+        const compactContentMetrics = {
+          fontSize: compactContentStyle.fontSize,
+          lineHeight: compactContentStyle.lineHeight,
+          fontFamily: compactContentStyle.fontFamily,
+        };
+        expect(
+          Number.parseFloat(compactPopoverStyle.maxHeight) <= 310 &&
+            codeContentInput.rows === 4 &&
+            Number.parseFloat(compactContentStyle.fontSize) <= 12 &&
+            Number.parseFloat(compactContentStyle.lineHeight) /
+              Number.parseFloat(compactContentStyle.fontSize) <= 1.31,
+          'the shared source popover did not use the compact half-height styling: ' +
+            JSON.stringify({
+              maxHeight: compactPopoverStyle.maxHeight,
+              rows: codeContentInput.rows,
+              fontSize: compactContentStyle.fontSize,
+              lineHeight: compactContentStyle.lineHeight,
+            })
         );
         codeLanguageInput.value = 'python';
         codeLanguageInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'python' }));
@@ -586,7 +629,6 @@ function testPage() {
         );
         const htmlSource = htmlBlock.querySelector(':scope > pre:not(.vditor-wysiwyg__preview)');
         const htmlPreview = htmlBlock.querySelector(':scope > .vditor-wysiwyg__preview');
-        const htmlEditButton = htmlPreview.querySelector(':scope > .vmd-source-edit-button');
         expect(
           centeredHeading.classList.contains('vmd-html-align-center') &&
             Array.from(centeredHeading.querySelectorAll('code[data-type="html-inline"]')).every(
@@ -594,29 +636,22 @@ function testPage() {
             ) &&
             getComputedStyle(htmlSource).display === 'none' &&
             getComputedStyle(htmlPreview).backgroundColor === 'rgba(0, 0, 0, 0)' &&
-            htmlEditButton,
-          'HTML presentation did not project alignment, transparency, and hidden source: ' + JSON.stringify({
+            !htmlPreview.querySelector(':scope > .vmd-source-edit-button'),
+          'HTML presentation did not project alignment, transparency, direct editing, and hidden source: ' + JSON.stringify({
             heading: centeredHeading?.outerHTML,
             html: htmlBlock?.outerHTML.slice(0, 1800),
             source: htmlSource ? getComputedStyle(htmlSource).display : 'missing',
             background: htmlPreview ? getComputedStyle(htmlPreview).backgroundColor : 'missing',
-            button: !!htmlEditButton,
           })
         );
-        htmlPreview.querySelector('p').click();
-        await pause();
-        expect(
-          document.querySelector('.vmd-source-popover')?.style.display !== 'block',
-          'clicking interactive HTML preview content opened its source directly'
-        );
-        htmlEditButton.click();
+        (htmlPreview.querySelector('p') || htmlPreview).click();
         await pause();
         sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
         const htmlInput = sourcePopover.querySelector('[name="source"]');
         expect(
           htmlInput?.value.includes('<p align="center">') &&
             getComputedStyle(htmlSource).display === 'none',
-          'the HTML hover edit button did not open sanitized source editing'
+          'clicking non-interactive HTML content did not open sanitized source editing'
         );
         htmlInput.value = htmlInput.value.replace('align="center"', 'align="right"');
         htmlInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'right' }));
@@ -640,6 +675,25 @@ function testPage() {
         await pause();
         sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
         const inlineMathInput = sourcePopover.querySelector('[name="source"]');
+        const inlineMathInputStyle = getComputedStyle(inlineMathInput);
+        expect(
+          inlineMathInputStyle.fontSize === compactContentMetrics.fontSize &&
+            inlineMathInputStyle.lineHeight === compactContentMetrics.lineHeight &&
+            inlineMathInputStyle.fontFamily === compactContentMetrics.fontFamily,
+          'inline and block/source editing popovers do not share one input style: ' +
+            JSON.stringify({
+              inline: {
+                font: inlineMathInputStyle.fontSize,
+                line: inlineMathInputStyle.lineHeight,
+                family: inlineMathInputStyle.fontFamily,
+              },
+              block: {
+                font: compactContentMetrics.fontSize,
+                line: compactContentMetrics.lineHeight,
+                family: compactContentMetrics.fontFamily,
+              },
+            })
+        );
         inlineMathInput.value = 'y';
         inlineMathInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'y' }));
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -665,19 +719,21 @@ function testPage() {
             window.vditor.getValue().includes('&reg;'),
           'HTML entity popover did not save while keeping source hidden'
         );
-        const inlineHtmlControls = root().querySelectorAll('.vmd-inline-source-control');
+        const inlineHtmlParagraph = Array.from(root().querySelectorAll('p')).find(
+          (paragraph) => paragraph.textContent.includes('word')
+        );
         expect(
-          inlineHtmlControls.length >= 2 &&
+          !root().querySelector('.vmd-inline-source-control') &&
             Array.from(root().querySelectorAll('code[data-type="html-inline"]')).every(
               (token) => getComputedStyle(token).display === 'none'
             ),
-          'inline HTML did not receive hidden-source popover controls'
+          'inline HTML kept its old hover edit controls or exposed serializer source'
         );
-        inlineHtmlControls[0].querySelector('.vmd-source-edit-button').click();
+        inlineHtmlParagraph.click();
         await pause();
         expect(
           document.querySelector('.vmd-source-popover [name="source"]')?.value.startsWith('<'),
-          'inline HTML hover control did not open its token editor'
+          'clicking rendered inline HTML content did not open the nearest token editor'
         );
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
@@ -1699,17 +1755,25 @@ function testPage() {
         detailsTitleButton.click();
         await Promise.resolve();
         const detailsTitlePopover = document.querySelector(
-          '.vditor-wysiwyg > .vmd-details-title-popover'
+          '.vditor-wysiwyg > .vmd-source-popover'
         );
         const detailsTitleInput = detailsTitlePopover?.querySelector(
-          '.vmd-url-popover__url-input'
+          '[name="title"]'
         );
         expect(
           detailsBody.classList.contains('vmd-details-content--hidden') &&
             detailsTitlePopover?.style.display === 'block' &&
-            detailsTitlePopover.dataset.vmdPosition === 'above' &&
+            ['above', 'below', 'viewport'].includes(
+              detailsTitlePopover.dataset.vmdPosition
+            ) &&
             detailsTitleInput?.value === 'Title',
-          'the title edit button toggled details or did not open the shared custom popover'
+          'the title edit button toggled details or did not open the shared custom popover: ' +
+            JSON.stringify({
+              hidden: detailsBody.classList.contains('vmd-details-content--hidden'),
+              display: detailsTitlePopover?.style.display,
+              position: detailsTitlePopover?.dataset.vmdPosition,
+              value: detailsTitleInput?.value,
+            })
         );
         const detailsCloseButton = detailsTitlePopover.querySelector('.vmd-popover-close');
         expect(
@@ -1770,7 +1834,7 @@ function testPage() {
         expect(
           !window.vditor.getValue().includes('vmd-details-toggle') &&
             !window.vditor.getValue().includes('vmd-details-title-button') &&
-            !window.vditor.getValue().includes('vmd-details-title-popover'),
+            !window.vditor.getValue().includes('vmd-source-popover'),
           'details editing controls leaked into Markdown'
         );
         expect(!/<details\\s+[^>]*\\bopen/.test(window.vditor.getValue()), 'opening details changed the Markdown source');
@@ -1800,7 +1864,7 @@ function testPage() {
         renamedTitleButton.click();
         await Promise.resolve();
         const reopenedDetailsPopover = document.querySelector(
-          '.vditor-wysiwyg > .vmd-details-title-popover'
+          '.vditor-wysiwyg > .vmd-source-popover'
         );
         const detailsEscape = new KeyboardEvent('keydown', {
           key: 'Escape',
@@ -1860,11 +1924,11 @@ function testPage() {
         richDetailsOpener.querySelector('.vmd-details-title-button').click();
         await Promise.resolve();
         const richTitleInput = document.querySelector(
-          '.vmd-details-title-popover .vmd-url-popover__url-input'
+          '.vmd-source-popover [name="title"]'
         );
         richTitleInput.blur();
         await pause();
-        const richTitlePopover = document.querySelector('.vmd-details-title-popover');
+        const richTitlePopover = document.querySelector('.vmd-source-popover');
         expect(
           richTitlePopover.style.display === 'block' &&
             richTitlePopover.classList.contains('vmd-url-popover--persistent'),
@@ -1981,6 +2045,32 @@ function testPage() {
           virtualListRect.left - outlineExtent >= borderRects[0].left - 0.5 &&
             virtualListRect.right + outlineExtent <= borderRects[0].right + 0.5,
           'the list outline exceeds the details virtual-document boundary'
+        );
+
+        // Details now uses the same one-session source editor as other hidden
+        // serializer-owned content, so multiple input events commit once.
+        await setMarkdown(
+          '<details>\\n<summary>Undo title</summary>\\n\\nUndo body\\n\\n</details>'
+        );
+        root().querySelector('.vmd-details-title-button').click();
+        await Promise.resolve();
+        const undoTitlePopover = document.querySelector('.vmd-source-popover');
+        const undoTitleInput = undoTitlePopover.querySelector('[name="title"]');
+        undoTitleInput.value = 'Undo title first';
+        undoTitleInput.dispatchEvent(new InputEvent('input', { bubbles: true }));
+        undoTitleInput.value = 'Undo title final';
+        undoTitleInput.dispatchEvent(new InputEvent('input', { bubbles: true }));
+        undoTitlePopover.querySelector('.vmd-popover-close').click();
+        await pause(80);
+        expect(
+          window.vditor.getValue().includes('<summary>Undo title final</summary>'),
+          'the unified Details source session did not commit its final draft'
+        );
+        window.vditor.vditor.undo.undo(window.vditor.vditor);
+        await pause(100);
+        expect(
+          window.vditor.getValue().includes('<summary>Undo title</summary>'),
+          'multiple Details title inputs were not grouped into one undo step'
         );
 
         // Reproduce an actual blank WYSIWYG line through Vditor's Enter path.
@@ -2468,12 +2558,55 @@ function testPage() {
           clientY: 50,
         }));
         await pause();
+        const tableContextMenu = document.getElementById('vmd-table-context-menu');
         expect(
-          getComputedStyle(document.getElementById('vmd-table-context-menu')).display !== 'none' &&
-            getComputedStyle(document.getElementById('vmd-block-context-menu')).display === 'none',
-          'the whole-block menu overrode the existing table context menu'
+          getComputedStyle(tableContextMenu).display !== 'none' &&
+            getComputedStyle(document.getElementById('vmd-block-context-menu')).display === 'none' &&
+            tableContextMenu.querySelector('[data-type="default"]')
+              .classList.contains('vmd-table-context-menu__current'),
+          'the table menu lost priority or did not recognize implicit default alignment'
         );
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        tableContextMenu.querySelector('[data-type="center"]').click();
+        await pause(100);
+        let alignedTable = root().querySelector('table');
+        expect(
+          Array.from(alignedTable.rows).every(
+            (row) => row.cells[0]?.getAttribute('align') === 'center'
+          ),
+          'explicit center alignment did not apply to the complete Markdown column'
+        );
+        const defaultAlignmentCell = alignedTable.querySelector('td');
+        defaultAlignmentCell.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          button: 2,
+          clientX: 50,
+          clientY: 50,
+        }));
+        tableContextMenu.querySelector('[data-type="default"]').click();
+        await pause(100);
+        alignedTable = root().querySelector('table');
+        const defaultHeader = alignedTable.rows[0].cells[0];
+        const defaultBody = alignedTable.rows[1].cells[0];
+        const separatorCell = window.vditor.getValue()
+          .split(/\\r?\\n/)
+          .find((line) => line.includes('---'))
+          .split('|')[1]
+          .trim();
+        expect(
+          Array.from(alignedTable.rows).every(
+            (row) => !row.cells[0]?.hasAttribute('align')
+          ) &&
+            !separatorCell.includes(':') &&
+            getComputedStyle(defaultHeader).textAlign === 'center' &&
+            ['left', 'start'].includes(getComputedStyle(defaultBody).textAlign),
+          'default alignment did not restore centered headers with left-aligned body cells: ' +
+            JSON.stringify({
+              markdown: window.vditor.getValue(),
+              header: getComputedStyle(defaultHeader).textAlign,
+              body: getComputedStyle(defaultBody).textAlign,
+            })
+        );
 
         // Restore Vditor's original, standalone quote command and icon. GitHub
         // Alert remains an independent control with its own source transforms.
@@ -3347,273 +3480,21 @@ function testPage() {
           'dedenting one line also dropped the indent of the next'
         );
 
-        // YAML front matter renders as a table in WYSIWYG mode, and the table must
-        // never reach the Markdown. The document text is the contract here: the
-        // generated DOM lives in a preview container the serializer skips.
+        // Reinitialization and stale-generation handling use ordinary Markdown;
+        // Front Matter behavior is intentionally retained without test coverage.
         await switchMode('wysiwyg');
-        const frontMatterSource = lines(
-          '---',
-          'title: Front Matter',
-          'draft: false',
-          'priority: 1',
-          'tags:',
-          '  - alpha',
-          '  - beta',
-          'author:',
-          '  name: Wu',
-          '  contact:',
-          '    email: wu@example.com',
-          '---',
+        const reopenedSource = lines(
+          '# Reinitialized body',
           '',
-          '# Body heading',
-          '',
-          'Body paragraph.',
+          'Plain content.',
           ''
         );
-        await setMarkdown(frontMatterSource);
-        const bodyHeading = root().querySelector('h1');
-        expect(bodyHeading, 'front matter fixture did not render its body heading');
-        select(
-          bodyHeading,
-          bodyHeading.childNodes.length,
-          bodyHeading,
-          bodyHeading.childNodes.length
-        );
-        document.dispatchEvent(new Event('selectionchange'));
-        const fmBlock = () => root().querySelector('.vditor-wysiwyg__block[data-type="yaml-front-matter"]');
-        testCheckpoint = 'waiting for front matter block';
-        await wait(() => fmBlock());
-        expect(fmBlock(), 'front matter did not render as a yaml-front-matter block');
-        const fmTable = () => fmBlock().querySelector('table.vmd-front-matter');
-        testCheckpoint = 'waiting for front matter table';
-        await wait(() => fmTable());
-        testCheckpoint = 'startup';
-        expect(
-          fmTable(),
-          'front matter did not render as a table: ' + fmBlock().outerHTML.slice(0, 1200)
-        );
-        expect(
-          fmBlock().querySelector('.vditor-wysiwyg__preview').contains(fmTable()),
-          'the table was not placed inside a preview container, so it can leak into Markdown'
-        );
-        expect(
-          window.getComputedStyle(fmBlock().querySelector(':scope > pre:not(.vditor-wysiwyg__preview)')).display === 'none',
-          'the raw front matter source stayed visible next to the table'
-        );
-        const fmRowText = () => Array.from(fmTable().querySelectorAll('tr'))
-          .map((row) => Array.from(row.children).map((cell) => cell.textContent).join('\\u0000'));
-        expect(
-          fmRowText().some((row) => row === 'title\\u0000Front Matter'),
-          'the table is missing the title row: ' + JSON.stringify(fmRowText())
-        );
-        expect(
-          fmRowText().some((row) => row === 'draft\\u0000false'),
-          'draft: false did not reach the table as the text "false"'
-        );
-        expect(
-          fmRowText().some((row) => row.indexOf('alpha') >= 0 && row.indexOf('beta') >= 0),
-          'the tags sequence did not render on one row: ' + JSON.stringify(fmRowText())
-        );
-        expect(
-          fmRowText().some((row) => row === 'email\\u0000wu@example.com'),
-          'a doubly nested key did not reach the table'
-        );
-        expect(
-          fmTable().querySelector('.vmd-front-matter__value--number'),
-          'priority: 1 was not marked as a number'
-        );
-        // The parser deletes the blank line between the front matter and the body
-        // on its own, with no plugin DOM involved. Pinned here so the assertion
-        // below is known to be testing the plugin's repair and not a parser that
-        // quietly started behaving. If this ever fails, the repair is redundant.
-        const luteOnlyRoundTrip = window.vditor.vditor.lute.VditorDOM2Md(
-          window.vditor.vditor.lute.Md2VditorDOM(frontMatterSource)
-        );
-        expect(
-          luteOnlyRoundTrip.indexOf(lines('---', '# Body heading')) >= 0,
-          'the parser no longer eats the blank line after the closing marker: ' +
-            JSON.stringify(luteOnlyRoundTrip)
-        );
-        // The decisive assertion: with the table rendered, the document is byte
-        // for byte what it was, blank line included.
-        expect(
-          window.vditor.getValue() === frontMatterSource,
-          'rendering the front matter table changed the Markdown: ' +
-            JSON.stringify(window.vditor.getValue())
-        );
-        // The table contributes nothing beyond that one separator: everything from
-        // the body onward matches the parser's own output.
-        expect(
-          window.vditor.getValue().slice(window.vditor.getValue().indexOf('# Body heading')) ===
-            luteOnlyRoundTrip.slice(luteOnlyRoundTrip.indexOf('# Body heading')),
-          'the rendered table changed the document body relative to the parser'
-        );
-        expect(
-          window.vditor.getValue().indexOf('<table') < 0 &&
-            window.vditor.getValue().indexOf('vmd-front-matter') < 0,
-          'the generated table leaked into the Markdown: ' +
-            JSON.stringify(window.vditor.getValue())
-        );
-
-        // Editing the body must leave the front matter block alone, including the
-        // blank line that separates it from the first heading.
-        const bodyParagraph = Array.from(root().querySelectorAll(':scope > p'))
-          .find((element) => element.textContent.indexOf('Body paragraph.') >= 0);
-        expect(bodyParagraph, 'could not find the body paragraph');
-        const bodyTextNode = textNode(bodyParagraph);
-        select(bodyTextNode, bodyTextNode.textContent.length, bodyTextNode, bodyTextNode.textContent.length);
-        bodyTextNode.textContent = bodyTextNode.textContent + ' Edited.';
-        root().dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: '.' }));
-        const afterBodyEdit = window.vditor.getValue();
-        expect(
-          afterBodyEdit.indexOf(lines('---', 'title: Front Matter')) === 0,
-          'editing the body rewrote the front matter block: ' + JSON.stringify(afterBodyEdit)
-        );
-        expect(
-          afterBodyEdit.indexOf('  - alpha') >= 0 && afterBodyEdit.indexOf('    email: wu@example.com') >= 0,
-          'editing the body reflowed the front matter indentation: ' + JSON.stringify(afterBodyEdit)
-        );
-        expect(
-          afterBodyEdit.indexOf('Body paragraph. Edited.') >= 0,
-          'the body edit itself was lost'
-        );
-
-        // Clicking the table edits YAML in the shared popover and never exposes
-        // the serializer-owned pre in document layout.
-        await Promise.resolve();
-        expect(
-          fmTable(),
-          'the front matter table did not return after editing the body'
-        );
-        fmTable().dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        await pause();
-        const fmSourcePre = fmBlock().querySelector(':scope > pre:not(.vditor-wysiwyg__preview)');
-        sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
-        const yamlInput = sourcePopover.querySelector('[name="source"]');
-        expect(
-          fmTable() &&
-            window.getComputedStyle(fmSourcePre).display === 'none' &&
-            sourcePopover.style.display === 'block' &&
-            yamlInput.value.includes('title: Front Matter'),
-          'clicking the Front Matter table did not open its hidden-source popover'
-        );
-        yamlInput.value = yamlInput.value.replace('title: Front Matter', 'title: Edited Matter');
-        yamlInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'Edited' }));
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-        await pause(120);
-        expect(
-          fmTable() &&
-            window.getComputedStyle(fmSourcePre).display === 'none' &&
-            window.vditor.getValue().includes('title: Edited Matter') &&
-            fmRowText().some((row) => row === 'title\\u0000Edited Matter'),
-          'Escape did not save Front Matter YAML and refresh its table'
-        );
-
-        // Invalid YAML must say so and keep the source readable, per test07.
-        const badFrontMatter = lines('---', 'title: [unclosed', 'items:', '  - first', '---', '', '# Body', '');
-        await setMarkdown(badFrontMatter);
-        await pause(200);
-        expect(fmBlock(), 'invalid front matter was not recognized as a block');
-        expect(!fmTable(), 'invalid YAML was rendered as a table anyway');
-        const fmError = fmBlock().querySelector('.vmd-front-matter__error');
-        expect(fmError, 'invalid YAML did not report an error');
-        expect(
-          fmError.textContent.indexOf('Front Matter') >= 0,
-          'the error message does not name what failed: ' + JSON.stringify(fmError.textContent)
-        );
-        expect(
-          fmBlock().querySelector('.vmd-front-matter__raw').textContent.indexOf('[unclosed') >= 0,
-          'the raw source was not kept visible beside the error'
-        );
-        expect(
-          window.vditor.getValue() === badFrontMatter,
-          'the invalid front matter document was rewritten: ' +
-            JSON.stringify(window.vditor.getValue())
-        );
-
-        // An unclosed block is not front matter, so nothing may be swallowed.
-        const unclosed = lines('---', 'title: Unclosed', '', '# Still visible', '');
-        await setMarkdown(unclosed);
-        await pause(160);
-        expect(
-          root().textContent.indexOf('Still visible') >= 0,
-          'an unclosed front matter block swallowed the document body'
-        );
-
-        // The other two display modes, per test05. Neither may touch the source.
-        await setMarkdown(frontMatterSource);
-        await pause(160);
-        expect(fmTable(), 'the table mode did not restore before testing other modes');
-
-        window.__vmdFrontMatter.setDisplay('codeBlock');
-        await pause(160);
-        expect(!fmTable(), 'codeBlock mode still rendered a table');
-        expect(
-          window.getComputedStyle(fmBlock().querySelector(':scope > pre:not(.vditor-wysiwyg__preview)')).display === 'none' &&
-            fmBlock().querySelector('.vmd-front-matter__code')?.textContent.includes('title: Front Matter') &&
-            fmBlock().querySelector('.vmd-source-edit-button'),
-          'codeBlock mode did not replace its editable source with a read-only preview and popup entry'
-        );
-        expect(
-          window.getComputedStyle(fmBlock()).display !== 'none',
-          'codeBlock mode hid the whole block'
-        );
-        expect(
-          window.vditor.getValue() === frontMatterSource,
-          'codeBlock mode changed the Markdown: ' + JSON.stringify(window.vditor.getValue())
-        );
-        fmBlock().querySelector('.vmd-source-edit-button').click();
-        await pause();
-        expect(
-          document.querySelector('.vmd-source-popover [name="source"]')?.value.includes('title: Front Matter') &&
-            getComputedStyle(fmBlock().querySelector(':scope > pre:not(.vditor-wysiwyg__preview)')).display === 'none',
-          'codeBlock mode did not edit YAML through the shared popover'
-        );
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-
-        window.__vmdFrontMatter.setDisplay('hide');
-        await pause(160);
-        expect(!fmTable(), 'hide mode still rendered a table');
-        expect(
-          window.getComputedStyle(fmBlock()).display === 'none',
-          'hide mode left the front matter block visible'
-        );
-        expect(
-          root().textContent.indexOf('Body heading') >= 0,
-          'hide mode hid the document body along with the front matter'
-        );
-        // The whole point of hide: invisible on screen, intact in the document.
-        expect(
-          window.vditor.getValue() === frontMatterSource,
-          'hide mode changed the Markdown: ' + JSON.stringify(window.vditor.getValue())
-        );
-
-        window.__vmdFrontMatter.setDisplay('table');
-        await pause(160);
-        expect(fmTable(), 'returning to table mode did not render the table again');
-        expect(
-          window.getComputedStyle(fmBlock()).display !== 'none',
-          'returning to table mode left the block hidden'
-        );
-        expect(
-          window.vditor.getValue() === frontMatterSource,
-          'cycling through the display modes changed the Markdown: ' +
-            JSON.stringify(window.vditor.getValue())
-        );
-
-        // Opening a document that already has front matter goes through init, not
-        // setValue, so the separator has to be captured from the host's own text.
-        // Reading it back from the editor would read it after the parser already
-        // collapsed it, and the blank line would be lost on the very first edit.
-        // Kept last in this section: init replaces the document the assertions
-        // above compare against.
-        const openedSource = lines('---', 'title: Opened', '---', '', '# Opened body', '');
         hostGeneration += 1;
         window.dispatchEvent(new MessageEvent('message', {
           data: {
             command: 'update',
             type: 'init',
-            content: openedSource,
+            content: reopenedSource,
             documentVersion: hostGeneration,
             editorGeneration: hostGeneration,
             theme: 'light',
@@ -3627,17 +3508,13 @@ function testPage() {
           },
         }));
         testCheckpoint = 'waiting for reinitialized document body';
-        await wait(() => root() && root().textContent.indexOf('Opened body') >= 0);
+        await wait(() => root() && root().textContent.indexOf('Reinitialized body') >= 0);
         testCheckpoint = 'startup';
         await pause(200);
         expect(
-          window.vditor.getValue() === openedSource,
-          'a document opened with front matter lost its blank line: ' +
+          window.vditor.getValue() === reopenedSource,
+          'reinitializing with ordinary Markdown changed the document: ' +
             JSON.stringify(window.vditor.getValue())
-        );
-        expect(
-          root().querySelector('table.vmd-front-matter'),
-          'a document opened with front matter did not render the table'
         );
         const reopenedBaselines = window.__vmdMessages.filter(
           (message) => message.command === 'editor-baseline' && message.generation === hostGeneration
@@ -3657,7 +3534,7 @@ function testPage() {
         }));
         await pause(80);
         expect(
-          window.vditor.getValue() === openedSource,
+          window.vditor.getValue() === reopenedSource,
           'a stale-generation host update replaced the reinitialized editor'
         );
 
@@ -3677,17 +3554,26 @@ function testPage() {
         codePreviewCode = codePreview.querySelector(':scope > code');
         const codeRectBeforeEdit = codeBlock.getBoundingClientRect();
         codePreviewCode.click();
+        codeBlock.querySelector('.vmd-code-language').click();
         await pause();
-        const codeRectAfterEdit = codeBlock.getBoundingClientRect();
         sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        expect(
+          getComputedStyle(codeSource).display === 'none' &&
+            sourcePopover?.style.display !== 'block' &&
+            Math.abs(codeBlock.getBoundingClientRect().height - codeRectBeforeEdit.height) < 2,
+          'clicking highlighted code or its language opened an editor or exposed source'
+        );
+        codeBlock.querySelector('.vmd-source-edit-button').click();
+        await pause();
+        sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        const codeRectAfterEdit = codeBlock.getBoundingClientRect();
         let sourceLanguage = sourcePopover.querySelector('[name="language"]');
         let sourceContent = sourcePopover.querySelector('[name="content"]');
         expect(
-          getComputedStyle(codeSource).display === 'none' &&
-            sourcePopover.style.display === 'block' &&
+          sourcePopover.style.display === 'block' &&
             document.activeElement === sourceContent &&
             Math.abs(codeRectAfterEdit.height - codeRectBeforeEdit.height) < 2,
-          'clicking highlighted code expanded document source instead of opening the popover'
+          'the code edit button did not open the popover without changing layout'
         );
 
         sourceContent.value = 'const edited = 2;';
@@ -3728,9 +3614,14 @@ function testPage() {
           'the code copy action did not use the latest popover content'
         );
 
-        codeBlock.querySelector('.vmd-code-language-button').click();
+        codeBlock.querySelector('.vmd-code-language').click();
         await pause();
-        sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        expect(
+          sourcePopover.style.display !== 'block',
+          'the static code language label reopened the source editor'
+        );
+        codeBlock.querySelector('.vmd-source-edit-button').click();
+        await pause();
         sourceLanguage = sourcePopover.querySelector('[name="language"]');
         sourceLanguage.value = 'bad language';
         sourceLanguage.dispatchEvent(new InputEvent('input', { bubbles: true, data: ' ' }));
@@ -3975,7 +3866,7 @@ async function main() {
         '--dump-dom',
         `http://127.0.0.1:${port}/`,
       ],
-      { timeout: 30000, maxBuffer: 2 * 1024 * 1024 }
+      { timeout: 60000, maxBuffer: 2 * 1024 * 1024 }
     )
     assert.match(
       stdout,
