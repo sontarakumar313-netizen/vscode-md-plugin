@@ -9,6 +9,7 @@ let activeCustomPopover: {
   popover: HTMLElement
   target: HTMLElement | null
   editorRoot: HTMLElement | null
+  finish: (() => void) | null
 } | null = null
 let popoverPositionListenersInstalled = false
 let popoverPositionQueued = false
@@ -16,6 +17,7 @@ let activeDetailsTitleFinish: (() => void) | null = null
 const POPOVER_POSITIONING_CLASS = 'vmd-url-popover--positioning'
 const PERSISTENT_POPOVER_CLASS = 'vmd-url-popover--persistent'
 const DETAILS_TITLE_POPOVER_CLASS = 'vmd-details-title-popover'
+const SOURCE_POPOVER_CLASS = 'vmd-source-popover'
 
 interface DetailsTitlePopoverOptions {
   popover: HTMLElement
@@ -25,6 +27,23 @@ interface DetailsTitlePopoverOptions {
   onInput: (value: string, event: InputEvent) => void
   onCompositionEnd: (value: string) => void
   onBlur: (value: string) => void
+}
+
+export interface WysiwygSourcePopoverField {
+  name: string
+  label: string
+  value: string
+  multiline?: boolean
+  spellcheck?: boolean
+}
+
+interface WysiwygSourcePopoverOptions {
+  popover: HTMLElement
+  target: HTMLElement
+  fields: WysiwygSourcePopoverField[]
+  focusField?: string
+  onChange: (values: Readonly<Record<string, string>>) => string | null
+  onFinish: (values: Readonly<Record<string, string>>, changed: boolean) => void
 }
 
 /** Records a click target before Vditor constructs its shared popover. */
@@ -59,8 +78,19 @@ function deactivateCustomPopover(): typeof activeCustomPopover {
     cancelDelayedNativePopoverRefresh
   )
   document.removeEventListener('keydown', handlePersistentPopoverKeydown, true)
+  document.removeEventListener(
+    'pointerdown',
+    handlePersistentPopoverPointerDown,
+    true
+  )
   active.popover.classList.remove(PERSISTENT_POPOVER_CLASS)
   activeCustomPopover = null
+  return active
+}
+
+function deactivateAndFinishCustomPopover(): typeof activeCustomPopover {
+  const active = deactivateCustomPopover()
+  active?.finish?.()
   return active
 }
 
@@ -71,12 +101,25 @@ function restorePopoverFocus(
   if (target?.isConnected) {
     target.focus({ preventScroll: true })
     if (document.activeElement === target) return
+    if (
+      editorRoot?.contains(target) &&
+      target.matches(
+        '.vmd-source-owned, [data-type="code-block"], [data-type="yaml-front-matter"]'
+      )
+    ) {
+      const range = document.createRange()
+      range.selectNode(target)
+      range.collapse(false)
+      const selection = window.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+    }
   }
   editorRoot?.focus({ preventScroll: true })
 }
 
 export function closeActiveWysiwygPopover(restoreFocus = false): void {
-  const active = deactivateCustomPopover()
+  const active = deactivateAndFinishCustomPopover()
   if (active) {
     active.popover.style.display = 'none'
     active.popover.classList.remove(POPOVER_POSITIONING_CLASS)
@@ -110,19 +153,34 @@ function handlePersistentPopoverKeydown(event: KeyboardEvent): void {
   closeActiveWysiwygPopover(true)
 }
 
+function handlePersistentPopoverPointerDown(event: PointerEvent): void {
+  const active = activeCustomPopover
+  const target = event.target
+  if (!active || !(target instanceof Node) || active.popover.contains(target)) {
+    return
+  }
+  closeActiveWysiwygPopover(false)
+}
+
 function activateCustomPopover(
   popover: HTMLElement,
-  target: HTMLElement | null
+  target: HTMLElement | null,
+  finish: (() => void) | null = null
 ): void {
-  deactivateCustomPopover()
+  deactivateAndFinishCustomPopover()
   const editorRoot = popover.parentElement?.querySelector<HTMLElement>(
     ':scope > .vditor-reset'
   ) ?? null
-  activeCustomPopover = { popover, target, editorRoot }
+  activeCustomPopover = { popover, target, editorRoot, finish }
   popover.classList.add(PERSISTENT_POPOVER_CLASS)
   editorRoot?.addEventListener('click', cancelDelayedNativePopoverRefresh)
   editorRoot?.addEventListener('keyup', cancelDelayedNativePopoverRefresh)
   document.addEventListener('keydown', handlePersistentPopoverKeydown, true)
+  document.addEventListener(
+    'pointerdown',
+    handlePersistentPopoverPointerDown,
+    true
+  )
 }
 
 /** Copies text without assuming that the Webview exposes Clipboard API access. */
@@ -248,11 +306,30 @@ function queueActivePopoverPosition(): void {
       editor.scrollLeft,
       Math.min(targetLeft, maxLeft)
     )}px`
-    // Vditor clamps its panel to -8px, which overlaps first-line targets. The
-    // WYSIWYG container does not clip overflow, so retain the actual measured
-    // above-target coordinate even when it is negative.
-    popover.style.top = `${targetTop - popover.offsetHeight - gap}px`
-    popover.dataset.vmdPosition = 'above'
+    const aboveTop = targetTop - popover.offsetHeight - gap
+    if (popover.classList.contains(SOURCE_POPOVER_CLASS)) {
+      const belowTop =
+        targetRect.bottom - editorRect.top + editor.scrollTop + gap
+      const visibleTop = editor.scrollTop - editorRect.top + 8
+      const visibleBottom = visibleTop + window.innerHeight - 16
+      if (aboveTop >= visibleTop) {
+        popover.style.top = `${aboveTop}px`
+        popover.dataset.vmdPosition = 'above'
+      } else if (belowTop + popover.offsetHeight <= visibleBottom) {
+        popover.style.top = `${belowTop}px`
+        popover.dataset.vmdPosition = 'below'
+      } else {
+        popover.style.top = `${Math.max(
+          visibleTop,
+          Math.min(belowTop, visibleBottom - popover.offsetHeight)
+        )}px`
+        popover.dataset.vmdPosition = 'viewport'
+      }
+    } else {
+      // Link/image popovers retain their established above-target placement.
+      popover.style.top = `${aboveTop}px`
+      popover.dataset.vmdPosition = 'above'
+    }
     popover.classList.remove(POPOVER_POSITIONING_CLASS)
     if (pendingPopoverTarget === target) pendingPopoverTarget = null
   })
@@ -345,12 +422,13 @@ export function showDetailsTitlePopover({
   onBlur,
 }: DetailsTitlePopoverOptions): HTMLInputElement {
   finishDetailsTitlePopover()
-  deactivateCustomPopover()
+  deactivateAndFinishCustomPopover()
   activePopoverPosition = null
   popover.replaceChildren()
   popover.classList.remove(
     'vmd-url-popover--image',
     'vmd-wysiwyg-popover--empty',
+    SOURCE_POPOVER_CLASS,
     POPOVER_POSITIONING_CLASS,
     PERSISTENT_POPOVER_CLASS
   )
@@ -403,6 +481,135 @@ export function showDetailsTitlePopover({
   return input
 }
 
+/** Opens serializer-owned source fields without exposing them in the document. */
+export function showWysiwygSourcePopover({
+  popover,
+  target,
+  fields,
+  focusField,
+  onChange,
+  onFinish,
+}: WysiwygSourcePopoverOptions): Readonly<Record<string, HTMLInputElement | HTMLTextAreaElement>> {
+  finishDetailsTitlePopover()
+  deactivateAndFinishCustomPopover()
+  activePopoverPosition = null
+  popover.replaceChildren()
+  popover.classList.remove(
+    'vmd-url-popover--image',
+    'vmd-wysiwyg-popover--empty',
+    DETAILS_TITLE_POPOVER_CLASS,
+    POPOVER_POSITIONING_CLASS,
+    PERSISTENT_POPOVER_CLASS
+  )
+  popover.classList.add('vmd-url-popover', SOURCE_POPOVER_CLASS)
+  delete popover.dataset.vmdPosition
+
+  const initialValues: Record<string, string> = {}
+  const controls: Record<string, HTMLInputElement | HTMLTextAreaElement> = {}
+  const error = document.createElement('div')
+  error.className = 'vmd-source-popover__error'
+  error.setAttribute('role', 'alert')
+  error.hidden = true
+
+  const currentValues = (): Readonly<Record<string, string>> => {
+    const values: Record<string, string> = {}
+    for (const field of fields) values[field.name] = controls[field.name]?.value ?? ''
+    return values
+  }
+  const applyChange = (): void => {
+    let message: string | null
+    try {
+      message = onChange(currentValues())
+    } catch (reason) {
+      message = reason instanceof Error && reason.message
+        ? reason.message
+        : 'Unable to update preview'
+    }
+    error.textContent = message || ''
+    error.hidden = !message
+    popover.classList.toggle('vmd-source-popover--invalid', !!message)
+  }
+
+  for (const field of fields) {
+    initialValues[field.name] = field.value
+    const row = document.createElement('label')
+    row.className = 'vmd-source-popover__field'
+    const label = document.createElement('span')
+    label.className = 'vmd-source-popover__label'
+    label.textContent = field.label
+    const control = field.multiline
+      ? document.createElement('textarea')
+      : document.createElement('input')
+    control.className = 'vditor-input vmd-source-popover__input'
+    control.name = field.name
+    control.value = field.value
+    control.spellcheck = field.spellcheck ?? false
+    control.setAttribute('aria-label', field.label)
+    if (control instanceof HTMLTextAreaElement) {
+      control.rows = 8
+      control.wrap = 'off'
+    } else {
+      control.type = 'text'
+    }
+    control.addEventListener('input', (event) => {
+      if (event instanceof InputEvent && event.isComposing) return
+      applyChange()
+    })
+    control.addEventListener('compositionend', applyChange)
+    control.addEventListener('keydown', (event: KeyboardEvent) => {
+      if (event.isComposing || event.keyCode === 229) {
+        event.stopImmediatePropagation()
+        return
+      }
+      if (
+        event.key === 'Enter' &&
+        (event.ctrlKey || event.metaKey) &&
+        !event.altKey &&
+        !event.shiftKey
+      ) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        closeActiveWysiwygPopover(true)
+        return
+      }
+      event.stopPropagation()
+    })
+    row.append(label, control)
+    popover.appendChild(row)
+    controls[field.name] = control
+  }
+  popover.appendChild(error)
+  const closeButton = addPopoverCloseButton(popover, error)
+  installPopoverTabOrder([...Object.values(controls), closeButton])
+
+  let finished = false
+  const finish = (): void => {
+    if (finished) return
+    finished = true
+    const values = currentValues()
+    const changed = fields.some(
+      (field) => values[field.name] !== initialValues[field.name]
+    )
+    onFinish(values, changed)
+  }
+
+  positionAboveTarget(popover, target)
+  popover.style.display = 'block'
+  activateCustomPopover(popover, target, finish)
+  const preferred = focusField ? controls[focusField] : undefined
+  const first = preferred ?? controls[fields[0]?.name]
+  const focusPreferredField = (): void => {
+    if (!first?.isConnected || popover.style.display !== 'block') return
+    first.focus({ preventScroll: true })
+    if (first instanceof HTMLInputElement) first.select()
+  }
+  focusPreferredField()
+  // Vditor's originating click may restore the editor selection after the
+  // capture listener returns. Re-assert the requested field once that work ends.
+  window.setTimeout(focusPreferredField, 0)
+  return controls
+}
+
 /**
  * Removes unwanted native controls from Vditor's WYSIWYG popover. Table
  * actions are provided by the shared right-click menu instead.
@@ -412,12 +619,13 @@ export function customizeWysiwygPopover(
   popover: HTMLElement
 ): void {
   finishDetailsTitlePopover()
-  deactivateCustomPopover()
+  deactivateAndFinishCustomPopover()
   // Vditor reuses one popover element for every context.
   popover.classList.remove(
     'vmd-url-popover',
     'vmd-url-popover--image',
     DETAILS_TITLE_POPOVER_CLASS,
+    SOURCE_POPOVER_CLASS,
     POPOVER_POSITIONING_CLASS,
     PERSISTENT_POPOVER_CLASS
   )
@@ -430,18 +638,8 @@ export function customizeWysiwygPopover(
     .forEach((action) => action.remove())
 
   if (type === 'code-block') {
-    const selection = window.getSelection()
-    const container = selection?.rangeCount
-      ? selection.getRangeAt(0).startContainer
-      : null
-    const element = container instanceof Element
-      ? container
-      : container?.parentElement
-    if (element?.closest('.vmd-code-block--ordinary')) {
-      // Ordinary blocks expose language through their persistent local menu.
-      // Rich-render blocks retain Vditor's native language/source popover.
-      popover.replaceChildren()
-    }
+    // Language and source for ordinary and rich blocks live in our shared editor.
+    popover.replaceChildren()
   } else if (type === 'heading') {
     popover
       .querySelector<HTMLInputElement>('input[placeholder^="ID"]')

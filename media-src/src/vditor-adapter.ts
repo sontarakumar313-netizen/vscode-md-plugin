@@ -13,6 +13,7 @@ import { setEditMode } from 'vditor/src/ts/toolbar/EditMode'
 import { afterRenderEvent as commitWysiwygAfterRender } from 'vditor/src/ts/wysiwyg/afterRenderEvent'
 import { renderDomByMd } from 'vditor/src/ts/wysiwyg/renderDomByMd'
 import { processCodeRender } from 'vditor/src/ts/util/processCode'
+import { mathRender } from 'vditor/src/ts/markdown/mathRender'
 import { renderToc } from 'vditor/src/ts/util/toc'
 import {
   genAPopover,
@@ -201,6 +202,70 @@ export function refreshVditorWysiwygCodePreview(
   preview.innerHTML = source.innerHTML
   preview.setAttribute('data-render', '2')
   processCodeRender(preview, internal)
+  return true
+}
+
+interface HtmlPreviewInternals {
+  currentMode?: string
+  lute?: { Md2VditorDOM(markdown: string): string }
+  wysiwyg?: { element?: HTMLElement }
+}
+
+/** Re-parses one raw HTML block with the configured, sanitized Lute instance. */
+export function refreshVditorWysiwygHtmlPreview(
+  internal: HtmlPreviewInternals | null,
+  block: HTMLElement,
+  source: string,
+  preview: HTMLElement
+): boolean {
+  if (
+    internal?.currentMode !== 'wysiwyg' ||
+    typeof internal.lute?.Md2VditorDOM !== 'function' ||
+    !internal.wysiwyg?.element?.contains(block)
+  ) {
+    return false
+  }
+  const parsed = document.createElement('div')
+  parsed.innerHTML = internal.lute.Md2VditorDOM(source)
+  const nextPreview = parsed.querySelector<HTMLElement>(
+    '.vditor-wysiwyg__block[data-type="html-block"] > .vditor-wysiwyg__preview'
+  )
+  if (!nextPreview) return false
+  preview.replaceChildren(...Array.from(nextPreview.childNodes))
+  preview.setAttribute('data-render', '1')
+  return true
+}
+
+interface MathPreviewInternals {
+  currentMode?: string
+  options?: Parameters<typeof mathRender>[1] & { preview?: { math?: IMath } }
+  wysiwyg?: { element?: HTMLElement }
+}
+
+/** Refreshes an inline or display formula while retaining its source element. */
+export function refreshVditorWysiwygMathPreview(
+  internal: MathPreviewInternals | null,
+  source: HTMLElement,
+  preview: HTMLElement,
+  value: string
+): boolean {
+  if (
+    internal?.currentMode !== 'wysiwyg' ||
+    !internal.wysiwyg?.element?.contains(source) ||
+    source.nextElementSibling !== preview
+  ) {
+    return false
+  }
+  const math = preview.querySelector<HTMLElement>('.language-math')
+  if (!math) return false
+  math.className = 'language-math'
+  math.removeAttribute('data-math')
+  math.textContent = value
+  mathRender(preview, {
+    cdn: internal.options?.cdn,
+    math: internal.options?.preview?.math,
+  })
+  preview.setAttribute('data-render', '1')
   return true
 }
 

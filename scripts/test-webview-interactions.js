@@ -410,24 +410,36 @@ function testPage() {
         expect(getComputedStyle(mathSource).display === 'none', 'formula source was initially exposed');
         mathPreview.click();
         await pause();
-        expect(getComputedStyle(mathSource).display !== 'none', 'formula preview did not open source editing');
-        document.body.dispatchEvent(new MouseEvent('mousedown', {
+        let sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        expect(
+          getComputedStyle(mathSource).display === 'none' &&
+            sourcePopover?.style.display === 'block' &&
+            sourcePopover.querySelector('[name="source"]')?.value === 'x^2',
+          'formula preview did not open the shared source popover'
+        );
+        document.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape',
           bubbles: true,
           cancelable: true,
         }));
-        expect(getComputedStyle(mathSource).display === 'none', 'formula source did not auto-close outside');
+        expect(
+          getComputedStyle(mathSource).display === 'none' &&
+            sourcePopover.style.display === 'none',
+          'Escape exposed formula source or failed to close its popover'
+        );
         let codeBlock = root().querySelector(
           '.vditor-wysiwyg__block[data-type="code-block"]'
         );
-        let codeSource = codeBlock.querySelector(':scope > .vditor-wysiwyg__pre');
+        let codeSource = codeBlock.querySelector(':scope > pre:not(.vditor-wysiwyg__preview)');
         let codePreview = codeBlock.querySelector(':scope > .vditor-wysiwyg__preview');
         let codePreviewCode = codePreview.querySelector(':scope > code');
         let codeLanguageButton = codeBlock.querySelector('.vmd-code-language-button');
         expect(
           codeBlock.classList.contains('vmd-code-block--ordinary') &&
             codeLanguageButton?.textContent.includes('js') &&
-            codeBlock.querySelector('.vmd-code-toolbar .vditor-copy'),
-          'the ordinary code block did not receive its persistent language/copy bar: ' +
+            codeBlock.querySelector('.vmd-code-toolbar .vditor-copy') &&
+            codeBlock.querySelector('.vmd-code-toolbar .vmd-source-edit-button'),
+          'the ordinary code block did not receive its language/edit/copy bar: ' +
             codeBlock.outerHTML.slice(0, 2000)
         );
         expect(
@@ -438,61 +450,44 @@ function testPage() {
 
         codeLanguageButton.click();
         await pause();
-        let codeLanguageMenu = document.getElementById('vmd-code-language-menu');
-        const codeLanguageItems = Array.from(
-          codeLanguageMenu.querySelectorAll('button[data-code-language]')
-        );
+        sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        const codeLanguageInput = sourcePopover.querySelector('[name="language"]');
+        const codeContentInput = sourcePopover.querySelector('[name="content"]');
         expect(
-          getComputedStyle(codeLanguageMenu).display !== 'none' &&
-            codeLanguageMenu.querySelector('.vmd-code-language-menu__current')?.dataset.codeLanguage === 'js' &&
-            codeLanguageItems.some((item) => item.dataset.codeLanguage === '') &&
-            codeLanguageItems.some((item) => item.dataset.codeLanguage === 'python') &&
-            !codeLanguageItems.some((item) => item.dataset.codeLanguage === 'mermaid'),
-          'the local code-language menu did not retain the custom current language or exclude rich renderers'
+          sourcePopover.style.display === 'block' &&
+            sourcePopover.querySelectorAll('.vmd-source-popover__field').length === 2 &&
+            codeLanguageInput.value === 'js' &&
+            codeContentInput.value === 'const a = 1;' &&
+            document.activeElement === codeLanguageInput,
+          'the code block did not open the required two-row shared popover: ' + JSON.stringify({
+            display: sourcePopover?.style.display,
+            fields: sourcePopover?.querySelectorAll('.vmd-source-popover__field').length,
+            language: codeLanguageInput?.value,
+            content: codeContentInput?.value,
+            active: document.activeElement?.getAttribute('name'),
+            html: sourcePopover?.outerHTML.slice(0, 1200),
+          })
         );
-        const menuPointerDown = new PointerEvent('pointerdown', {
-          bubbles: true,
-          cancelable: true,
-        });
-        codeLanguageMenu.dispatchEvent(menuPointerDown);
-        expect(
-          !menuPointerDown.defaultPrevented,
-          'the code-language menu prevented native scrollbar dragging'
-        );
-        codeLanguageMenu.scrollTop = Math.min(
-          40,
-          Math.max(1, codeLanguageMenu.scrollHeight - codeLanguageMenu.clientHeight)
-        );
-        codeLanguageMenu.dispatchEvent(new Event('scroll'));
-        expect(
-          getComputedStyle(codeLanguageMenu).display !== 'none',
-          'scrolling the code-language menu closed it'
-        );
+        codeLanguageInput.value = 'python';
+        codeLanguageInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'python' }));
         document.dispatchEvent(new KeyboardEvent('keydown', {
           key: 'Escape',
           bubbles: true,
           cancelable: true,
         }));
-        expect(
-          getComputedStyle(codeLanguageMenu).display === 'none' &&
-            window.vditor.getValue().includes(markerFence + 'js\\nconst a = 1;'),
-          'Escape did not close the code-language menu without changing Markdown'
-        );
-        codeLanguageButton.click();
-        await pause();
-        codeLanguageMenu.querySelector('button[data-code-language="python"]').click();
         await pause(100);
         expect(
-          window.vditor.getValue().includes(markerFence + 'python\\nconst a = 1;') &&
-            codeSource.querySelector('code').classList.contains('language-python') &&
-            getComputedStyle(codeLanguageMenu).display === 'none',
-          'selecting a local code language did not update the fenced Markdown'
+          sourcePopover.style.display === 'none' &&
+            getComputedStyle(codeSource).display === 'none' &&
+            window.vditor.getValue().includes(markerFence + 'python\\nconst a = 1;') &&
+            codeSource.querySelector('code').classList.contains('language-python'),
+          'Escape did not preserve the popover language edit while keeping source hidden'
         );
         window.vditor.vditor.undo.undo(window.vditor.vditor);
         await pause(100);
         expect(
           window.vditor.getValue().includes(markerFence + 'js\\nconst a = 1;'),
-          'the local code-language change could not be undone'
+          'the popover code-language change could not be undone in one step'
         );
 
         // Heading labels are real controls rather than non-interactive pseudo text.
@@ -553,12 +548,166 @@ function testPage() {
         const richCodeBlock = root().querySelector(
           '.vditor-wysiwyg__block[data-type="code-block"]'
         );
-        const richCodeSource = richCodeBlock.querySelector(':scope > .vditor-wysiwyg__pre');
+        const richCodeSource = richCodeBlock.querySelector(':scope > pre:not(.vditor-wysiwyg__preview)');
+        const richEditButton = richCodeBlock.querySelector('.vmd-source-edit-button');
         expect(
-          !richCodeBlock.classList.contains('vmd-code-block--ordinary') &&
-            !richCodeBlock.querySelector('.vmd-code-toolbar') &&
+          richCodeBlock.classList.contains('vmd-code-block--rich') &&
+            richCodeBlock.querySelector('.vmd-code-toolbar') &&
+            richEditButton &&
             getComputedStyle(richCodeSource).display === 'none',
-          'a rich-render code block incorrectly received the ordinary code toolbar'
+          'a rich-render code block did not receive its hover editor while hiding source'
+        );
+        richCodeBlock.querySelector('.language-math')?.click();
+        await pause();
+        expect(
+          document.querySelector('.vmd-source-popover')?.style.display !== 'block',
+          'clicking a rich renderer opened source without its hover edit button'
+        );
+        richEditButton.click();
+        await pause();
+        expect(
+          document.querySelector('.vmd-source-popover [name="language"]')?.value === 'math' &&
+            getComputedStyle(richCodeSource).display === 'none',
+          'the rich renderer hover edit button did not open the shared code popover'
+        );
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+        // Formula, HTML block, inline HTML, and entities all use the same
+        // popover while serializer-owned source remains out of layout.
+        await setMarkdown(
+          '# <p align="center">Centered title</p>\\n\\n' +
+            '<p align="center"><a href="https://example.com/raw" target="_blank"><img src="assets/raw.png" alt="raw"></a></p>\\n\\n' +
+            'Inline $x$ and &copy; and <span>word</span>.'
+        );
+        await pause(160);
+        const centeredHeading = root().querySelector('h1');
+        const htmlBlock = root().querySelector(
+          '.vditor-wysiwyg__block[data-type="html-block"]'
+        );
+        const htmlSource = htmlBlock.querySelector(':scope > pre:not(.vditor-wysiwyg__preview)');
+        const htmlPreview = htmlBlock.querySelector(':scope > .vditor-wysiwyg__preview');
+        const htmlEditButton = htmlPreview.querySelector(':scope > .vmd-source-edit-button');
+        expect(
+          centeredHeading.classList.contains('vmd-html-align-center') &&
+            Array.from(centeredHeading.querySelectorAll('code[data-type="html-inline"]')).every(
+              (token) => getComputedStyle(token).display === 'none'
+            ) &&
+            getComputedStyle(htmlSource).display === 'none' &&
+            getComputedStyle(htmlPreview).backgroundColor === 'rgba(0, 0, 0, 0)' &&
+            htmlEditButton,
+          'HTML presentation did not project alignment, transparency, and hidden source: ' + JSON.stringify({
+            heading: centeredHeading?.outerHTML,
+            html: htmlBlock?.outerHTML.slice(0, 1800),
+            source: htmlSource ? getComputedStyle(htmlSource).display : 'missing',
+            background: htmlPreview ? getComputedStyle(htmlPreview).backgroundColor : 'missing',
+            button: !!htmlEditButton,
+          })
+        );
+        htmlPreview.querySelector('p').click();
+        await pause();
+        expect(
+          document.querySelector('.vmd-source-popover')?.style.display !== 'block',
+          'clicking interactive HTML preview content opened its source directly'
+        );
+        htmlEditButton.click();
+        await pause();
+        sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        const htmlInput = sourcePopover.querySelector('[name="source"]');
+        expect(
+          htmlInput?.value.includes('<p align="center">') &&
+            getComputedStyle(htmlSource).display === 'none',
+          'the HTML hover edit button did not open sanitized source editing'
+        );
+        htmlInput.value = htmlInput.value.replace('align="center"', 'align="right"');
+        htmlInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'right' }));
+        await pause(80);
+        expect(
+          htmlPreview.querySelector('p')?.getAttribute('align') === 'right' &&
+            getComputedStyle(htmlSource).display === 'none',
+          'editing raw HTML did not refresh its sanitized preview'
+        );
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await pause(80);
+        expect(
+          window.vditor.getValue().includes('<p align="right">') &&
+            !window.vditor.getValue().includes('vmd-source-edit-button'),
+          'closing the HTML popover lost source or serialized its hover control'
+        );
+
+        const inlineMath = root().querySelector('span[data-type="math-inline"]');
+        const inlineMathSource = inlineMath.querySelector(':scope > code');
+        inlineMath.querySelector('.vditor-wysiwyg__preview').click();
+        await pause();
+        sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        const inlineMathInput = sourcePopover.querySelector('[name="source"]');
+        inlineMathInput.value = 'y';
+        inlineMathInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'y' }));
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await pause(80);
+        expect(
+          getComputedStyle(inlineMathSource).display === 'none' &&
+            window.vditor.getValue().includes('$y$'),
+          'inline formula popover did not save while keeping source hidden'
+        );
+
+        const htmlEntity = root().querySelector('span[data-type="html-entity"]');
+        const entitySource = htmlEntity.querySelector(':scope > code');
+        htmlEntity.querySelector('.vditor-wysiwyg__preview').click();
+        await pause();
+        sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        const entityInput = sourcePopover.querySelector('[name="source"]');
+        entityInput.value = '&reg;';
+        entityInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: '&reg;' }));
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await pause(80);
+        expect(
+          getComputedStyle(entitySource).display === 'none' &&
+            window.vditor.getValue().includes('&reg;'),
+          'HTML entity popover did not save while keeping source hidden'
+        );
+        const inlineHtmlControls = root().querySelectorAll('.vmd-inline-source-control');
+        expect(
+          inlineHtmlControls.length >= 2 &&
+            Array.from(root().querySelectorAll('code[data-type="html-inline"]')).every(
+              (token) => getComputedStyle(token).display === 'none'
+            ),
+          'inline HTML did not receive hidden-source popover controls'
+        );
+        inlineHtmlControls[0].querySelector('.vmd-source-edit-button').click();
+        await pause();
+        expect(
+          document.querySelector('.vmd-source-popover [name="source"]')?.value.startsWith('<'),
+          'inline HTML hover control did not open its token editor'
+        );
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+        const rawLinkedImage = root().querySelector(
+          '.vditor-wysiwyg__block[data-type="html-block"] a img'
+        );
+        const rawOpenBefore = window.__vmdMessages.filter(
+          (message) => message.command === 'open-link'
+        ).length;
+        rawLinkedImage.dispatchEvent(new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+        }));
+        expect(
+          window.__vmdMessages.filter((message) => message.command === 'open-link').length === rawOpenBefore &&
+            document.querySelector('.vmd-url-popover--image')?.style.display !== 'block',
+          'plain-clicking a raw HTML linked image escaped or opened a Markdown image editor'
+        );
+        const rawPrimaryClick = /Mac|iPhone|iPad/.test(navigator.platform)
+          ? { metaKey: true }
+          : { ctrlKey: true };
+        rawLinkedImage.dispatchEvent(new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          ...rawPrimaryClick,
+        }));
+        expect(
+          window.__vmdMessages.filter((message) => message.command === 'open-link').length === rawOpenBefore + 1 &&
+            window.__vmdMessages.filter((message) => message.command === 'open-link').at(-1).href === 'https://example.com/raw',
+          'exact Ctrl/Cmd+click did not open the raw HTML linked image exactly once'
         );
 
         // Plain link clicks edit the raw href; only Ctrl/Cmd+click follows it.
@@ -699,17 +848,23 @@ function testPage() {
         const linkParagraph = root().querySelector('p');
         const outsideLinkText = textNode(linkParagraph);
         select(outsideLinkText, 1, outsideLinkText, 1);
-        linkParagraph.dispatchEvent(new MouseEvent('click', {
+        linkParagraph.dispatchEvent(new PointerEvent('pointerdown', {
           bubbles: true,
           cancelable: true,
         }));
-        await pause(260);
+        await pause();
         expect(
-          urlPopover.style.display === 'block' &&
-            urlPopover.classList.contains('vmd-url-popover--persistent') &&
-            linkUrlInput.isConnected,
-          'clicking outside replaced or dismissed the persistent link popover'
+          urlPopover.style.display === 'none' &&
+            !urlPopover.classList.contains('vmd-url-popover--persistent'),
+          'clicking outside did not close the persistent link popover'
         );
+        select(linkText, 2, linkText, 2);
+        renderedStrong.dispatchEvent(new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+        }));
+        await Promise.resolve();
+        urlPopover = document.querySelector('.vditor-wysiwyg > .vmd-url-popover');
         const linkEscape = new KeyboardEvent('keydown', {
           key: 'Escape',
           bubbles: true,
@@ -717,10 +872,13 @@ function testPage() {
         });
         document.dispatchEvent(linkEscape);
         expect(
-          linkEscape.defaultPrevented &&
-            urlPopover.style.display === 'none' &&
+          urlPopover.style.display === 'none' &&
             !urlPopover.classList.contains('vmd-url-popover--persistent'),
-          'Escape did not close only the active link popover'
+          'Escape did not close only the active link popover: ' + JSON.stringify({
+            display: urlPopover?.style.display,
+            persistent: urlPopover?.classList.contains('vmd-url-popover--persistent'),
+            html: urlPopover?.outerHTML.slice(0, 600),
+          })
         );
 
         renderedLink = root().querySelector('a');
@@ -891,18 +1049,22 @@ function testPage() {
         const imageParagraph = root().querySelector('img').closest('p');
         const outsideImageText = textNode(imageParagraph);
         select(outsideImageText, 1, outsideImageText, 1);
-        imageParagraph.dispatchEvent(new MouseEvent('click', {
+        imageParagraph.dispatchEvent(new PointerEvent('pointerdown', {
           bubbles: true,
           cancelable: true,
         }));
-        await pause(260);
+        await pause();
         expect(
-          urlPopover.style.display === 'block' &&
-            urlPopover.classList.contains('vmd-url-popover--persistent') &&
-            imageUrlInput.isConnected,
-          'clicking outside replaced or dismissed the persistent image popover'
+          urlPopover.style.display === 'none' &&
+            !urlPopover.classList.contains('vmd-url-popover--persistent'),
+          'clicking outside did not close the persistent image popover'
         );
-        imageCloseButton.click();
+        renderedImage.dispatchEvent(new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+        }));
+        await wait(() => urlPopover.style.display === 'block');
+        urlPopover.querySelector('.vmd-popover-close').click();
         expect(
           urlPopover.style.display === 'none' &&
             !urlPopover.classList.contains('vmd-url-popover--persistent'),
@@ -3316,43 +3478,35 @@ function testPage() {
           'the body edit itself was lost'
         );
 
-        // Clicking the table swaps in the source so it can be edited as a code
-        // area, and the caret lands inside that source. The table controller
-        // refreshes from MutationObserver on the next microtask; waiting with a
-        // timer here races Chrome virtual time, so yield directly to that queue.
+        // Clicking the table edits YAML in the shared popover and never exposes
+        // the serializer-owned pre in document layout.
         await Promise.resolve();
         expect(
           fmTable(),
           'the front matter table did not return after editing the body'
         );
         fmTable().dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        await pause(160);
-        expect(!fmTable(), 'clicking the table did not switch to the source view');
+        await pause();
         const fmSourcePre = fmBlock().querySelector(':scope > pre:not(.vditor-wysiwyg__preview)');
+        sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        const yamlInput = sourcePopover.querySelector('[name="source"]');
         expect(
-          window.getComputedStyle(fmSourcePre).display !== 'none',
-          'the front matter source stayed hidden after clicking the table'
+          fmTable() &&
+            window.getComputedStyle(fmSourcePre).display === 'none' &&
+            sourcePopover.style.display === 'block' &&
+            yamlInput.value.includes('title: Front Matter'),
+          'clicking the Front Matter table did not open its hidden-source popover'
         );
+        yamlInput.value = yamlInput.value.replace('title: Front Matter', 'title: Edited Matter');
+        yamlInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'Edited' }));
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await pause(120);
         expect(
-          fmSourcePre.contains(window.getSelection().getRangeAt(0).startContainer),
-          'the caret was not placed inside the front matter source'
-        );
-        expect(
-          window.vditor.getValue() === afterBodyEdit,
-          'toggling to the source view changed the Markdown: ' +
-            JSON.stringify(window.vditor.getValue())
-        );
-
-        // Moving the caret out brings the table back.
-        const outsideNode = textNode(Array.from(root().querySelectorAll(':scope > p'))
-          .find((element) => element.textContent.indexOf('Body paragraph.') >= 0));
-        select(outsideNode, 0, outsideNode, 0);
-        document.dispatchEvent(new Event('selectionchange'));
-        await pause(160);
-        expect(fmTable(), 'leaving the front matter did not restore the table');
-        expect(
-          window.vditor.getValue() === afterBodyEdit,
-          'restoring the table changed the Markdown'
+          fmTable() &&
+            window.getComputedStyle(fmSourcePre).display === 'none' &&
+            window.vditor.getValue().includes('title: Edited Matter') &&
+            fmRowText().some((row) => row === 'title\\u0000Edited Matter'),
+          'Escape did not save Front Matter YAML and refresh its table'
         );
 
         // Invalid YAML must say so and keep the source readable, per test07.
@@ -3395,8 +3549,10 @@ function testPage() {
         await pause(160);
         expect(!fmTable(), 'codeBlock mode still rendered a table');
         expect(
-          window.getComputedStyle(fmBlock().querySelector(':scope > pre:not(.vditor-wysiwyg__preview)')).display !== 'none',
-          'codeBlock mode hid the YAML source instead of showing it'
+          window.getComputedStyle(fmBlock().querySelector(':scope > pre:not(.vditor-wysiwyg__preview)')).display === 'none' &&
+            fmBlock().querySelector('.vmd-front-matter__code')?.textContent.includes('title: Front Matter') &&
+            fmBlock().querySelector('.vmd-source-edit-button'),
+          'codeBlock mode did not replace its editable source with a read-only preview and popup entry'
         );
         expect(
           window.getComputedStyle(fmBlock()).display !== 'none',
@@ -3406,6 +3562,14 @@ function testPage() {
           window.vditor.getValue() === frontMatterSource,
           'codeBlock mode changed the Markdown: ' + JSON.stringify(window.vditor.getValue())
         );
+        fmBlock().querySelector('.vmd-source-edit-button').click();
+        await pause();
+        expect(
+          document.querySelector('.vmd-source-popover [name="source"]')?.value.includes('title: Front Matter') &&
+            getComputedStyle(fmBlock().querySelector(':scope > pre:not(.vditor-wysiwyg__preview)')).display === 'none',
+          'codeBlock mode did not edit YAML through the shared popover'
+        );
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
         window.__vmdFrontMatter.setDisplay('hide');
         await pause(160);
@@ -3497,9 +3661,8 @@ function testPage() {
           'a stale-generation host update replaced the reinitialized editor'
         );
 
-        // Run direct code input after toolbar-selection fixtures so Vditor's
-        // native input history cannot affect their deliberately synthetic focus.
-        testCheckpoint = 'ordinary code direct editing';
+        // Code source and language are edited only through the shared popover.
+        testCheckpoint = 'ordinary code popover editing';
         await setMarkdown(
           'Before code\\n\\n' + markerFence +
             'js\\nconst a = 1;\\nconst b = 2;\\n' + markerFence +
@@ -3509,73 +3672,52 @@ function testPage() {
         codeBlock = root().querySelector(
           '.vditor-wysiwyg__block[data-type="code-block"]'
         );
-        codeSource = codeBlock.querySelector(':scope > .vditor-wysiwyg__pre');
+        codeSource = codeBlock.querySelector(':scope > pre:not(.vditor-wysiwyg__preview)');
         codePreview = codeBlock.querySelector(':scope > .vditor-wysiwyg__preview');
         codePreviewCode = codePreview.querySelector(':scope > code');
         const codeRectBeforeEdit = codeBlock.getBoundingClientRect();
         codePreviewCode.click();
         await pause();
         const codeRectAfterEdit = codeBlock.getBoundingClientRect();
-        const sourceRectAfterEdit = codeSource.getBoundingClientRect();
-        const previewRectAfterEdit = codePreview.getBoundingClientRect();
+        sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        let sourceLanguage = sourcePopover.querySelector('[name="language"]');
+        let sourceContent = sourcePopover.querySelector('[name="content"]');
         expect(
-          !codeBlock.classList.contains('vmd-code-block--editing') &&
-            getComputedStyle(codeSource).display !== 'none' &&
-            getComputedStyle(codePreviewCode).display !== 'none' &&
-            sourceRectAfterEdit.top <= previewRectAfterEdit.top &&
-            codeRectAfterEdit.height > codeRectBeforeEdit.height &&
-            getComputedStyle(codeBlock.querySelector('.vmd-code-toolbar')).display === 'flex',
-          'clicking highlighted code did not open native source above the visible preview: ' +
-            JSON.stringify({
-              blockBefore: codeRectBeforeEdit.toJSON(),
-              blockAfter: codeRectAfterEdit.toJSON(),
-              source: sourceRectAfterEdit.toJSON(),
-              preview: previewRectAfterEdit.toJSON(),
-            })
-        );
-        expect(
-          window.vditor.vditor.wysiwyg.popover.style.display !== 'block',
-          "ordinary code editing restored Vditor's duplicate language popover"
+          getComputedStyle(codeSource).display === 'none' &&
+            sourcePopover.style.display === 'block' &&
+            document.activeElement === sourceContent &&
+            Math.abs(codeRectAfterEdit.height - codeRectBeforeEdit.height) < 2,
+          'clicking highlighted code expanded document source instead of opening the popover'
         );
 
-        let sourceCode = codeSource.querySelector(':scope > code');
-        select(sourceCode, 0, sourceCode, sourceCode.childNodes.length);
+        sourceContent.value = 'const edited = 2;';
+        sourceContent.dispatchEvent(new InputEvent('input', { bubbles: true, data: '2' }));
+        sourceLanguage.value = 'objective-c';
+        sourceLanguage.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'objective-c' }));
+        await pause(100);
         expect(
-          document.execCommand('insertText', false, 'const edited = 2;'),
-          "the browser did not accept input in Vditor's native code source"
+          getComputedStyle(codeSource).display === 'none' &&
+            codePreview.textContent.includes('const edited = 2;'),
+          'popover code input did not refresh its preview while keeping source hidden'
         );
-        await pause(120);
+        document.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause(100);
         codeBlock = root().querySelector(
           '.vditor-wysiwyg__block[data-type="code-block"]'
         );
-        codeSource = codeBlock.querySelector(':scope > .vditor-wysiwyg__pre');
+        codeSource = codeBlock.querySelector(':scope > pre:not(.vditor-wysiwyg__preview)');
         codePreview = codeBlock.querySelector(':scope > .vditor-wysiwyg__preview');
-        codePreviewCode = codePreview.querySelector(':scope > code');
         expect(
-          window.vditor.getValue().includes('const edited = 2;') &&
-            !codeBlock.classList.contains('vmd-code-block--editing') &&
-            getComputedStyle(codeSource).display !== 'none' &&
-            getComputedStyle(codePreviewCode).display !== 'none' &&
-            codePreviewCode.textContent.includes('const edited = 2;'),
-          'native source input was not synchronized with the visible code preview'
+          window.vditor.getValue().includes(markerFence + 'objective-c\\nconst edited = 2;') &&
+            getComputedStyle(codeSource).display === 'none' &&
+            sourcePopover.style.display === 'none',
+          'Escape did not commit the current legal code popover draft'
         );
 
-        codeLanguageButton = codeBlock.querySelector('.vmd-code-language-button');
-        codeLanguageButton.click();
-        await pause();
-        codeLanguageMenu = document.getElementById('vmd-code-language-menu');
-        codeLanguageMenu.querySelector('button[data-code-language="typescript"]').click();
-        await pause(100);
-        const codeSelectionAfterLanguage = window.getSelection();
-        expect(
-          window.vditor.getValue().includes(markerFence + 'typescript\\nconst edited = 2;') &&
-            !codeBlock.classList.contains('vmd-code-block--editing') &&
-            getComputedStyle(codeSource).display !== 'none' &&
-            getComputedStyle(codePreviewCode).display !== 'none' &&
-            codeSelectionAfterLanguage?.rangeCount &&
-            codeSource.contains(codeSelectionAfterLanguage.getRangeAt(0).startContainer),
-          'switching language while native source was open lost the code body, caret, or preview'
-        );
         const directCopyButton = codeBlock.querySelector(
           '.vmd-code-toolbar .vditor-copy .vditor-tooltipped'
         );
@@ -3583,33 +3725,38 @@ function testPage() {
         await pause();
         expect(
           window.__vmdClipboardText === 'const edited = 2;',
-          'the code copy action did not use the latest native-source content'
+          'the code copy action did not use the latest popover content'
         );
 
-        sourceCode = codeSource.querySelector(':scope > code');
-        const sourceSelectionText = textNode(sourceCode);
-        select(sourceSelectionText, 3, sourceSelectionText, 3);
-        sourceCode.dispatchEvent(new KeyboardEvent('keydown', {
-          key: 'Escape',
-          bubbles: true,
-          cancelable: true,
-        }));
+        codeBlock.querySelector('.vmd-code-language-button').click();
         await pause();
-        document.body.dispatchEvent(new MouseEvent('mousedown', {
-          bubbles: true,
-          cancelable: true,
-        }));
+        sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        sourceLanguage = sourcePopover.querySelector('[name="language"]');
+        sourceLanguage.value = 'bad language';
+        sourceLanguage.dispatchEvent(new InputEvent('input', { bubbles: true, data: ' ' }));
+        expect(
+          !sourcePopover.querySelector('.vmd-source-popover__error').hidden,
+          'an invalid code language did not expose an accessible validation error'
+        );
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
         await pause();
         expect(
-          !codeBlock.classList.contains('vmd-code-block--editing') &&
-            getComputedStyle(codeSource).display === 'none' &&
-            getComputedStyle(codePreviewCode).display !== 'none' &&
-            codePreviewCode.textContent.includes('const edited = 2;'),
-          'native code source did not close while retaining its preview'
+          window.vditor.getValue().includes(markerFence + 'objective-c\\nconst edited = 2;') &&
+            !window.vditor.getValue().includes('bad language'),
+          'closing an invalid language draft corrupted the fenced Markdown'
         );
         expect(
           !window.vditor.getValue().includes('vmd-code-'),
           'the code editing controls leaked into Markdown'
+        );
+        window.vditor.vditor.undo.undo(window.vditor.vditor);
+        await pause(100);
+        expect(
+          window.vditor.getValue().includes(markerFence + 'js\\nconst a = 1;\\nconst b = 2;') &&
+            getComputedStyle(
+              root().querySelector('[data-type="code-block"] > pre:not(.vditor-wysiwyg__preview)')
+            ).display === 'none',
+          'one undo did not restore the complete pre-popover code session'
         );
 
         // This reproduces 00-docs/代码修复-20260813-031654.md: multiple ordinary

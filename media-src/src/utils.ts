@@ -20,6 +20,8 @@ declare global {
     __vmdDetails?: { rebind?: () => void }
     __vmdAlerts?: { rebind?: () => void }
     __vmdCodeBlocks?: { rebind?: () => void }
+    __vmdSourceEditors?: { rebind?: () => void }
+    __vmdHtmlPresentation?: { rebind?: () => void }
     __vmdHeadingLevels?: { dispose(): void; rebind(): void }
     __vmdFrontMatter?: { rebind?: () => void }
     __vmdSplitScrollSync?: { rebind?: (editor?: unknown) => void }
@@ -193,10 +195,26 @@ export function fixLinkClick() {
       const href = link?.getAttribute('href') || undefined
       if (!href) return
       const followsLink = isExactPrimaryModifier(event)
+      const isRawHtmlPreview = !!element?.closest(
+        '.vditor-wysiwyg__block[data-type="html-block"] > .vditor-wysiwyg__preview'
+      )
 
-      // A linked image owns its ordinary click: let Vditor's image branch open
-      // the URL/title popover. The exact platform modifier still follows the
-      // enclosing anchor.
+      // Raw HTML anchors are serializer-skipped preview content. Never feed them
+      // to Markdown link/image popovers, and never let target=_blank bypass the
+      // exact-modifier rule.
+      if (isRawHtmlPreview) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        if (followsLink) {
+          if (href.startsWith('#')) scrollToHeadingAnchor(href.slice(1))
+          else openLink(href)
+        }
+        return
+      }
+
+      // A Markdown linked image owns its ordinary click: let Vditor's image
+      // branch open the URL/title popover. The exact platform modifier still
+      // follows the enclosing anchor.
       if (image && isWysiwyg && !followsLink) return
 
       // Vditor opens anchors from its bubbling listener. Claim every remaining

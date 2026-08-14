@@ -4,48 +4,15 @@ import {
   getVditorInternals,
   refreshVditorWysiwygCodePreview,
 } from './vditor-adapter'
+import { showWysiwygSourcePopover } from './wysiwyg-popover'
 
 const ORDINARY_CLASS = 'vmd-code-block--ordinary'
+const RICH_CLASS = 'vmd-code-block--rich'
 const TOOLBAR_CLASS = 'vmd-code-toolbar'
 const LANGUAGE_BUTTON_CLASS = 'vmd-code-language-button'
-const MENU_ID = 'vmd-code-language-menu'
-const MENU_CURRENT_CLASS = 'vmd-code-language-menu__current'
+const EDIT_BUTTON_CLASS = 'vmd-source-edit-button'
 const ZERO_WIDTH_SPACE = '\u200b'
 
-const COMMON_LANGUAGES = [
-  'javascript',
-  'typescript',
-  'python',
-  'java',
-  'c',
-  'cpp',
-  'csharp',
-  'go',
-  'rust',
-  'html',
-  'css',
-  'json',
-  'yaml',
-  'bash',
-  'shell',
-  'sql',
-  'xml',
-  'php',
-  'ruby',
-  'swift',
-  'kotlin',
-  'r',
-  'scala',
-  'diff',
-  'dockerfile',
-  'makefile',
-  'toml',
-  'ini',
-  'markdown',
-] as const
-const COMMON_LANGUAGE_SET = new Set<string>(COMMON_LANGUAGES)
-
-/** Languages rendered as diagrams or other rich previews remain native Vditor blocks. */
 const SPECIAL_LANGUAGES = new Set([
   'abc',
   'plantuml',
@@ -64,15 +31,6 @@ interface CodeBlockParts {
   source: HTMLElement
   sourceCode: HTMLElement
   preview: HTMLElement
-  previewPre: HTMLElement
-  previewCode: HTMLElement
-}
-
-interface LanguageMenuState extends CodeBlockParts {
-  button: HTMLButtonElement
-  language: string
-  languages: ReadonlySet<string>
-  caretOffset: number | null
 }
 
 function getWysiwygRoot(): HTMLElement | null {
@@ -81,21 +39,22 @@ function getWysiwygRoot(): HTMLElement | null {
   )
 }
 
+function getSharedPopover(): HTMLElement | null {
+  const popover = getVditorInternals()?.wysiwyg?.popover
+  return popover instanceof HTMLElement ? popover : null
+}
+
 function getCodeBlockParts(block: HTMLElement): CodeBlockParts | null {
   if (block.getAttribute('data-type') !== 'code-block') return null
   const source = block.querySelector<HTMLElement>(
-    ':scope > .vditor-wysiwyg__pre'
+    ':scope > pre:not(.vditor-wysiwyg__preview)'
   )
   const sourceCode = source?.querySelector<HTMLElement>(':scope > code') ?? null
   const preview = block.querySelector<HTMLElement>(
     ':scope > .vditor-wysiwyg__preview'
   )
-  const previewPre = preview?.matches('pre')
-    ? preview
-    : preview?.querySelector<HTMLElement>(':scope > pre') ?? null
-  const previewCode = previewPre?.querySelector<HTMLElement>(':scope > code') ?? null
-  return source && sourceCode && preview && previewPre && previewCode
-    ? { block, source, sourceCode, preview, previewPre, previewCode }
+  return source && sourceCode && preview
+    ? { block, source, sourceCode, preview }
     : null
 }
 
@@ -106,6 +65,20 @@ function languageFromCode(code: HTMLElement): string {
 
 function languageLabel(language: string): string {
   return language || t('plainTextCode')
+}
+
+function normalizeLanguage(value: string): string | null {
+  const language = value.trim()
+  if (
+    /[\s`]/.test(language) ||
+    Array.from(language).some((character) => {
+      const code = character.charCodeAt(0)
+      return code < 32 || code === 127
+    })
+  ) {
+    return null
+  }
+  return language
 }
 
 function setSourceLanguage(code: HTMLElement, language: string): void {
@@ -125,198 +98,71 @@ function sourceText(sourceCode: HTMLElement): string {
   return text.endsWith('\n') ? text.slice(0, -1) : text
 }
 
+function setSourceText(sourceCode: HTMLElement, value: string): void {
+  sourceCode.textContent = `${value}\n`
+}
+
 function syncCopyTextarea(parts: CodeBlockParts): void {
-  const textarea = parts.previewPre.querySelector<HTMLTextAreaElement>(
-    `:scope > .${TOOLBAR_CLASS} .vditor-copy textarea`
+  const textarea = parts.preview.querySelector<HTMLTextAreaElement>(
+    `.${TOOLBAR_CLASS} .vditor-copy textarea`
   )
   if (textarea) textarea.value = sourceText(parts.sourceCode)
 }
 
-function selectionOffsetWithin(element: HTMLElement): number | null {
-  const selection = window.getSelection()
-  if (!selection || selection.rangeCount === 0) return null
-  const active = selection.getRangeAt(0)
-  if (!element.contains(active.startContainer)) return null
-  const range = document.createRange()
-  range.selectNodeContents(element)
-  try {
-    range.setEnd(active.startContainer, active.startOffset)
-  } catch (_) {
-    return null
-  }
-  return range.toString().length
+function createEditButton(): HTMLButtonElement {
+  const button = document.createElement('button')
+  button.type = 'button'
+  button.className = EDIT_BUTTON_CLASS
+  button.setAttribute('contenteditable', 'false')
+  button.setAttribute('data-render', '1')
+  button.setAttribute('aria-label', t('editSource') || 'Edit source')
+  button.innerHTML =
+    '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.7 1.8a1.4 1.4 0 0 1 2 2l-8.4 8.4-3 .6.6-3 8.8-8z" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>'
+  return button
 }
 
-function restoreTextOffset(element: HTMLElement, requestedOffset: number): void {
-  const offset = Math.max(0, requestedOffset)
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
-  let remaining = offset
-  let text = walker.nextNode()
-  while (text) {
-    const length = text.textContent?.length ?? 0
-    if (remaining <= length) {
-      const range = document.createRange()
-      range.setStart(text, remaining)
-      range.collapse(true)
-      const selection = window.getSelection()
-      selection?.removeAllRanges()
-      selection?.addRange(range)
-      return
-    }
-    remaining -= length
-    text = walker.nextNode()
-  }
-
-  const fallback = document.createRange()
-  fallback.selectNodeContents(element)
-  fallback.collapse(false)
-  const selection = window.getSelection()
-  selection?.removeAllRanges()
-  selection?.addRange(fallback)
-}
-
-function positionMenu(menu: HTMLElement, target: HTMLElement): void {
-  const margin = 8
-  const gap = 4
-  menu.style.display = 'block'
-  menu.style.visibility = 'hidden'
-  menu.style.left = '0'
-  menu.style.top = '0'
-
-  const targetRect = target.getBoundingClientRect()
-  const maxLeft = Math.max(margin, window.innerWidth - menu.offsetWidth - margin)
-  const left = Math.min(Math.max(targetRect.left, margin), maxLeft)
-  const below = targetRect.bottom + gap
-  const above = targetRect.top - menu.offsetHeight - gap
-  const maxTop = Math.max(margin, window.innerHeight - menu.offsetHeight - margin)
-  const top = below <= maxTop || above < margin ? Math.min(below, maxTop) : above
-
-  menu.style.left = `${left}px`
-  menu.style.top = `${Math.max(margin, top)}px`
-  menu.style.visibility = 'visible'
-}
-
-function createLanguageMenu(): HTMLDivElement {
-  const menu = document.createElement('div')
-  menu.id = MENU_ID
-  menu.setAttribute('role', 'menu')
-  menu.setAttribute('aria-label', t('changeCodeLanguage'))
-  document.body.appendChild(menu)
-  return menu
-}
-
-/**
- * Adds a persistent language/copy toolbar to ordinary WYSIWYG code blocks.
- * Source editing remains Vditor-native: clicking the rendered code opens its
- * editable source above the still-visible preview.
- */
+/** Keeps every fenced source hidden and edits ordinary/rich blocks in one popover. */
 export function initWysiwygCodeBlocks(): { rebind(): void } {
-  const menu = createLanguageMenu()
-  let state: LanguageMenuState | null = null
   let root: HTMLElement | null = null
   let boundRoot: HTMLElement | null = null
   let observer: MutationObserver | null = null
   let refreshQueued = false
-
-  function hideMenu(): void {
-    state?.button.setAttribute('aria-expanded', 'false')
-    state = null
-    menu.style.display = 'none'
-    menu.style.visibility = ''
-  }
-
-  function menuLanguages(current: string): string[] {
-    const languages = ['']
-    if (current && !COMMON_LANGUAGE_SET.has(current)) {
-      languages.push(current)
-    }
-    languages.push(...COMMON_LANGUAGES)
-    return languages
-  }
-
-  function buildMenu(current: string): ReadonlySet<string> {
-    const languages = menuLanguages(current)
-    menu.replaceChildren()
-    for (const language of languages) {
-      const button = document.createElement('button')
-      button.type = 'button'
-      button.dataset.codeLanguage = language
-      button.setAttribute('role', 'menuitemradio')
-      button.setAttribute('aria-checked', String(language === current))
-      button.classList.toggle(MENU_CURRENT_CLASS, language === current)
-      button.textContent = languageLabel(language)
-      menu.appendChild(button)
-    }
-    return new Set(languages)
-  }
-
-  function showMenu(button: HTMLButtonElement, focusCurrent = false): void {
-    const block = button.closest<HTMLElement>(
-      `.vditor-wysiwyg__block.${ORDINARY_CLASS}`
-    )
-    const parts = block ? getCodeBlockParts(block) : null
-    if (!parts) return
-    if (state?.button === button && menu.style.display === 'block') {
-      hideMenu()
-      return
-    }
-
-    hideMenu()
-    const language = languageFromCode(parts.sourceCode)
-    const languages = buildMenu(language)
-    state = {
-      ...parts,
-      button,
-      language,
-      languages,
-      caretOffset: selectionOffsetWithin(parts.sourceCode),
-    }
-    button.setAttribute('aria-expanded', 'true')
-    positionMenu(menu, button)
-    if (focusCurrent) {
-      requestAnimationFrame(() => {
-        menu
-          .querySelector<HTMLButtonElement>(`.${MENU_CURRENT_CLASS}`)
-          ?.focus()
-      })
-    }
-  }
+  let writing = false
+  const renderTimers = new WeakMap<HTMLElement, number>()
+  const renderVersions = new WeakMap<HTMLElement, number>()
 
   function decorateBlock(block: HTMLElement): void {
     const parts = getCodeBlockParts(block)
     if (!parts) return
     const language = languageFromCode(parts.sourceCode)
-    if (isSpecialLanguage(language)) {
-      block.classList.remove(ORDINARY_CLASS)
-      parts.previewPre.querySelector(`:scope > .${TOOLBAR_CLASS}`)?.remove()
-      return
-    }
+    const rich = isSpecialLanguage(language)
+    parts.source.style.setProperty('display', 'none', 'important')
+    block.classList.toggle(ORDINARY_CLASS, !rich)
+    block.classList.toggle(RICH_CLASS, rich)
 
-    block.classList.add(ORDINARY_CLASS)
-
-    let toolbar = parts.previewPre.querySelector<HTMLElement>(
+    let toolbar = parts.preview.querySelector<HTMLElement>(
       `:scope > .${TOOLBAR_CLASS}`
     )
-    let languageButton = toolbar?.querySelector<HTMLButtonElement>(
-      `:scope > .${LANGUAGE_BUTTON_CLASS}`
-    ) ?? null
     if (!toolbar) {
       toolbar = document.createElement('div')
       toolbar.className = TOOLBAR_CLASS
       toolbar.setAttribute('contenteditable', 'false')
       toolbar.setAttribute('data-render', '1')
-      parts.previewPre.insertBefore(toolbar, parts.previewPre.firstChild)
+      if (rich) parts.preview.appendChild(toolbar)
+      else parts.preview.insertBefore(toolbar, parts.preview.firstChild)
     }
+
+    let languageButton = toolbar.querySelector<HTMLButtonElement>(
+      `:scope > .${LANGUAGE_BUTTON_CLASS}`
+    )
     if (!languageButton) {
       languageButton = document.createElement('button')
       languageButton.type = 'button'
       languageButton.className = LANGUAGE_BUTTON_CLASS
       languageButton.setAttribute('contenteditable', 'false')
-      languageButton.setAttribute('aria-haspopup', 'menu')
-      languageButton.setAttribute('aria-expanded', 'false')
-      toolbar.appendChild(languageButton)
+      languageButton.setAttribute('data-render', '1')
+      toolbar.prepend(languageButton)
     }
-
     const label = languageLabel(language)
     if (languageButton.textContent !== label) languageButton.textContent = label
     languageButton.dataset.codeLanguage = language
@@ -325,202 +171,199 @@ export function initWysiwygCodeBlocks(): { rebind(): void } {
       `${t('changeCodeLanguage')}: ${label}`
     )
 
-    const copy = parts.previewPre.querySelector<HTMLElement>(
-      ':scope > .vditor-copy'
+    let editButton = toolbar.querySelector<HTMLButtonElement>(
+      `:scope > .${EDIT_BUTTON_CLASS}`
     )
+    if (!editButton) {
+      editButton = createEditButton()
+      toolbar.appendChild(editButton)
+    }
+
+    const copy = parts.preview.querySelector<HTMLElement>(':scope > .vditor-copy')
     if (copy && copy.parentElement !== toolbar) toolbar.appendChild(copy)
     syncCopyTextarea(parts)
   }
 
   function refresh(): void {
     refreshQueued = false
-    const activeRoot = root
-    if (!activeRoot) return
-    activeRoot
-      .querySelectorAll<HTMLElement>(
-        '.vditor-wysiwyg__block[data-type="code-block"]'
-      )
-      .forEach(decorateBlock)
-
-    if (state && (!state.button.isConnected || !state.block.isConnected)) {
-      hideMenu()
+    if (!root || writing) return
+    writing = true
+    try {
+      root
+        .querySelectorAll<HTMLElement>(
+          '.vditor-wysiwyg__block[data-type="code-block"]'
+        )
+        .forEach(decorateBlock)
+    } finally {
+      writing = false
     }
   }
 
   function queueRefresh(): void {
-    if (refreshQueued) return
+    if (refreshQueued || writing) return
     refreshQueued = true
     queueMicrotask(refresh)
   }
 
-  function ordinaryBlockFor(target: Element | null): HTMLElement | null {
-    return target?.closest<HTMLElement>(
-      `.vditor-wysiwyg__block.${ORDINARY_CLASS}`
-    ) ?? null
+  function schedulePreviewRender(
+    parts: CodeBlockParts,
+    render: () => void
+  ): void {
+    const previousTimer = renderTimers.get(parts.block)
+    if (previousTimer !== undefined) window.clearTimeout(previousTimer)
+    const version = (renderVersions.get(parts.block) ?? 0) + 1
+    renderVersions.set(parts.block, version)
+    const timer = window.setTimeout(() => {
+      renderTimers.delete(parts.block)
+      if (
+        renderVersions.get(parts.block) !== version ||
+        !parts.block.isConnected
+      ) {
+        return
+      }
+      render()
+    }, 50)
+    renderTimers.set(parts.block, timer)
+  }
+
+  function flushPreviewRender(
+    parts: CodeBlockParts,
+    render: () => void
+  ): void {
+    const timer = renderTimers.get(parts.block)
+    if (timer !== undefined) window.clearTimeout(timer)
+    renderTimers.delete(parts.block)
+    renderVersions.set(parts.block, (renderVersions.get(parts.block) ?? 0) + 1)
+    render()
+  }
+
+  function openEditor(
+    parts: CodeBlockParts,
+    focusField: 'language' | 'content'
+  ): void {
+    const popover = getSharedPopover()
+    const internal = getVditorInternals()
+    if (!popover || !internal || internal.currentMode !== 'wysiwyg') return
+    const initialLanguage = languageFromCode(parts.sourceCode)
+    const initialContent = sourceText(parts.sourceCode)
+
+    showWysiwygSourcePopover({
+      popover,
+      target: parts.block,
+      focusField,
+      fields: [
+        {
+          name: 'language',
+          label: t('changeCodeLanguage'),
+          value: initialLanguage,
+        },
+        {
+          name: 'content',
+          label: t('codeContent') || 'Code content',
+          value: initialContent,
+          multiline: true,
+        },
+      ],
+      onChange: (values) => {
+        if (!parts.block.isConnected || !parts.sourceCode.isConnected) {
+          return 'The code block is no longer available'
+        }
+        const language = normalizeLanguage(values.language ?? '')
+        const content = values.content ?? ''
+        if (sourceText(parts.sourceCode) !== content) {
+          setSourceText(parts.sourceCode, content)
+        }
+        if (language === null) {
+          parts.source.style.setProperty('display', 'none', 'important')
+          return t('invalidCodeLanguage') || 'Language cannot contain whitespace, control characters, or backticks'
+        }
+        if (languageFromCode(parts.sourceCode) !== language) {
+          setSourceLanguage(parts.sourceCode, language)
+          internal.hint.recentLanguage = language
+        }
+        schedulePreviewRender(parts, () => {
+          refreshVditorWysiwygCodePreview(internal, parts.source, parts.preview)
+          parts.source.style.setProperty('display', 'none', 'important')
+          queueRefresh()
+        })
+        return null
+      },
+      onFinish: (_values, changed) => {
+        if (!changed || !parts.block.isConnected || !parts.sourceCode.isConnected) {
+          return
+        }
+        const sourceChanged =
+          languageFromCode(parts.sourceCode) !== initialLanguage ||
+          sourceText(parts.sourceCode) !== initialContent
+        if (!sourceChanged) return
+        flushPreviewRender(parts, () => {
+          refreshVditorWysiwygCodePreview(internal, parts.source, parts.preview)
+        })
+        parts.source.style.setProperty('display', 'none', 'important')
+        commitVditorWysiwygDomEdit(internal)
+        queueRefresh()
+      },
+    })
+  }
+
+  function onSelectionChange(): void {
+    if (
+      !root ||
+      document.activeElement?.closest('.vmd-source-popover')
+    ) {
+      return
+    }
+    const selection = window.getSelection()
+    if (!selection?.rangeCount) return
+    const node = selection.getRangeAt(0).startContainer
+    const element = node instanceof Element ? node : node.parentElement
+    const block = element?.closest<HTMLElement>(
+      '.vditor-wysiwyg__block[data-type="code-block"]'
+    )
+    const parts = block ? getCodeBlockParts(block) : null
+    if (!parts || !parts.source.contains(node)) return
+    parts.source.style.setProperty('display', 'none', 'important')
+    openEditor(parts, 'content')
   }
 
   function onRootPointerDown(event: PointerEvent): void {
     const target = event.target instanceof Element ? event.target : null
-    const block = ordinaryBlockFor(target)
-    if (!target || !block || !target.closest(`.${TOOLBAR_CLASS}`)) return
-    const parts = getCodeBlockParts(block)
-    if (!parts) return
-
-    // Toolbar actions must not move the source caret or make Vditor interpret
-    // the control press as a request to open the source panel.
-    syncCopyTextarea(parts)
+    if (!target?.closest(`.${LANGUAGE_BUTTON_CLASS}, .${EDIT_BUTTON_CLASS}`)) {
+      return
+    }
     event.preventDefault()
     event.stopImmediatePropagation()
   }
 
   function onRootClick(event: MouseEvent): void {
     const target = event.target instanceof Element ? event.target : null
-    if (!ordinaryBlockFor(target)) return
-
-    const languageButton = target?.closest<HTMLButtonElement>(
-      `.${LANGUAGE_BUTTON_CLASS}`
+    const block = target?.closest<HTMLElement>(
+      '.vditor-wysiwyg__block[data-type="code-block"]'
     )
-    if (languageButton) {
-      event.preventDefault()
-      event.stopImmediatePropagation()
-      showMenu(languageButton)
-      return
-    }
-    if (target?.closest(`.${TOOLBAR_CLASS}`)) {
-      event.preventDefault()
-      event.stopImmediatePropagation()
-    }
-    // Code-body clicks intentionally continue to Vditor's native WYSIWYG
-    // handler, which opens the editable source above the rendered preview.
-  }
+    const parts = block ? getCodeBlockParts(block) : null
+    if (!target || !parts) return
 
-  function applyLanguage(language: string): void {
-    const current = state
-    if (!current || !current.languages.has(language)) return
-    const restoreOffset =
-      selectionOffsetWithin(current.sourceCode) ?? current.caretOffset
-    const sourceWasOpen = getComputedStyle(current.source).display !== 'none'
-    hideMenu()
-    if (language === current.language) {
-      if (sourceWasOpen && restoreOffset !== null) {
-        restoreTextOffset(current.sourceCode, restoreOffset)
+    const languageButton = target.closest(`.${LANGUAGE_BUTTON_CLASS}`)
+    const editButton = target.closest(`.${EDIT_BUTTON_CLASS}`)
+    const ordinaryPreviewClick =
+      parts.block.classList.contains(ORDINARY_CLASS) &&
+      parts.preview.contains(target) &&
+      !target.closest('.vditor-copy')
+    if (!languageButton && !editButton && !ordinaryPreviewClick) {
+      if (
+        parts.block.classList.contains(RICH_CLASS) &&
+        parts.preview.contains(target)
+      ) {
+        // Keep diagram controls interactive without letting Vditor expose the
+        // hidden source or move the caret into it.
+        event.stopImmediatePropagation()
       }
       return
     }
 
-    const internal = getVditorInternals()
-    if (
-      !internal ||
-      internal.currentMode !== 'wysiwyg' ||
-      !current.block.isConnected ||
-      !current.sourceCode.isConnected
-    ) {
-      return
-    }
-
-    setSourceLanguage(current.sourceCode, language)
-    internal.hint.recentLanguage = language
-    refreshVditorWysiwygCodePreview(
-      internal,
-      current.source,
-      current.preview
-    )
-    if (sourceWasOpen) current.source.style.display = 'block'
-    decorateBlock(current.block)
-    commitVditorWysiwygDomEdit(internal)
-
-    requestAnimationFrame(() => {
-      const nextParts = getCodeBlockParts(current.block)
-      if (!nextParts) return
-      if (sourceWasOpen) {
-        nextParts.source.style.display = 'block'
-        if (restoreOffset !== null) {
-          restoreTextOffset(nextParts.sourceCode, restoreOffset)
-        }
-      } else {
-        nextParts.previewPre
-          .querySelector<HTMLButtonElement>(`.${LANGUAGE_BUTTON_CLASS}`)
-          ?.focus({ preventScroll: true })
-      }
-    })
-  }
-
-  function onDocumentPointerDown(event: PointerEvent): void {
-    const target = event.target instanceof Element ? event.target : null
-    if (target?.closest(`#${MENU_ID}`)) return
-
-    const codeButton = target?.closest(`.${LANGUAGE_BUTTON_CLASS}`) ?? null
-    if (!codeButton) hideMenu()
-  }
-
-  function sourcePartsFromSelection(): CodeBlockParts | null {
-    const selection = window.getSelection()
-    if (!selection || selection.rangeCount === 0) return null
-    const node = selection.getRangeAt(0).startContainer
-    const element = node instanceof Element ? node : node.parentElement
-    const block = ordinaryBlockFor(element)
-    if (!block) return null
-    const parts = getCodeBlockParts(block)
-    return parts?.source.contains(node) ? parts : null
-  }
-
-  function onDocumentKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Escape' && menu.style.display === 'block') {
-      event.preventDefault()
-      event.stopImmediatePropagation()
-      hideMenu()
-      return
-    }
-    const target = event.target instanceof Element ? event.target : null
-    if (target?.closest(`#${MENU_ID}`)) return
-
-    const parts = sourcePartsFromSelection()
-    if (
-      !parts ||
-      !event.altKey ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.shiftKey ||
-      event.key !== 'Enter'
-    ) {
-      return
-    }
-    const button = parts.previewPre.querySelector<HTMLButtonElement>(
-      `.${LANGUAGE_BUTTON_CLASS}`
-    )
-    if (!button) return
     event.preventDefault()
     event.stopImmediatePropagation()
-    showMenu(button, true)
-  }
-
-  function onMenuKeydown(event: KeyboardEvent): void {
-    const buttons = Array.from(
-      menu.querySelectorAll<HTMLButtonElement>('button[data-code-language]')
-    )
-    const activeIndex =
-      document.activeElement instanceof HTMLButtonElement
-        ? buttons.indexOf(document.activeElement)
-        : -1
-    let nextIndex = -1
-    if (event.key === 'ArrowDown') {
-      nextIndex = activeIndex < 0 ? 0 : (activeIndex + 1) % buttons.length
-    } else if (event.key === 'ArrowUp') {
-      nextIndex = activeIndex <= 0 ? buttons.length - 1 : activeIndex - 1
-    } else if (event.key === 'Home') {
-      nextIndex = 0
-    } else if (event.key === 'End') {
-      nextIndex = buttons.length - 1
-    } else if (event.key === 'Escape') {
-      event.preventDefault()
-      event.stopPropagation()
-      hideMenu()
-      return
-    }
-    if (nextIndex < 0) return
-    event.preventDefault()
-    event.stopPropagation()
-    buttons[nextIndex]?.focus()
+    openEditor(parts, languageButton ? 'language' : 'content')
   }
 
   function unbindRoot(): void {
@@ -533,13 +376,11 @@ export function initWysiwygCodeBlocks(): { rebind(): void } {
   }
 
   function rebind(): void {
-    hideMenu()
     const nextRoot = getWysiwygRoot()
     if (nextRoot === root && boundRoot === nextRoot) {
       queueRefresh()
       return
     }
-
     unbindRoot()
     root = nextRoot
     if (!root) return
@@ -555,46 +396,7 @@ export function initWysiwygCodeBlocks(): { rebind(): void } {
     queueRefresh()
   }
 
-  menu.addEventListener('pointerdown', (event) => {
-    const target = event.target instanceof Element ? event.target : null
-    if (!target?.closest('button[data-code-language]')) return
-    // Keep the source caret only when a language item is pressed. Preventing
-    // pointerdown on the whole menu also prevents dragging its native scrollbar.
-    event.preventDefault()
-    event.stopPropagation()
-  })
-  menu.addEventListener('click', (event) => {
-    event.preventDefault()
-    event.stopPropagation()
-    const target = event.target instanceof Element ? event.target : null
-    const button = target?.closest<HTMLButtonElement>(
-      'button[data-code-language]'
-    )
-    const language = button?.dataset.codeLanguage
-    if (language !== undefined) applyLanguage(language)
-  })
-  menu.addEventListener('keydown', onMenuKeydown)
-  document.addEventListener('pointerdown', onDocumentPointerDown, true)
-  document.addEventListener('keydown', onDocumentKeydown, true)
-  document.addEventListener(
-    'scroll',
-    (event) => {
-      // The menu is intentionally scrollable. Scroll events do not bubble but
-      // are observable here in capture phase, so ignore the menu's own scroll
-      // while still closing it when an editor or outer container moves.
-      if (
-        event.target === menu ||
-        (event.target instanceof Node && menu.contains(event.target))
-      ) {
-        return
-      }
-      hideMenu()
-    },
-    true
-  )
-  window.addEventListener('resize', hideMenu)
-  window.addEventListener('blur', hideMenu)
-
+  document.addEventListener('selectionchange', onSelectionChange)
   rebind()
   return { rebind }
 }

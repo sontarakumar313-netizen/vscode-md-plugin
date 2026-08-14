@@ -30,6 +30,8 @@ import {
 import { initWysiwygDetails } from './wysiwyg-details'
 import { initWysiwygAlerts } from './wysiwyg-alert'
 import { initWysiwygCodeBlocks } from './wysiwyg-code-block'
+import { initWysiwygSourceEditors } from './wysiwyg-source-editor'
+import { initWysiwygHtmlPresentation } from './wysiwyg-html-presentation'
 import { initWysiwygHeadingLevels } from './wysiwyg-heading-level'
 import {
   attachFrontMatterSeparator,
@@ -591,6 +593,8 @@ function refreshModeDependentFeatures(): void {
   window.__vmdDetails?.rebind?.()
   window.__vmdAlerts?.rebind?.()
   window.__vmdCodeBlocks?.rebind?.()
+  window.__vmdSourceEditors?.rebind?.()
+  window.__vmdHtmlPresentation?.rebind?.()
   window.__vmdHeadingLevels?.rebind?.()
   window.__vmdFrontMatter?.rebind?.()
   window.__vmdSplitScrollSync?.rebind?.(window.vditor)
@@ -857,6 +861,16 @@ function initVditor(msg) {
         ;(window as any).__vmdCodeBlocks = initWysiwygCodeBlocks()
       } else {
         ;(window as any).__vmdCodeBlocks.rebind?.()
+      }
+      if (!window.__vmdSourceEditors) {
+        window.__vmdSourceEditors = initWysiwygSourceEditors()
+      } else {
+        window.__vmdSourceEditors.rebind?.()
+      }
+      if (!window.__vmdHtmlPresentation) {
+        window.__vmdHtmlPresentation = initWysiwygHtmlPresentation()
+      } else {
+        window.__vmdHtmlPresentation.rebind?.()
       }
       if (!window.__vmdHeadingLevels) {
         window.__vmdHeadingLevels = initWysiwygHeadingLevels()

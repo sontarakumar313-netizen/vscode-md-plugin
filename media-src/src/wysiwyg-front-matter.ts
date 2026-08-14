@@ -4,20 +4,21 @@ import {
   restoreFrontMatterSeparator,
 } from './front-matter'
 import type { FrontMatterEntry, FrontMatterValue } from './front-matter'
+import { t } from './lang'
+import {
+  commitVditorWysiwygDomEdit,
+  getVditorInternals,
+} from './vditor-adapter'
+import {
+  closeActiveWysiwygPopover,
+  showWysiwygSourcePopover,
+} from './wysiwyg-popover'
 
 /**
- * Shows YAML front matter as a table in WYSIWYG mode, and hands the raw source
- * back the moment the caret enters the block so it can be edited as a code area.
- *
- * The table lives inside a `.vditor-wysiwyg__preview` container, which Lute skips
- * when it serializes the DOM back to Markdown. That is the whole reason the
- * rendered table cannot leak into the document: the source `<pre><code>` stays
- * exactly where Vditor put it, untouched, and remains the only thing that round
- * trips. Nothing here ever writes a value back.
- *
- * Vditor's own preview/source toggle does not cover this block. Its check is
- * `data-type.indexOf("block") > -1`, and `yaml-front-matter` has no "block" in it,
- * so the focus behaviour below is the plugin's own.
+ * Shows YAML front matter as a table or read-only code preview in WYSIWYG mode.
+ * The serializer-owned `<pre><code>` always stays hidden and is edited through
+ * the shared popover. Generated previews live in a container Lute skips when it
+ * serializes the DOM, so display-only controls cannot leak into Markdown.
  */
 
 export type FrontMatterDisplay = 'table' | 'codeBlock' | 'hide'
@@ -199,84 +200,73 @@ export function initWysiwygFrontMatter(display: FrontMatterDisplay = 'table') {
   let boundRoot: HTMLElement | null = null
   let observer: MutationObserver | null = null
   let refreshQueued = false
-  // Set while the observer's own DOM writes are in flight, so inserting the
-  // preview container does not re-enter refresh in an endless loop.
   let writing = false
-  let editing = false
-
-  function caretIsInside(block: HTMLElement): boolean {
-    const selection = window.getSelection()
-    if (!selection || selection.rangeCount === 0) return false
-    const node = selection.getRangeAt(0).startContainer
-    const element =
-      node.nodeType === Node.ELEMENT_NODE
-        ? (node as HTMLElement)
-        : node.parentElement
-    if (!element) return false
-    const source = getSourcePre(block)
-    // Only the source counts as editing. The caret landing in the generated
-    // preview must not be read as intent to edit, or the table would flip to
-    // source the moment it was clicked.
-    return source ? source.contains(element) : block.contains(element)
-  }
 
   function clearPreview(block: HTMLElement): void {
-    const preview = getPreview(block)
-    if (preview) preview.remove()
+    getPreview(block)?.remove()
   }
 
-  function showSource(block: HTMLElement): void {
-    clearPreview(block)
-    block.classList.remove('vmd-front-matter-block--rendered')
-    const source = getSourcePre(block)
-    if (source) source.style.removeProperty('display')
+  function createEditButton(): HTMLButtonElement {
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'vmd-source-edit-button'
+    button.setAttribute('contenteditable', 'false')
+    button.setAttribute('data-render', '1')
+    button.setAttribute('aria-label', t('editSource') || 'Edit source')
+    button.innerHTML =
+      '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11.7 1.8a1.4 1.4 0 0 1 2 2l-8.4 8.4-3 .6.6-3 8.8-8z" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>'
+    return button
   }
 
-  function renderTable(block: HTMLElement): void {
+  function renderPreview(block: HTMLElement): void {
     const source = getSourceText(block)
     const existing = getPreview(block)
-    if (existing?.getAttribute('data-vmd-source') === source) {
+    if (
+      existing?.getAttribute('data-vmd-source') === source &&
+      existing.getAttribute('data-vmd-mode') === mode
+    ) {
       block.classList.add('vmd-front-matter-block--rendered')
+      getSourcePre(block)?.style.setProperty('display', 'none', 'important')
       return
     }
-    if (existing) existing.remove()
+    existing?.remove()
 
     const preview = document.createElement('div')
     preview.className = PREVIEW_CLASS
-    // Vditor treats a preview container as non-editable machinery; marking it so
-    // keeps the caret out of the generated table and out of getValue()'s way.
     preview.setAttribute('contenteditable', 'false')
     preview.setAttribute('data-vmd-source', source)
-    preview.appendChild(buildTable(source))
+    preview.setAttribute('data-vmd-mode', mode)
+    if (mode === 'codeBlock') {
+      const raw = document.createElement('pre')
+      raw.className = 'vmd-front-matter__code'
+      raw.textContent = source
+      preview.appendChild(raw)
+    } else {
+      preview.appendChild(buildTable(source))
+    }
+    preview.appendChild(createEditButton())
     block.appendChild(preview)
     block.classList.add('vmd-front-matter-block--rendered')
+    getSourcePre(block)?.style.setProperty('display', 'none', 'important')
   }
 
   function refresh(): void {
     refreshQueued = false
     if (writing || !root) return
-
     const block = findBlock(root)
     if (!block) return
 
     writing = true
     try {
-      if (mode === 'codeBlock') {
-        showSource(block)
-        block.classList.remove('vmd-front-matter-block--hidden')
-        return
-      }
+      getSourcePre(block)?.style.setProperty('display', 'none', 'important')
       if (mode === 'hide') {
         clearPreview(block)
+        block.classList.remove('vmd-front-matter-block--rendered')
         block.classList.add('vmd-front-matter-block--hidden')
         return
       }
       block.classList.remove('vmd-front-matter-block--hidden')
-      if (editing && caretIsInside(block)) {
-        showSource(block)
-        return
-      }
-      renderTable(block)
+      renderPreview(block)
     } finally {
       writing = false
     }
@@ -288,56 +278,91 @@ export function initWysiwygFrontMatter(display: FrontMatterDisplay = 'table') {
     queueMicrotask(refresh)
   }
 
-  function setEditing(next: boolean): void {
-    if (editing === next) return
-    editing = next
-    queueRefresh()
+  function openEditor(block: HTMLElement): void {
+    const sourcePre = getSourcePre(block)
+    const sourceCode = sourcePre?.querySelector<HTMLElement>(':scope > code')
+    const popover = getVditorInternals()?.wysiwyg?.popover
+    const internal = getVditorInternals()
+    if (
+      !sourcePre ||
+      !sourceCode ||
+      !(popover instanceof HTMLElement) ||
+      !internal ||
+      internal.currentMode !== 'wysiwyg'
+    ) {
+      return
+    }
+    const initial = sourceCode.textContent || ''
+    showWysiwygSourcePopover({
+      popover,
+      target: block,
+      focusField: 'source',
+      fields: [
+        {
+          name: 'source',
+          label: 'Front Matter YAML',
+          value: initial,
+          multiline: true,
+        },
+      ],
+      onChange: (values) => {
+        if (!block.isConnected || !sourceCode.isConnected) {
+          return 'The Front Matter block is no longer available'
+        }
+        sourceCode.textContent = values.source ?? ''
+        sourcePre.style.setProperty('display', 'none', 'important')
+        writing = true
+        try {
+          renderPreview(block)
+        } finally {
+          writing = false
+        }
+        return null
+      },
+      onFinish: (_values, changed) => {
+        if (
+          !changed ||
+          !block.isConnected ||
+          !sourceCode.isConnected ||
+          sourceCode.textContent === initial
+        ) {
+          return
+        }
+        sourcePre.style.setProperty('display', 'none', 'important')
+        commitVditorWysiwygDomEdit(internal)
+        queueRefresh()
+      },
+    })
   }
 
-  function onSelectionChange(): void {
-    if (!root) return
+  function onRootPointerDown(event: PointerEvent): void {
+    if (!root || mode === 'hide') return
+    const target = event.target instanceof Element ? event.target : null
     const block = findBlock(root)
-    setEditing(block ? caretIsInside(block) : false)
-  }
-
-  function onRootClick(event: Event): void {
-    if (!root) return
-    const block = findBlock(root)
-    if (!block) return
-    const target = event.target as HTMLElement | null
-    const preview = getPreview(block)
+    const preview = block ? getPreview(block) : null
     if (!target || !preview?.contains(target)) return
-    // Clicking the table is a request to edit it: show the source and put the
-    // caret in it, since the preview itself is not editable.
     event.preventDefault()
     event.stopImmediatePropagation()
-    editing = true
-    writing = true
-    try {
-      showSource(block)
-    } finally {
-      writing = false
-    }
-    const code = getSourcePre(block)?.querySelector('code')
-    if (code) {
-      const range = document.createRange()
-      range.selectNodeContents(code)
-      range.collapse(true)
-      const selection = window.getSelection()
-      selection?.removeAllRanges()
-      selection?.addRange(range)
-      ;(code as HTMLElement).focus?.()
-    }
+  }
+
+  function onRootClick(event: MouseEvent): void {
+    if (!root || mode === 'hide') return
+    const block = findBlock(root)
+    const preview = block ? getPreview(block) : null
+    const target = event.target instanceof Element ? event.target : null
+    if (!block || !target || !preview?.contains(target)) return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    openEditor(block)
   }
 
   function unbindRoot(): void {
     observer?.disconnect()
     observer = null
-    if (boundRoot) {
-      boundRoot.removeEventListener('click', onRootClick, true)
-      boundRoot = null
-    }
-    document.removeEventListener('selectionchange', onSelectionChange)
+    if (!boundRoot) return
+    boundRoot.removeEventListener('pointerdown', onRootPointerDown, true)
+    boundRoot.removeEventListener('click', onRootClick, true)
+    boundRoot = null
   }
 
   function rebind(): void {
@@ -346,18 +371,14 @@ export function initWysiwygFrontMatter(display: FrontMatterDisplay = 'table') {
       queueRefresh()
       return
     }
-
     unbindRoot()
     root = nextRoot
     if (!root) return
-
-    root.addEventListener('click', onRootClick, true)
     boundRoot = root
-    document.addEventListener('selectionchange', onSelectionChange)
-
+    root.addEventListener('pointerdown', onRootPointerDown, true)
+    root.addEventListener('click', onRootClick, true)
     observer = new MutationObserver(queueRefresh)
     observer.observe(root, { childList: true, subtree: true, characterData: true })
-    editing = false
     queueRefresh()
   }
 
@@ -366,13 +387,13 @@ export function initWysiwygFrontMatter(display: FrontMatterDisplay = 'table') {
     rebind,
     setDisplay(next: FrontMatterDisplay) {
       if (mode === next) return
+      closeActiveWysiwygPopover()
       mode = next
-      // Drop any stale container so the new mode renders from scratch.
       const block = root ? findBlock(root) : null
       if (block) {
         writing = true
         try {
-          showSource(block)
+          clearPreview(block)
         } finally {
           writing = false
         }

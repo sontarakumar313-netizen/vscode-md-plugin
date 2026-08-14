@@ -159,6 +159,143 @@ body,
   width: 100% !important;
 }
 
+.vditor-wysiwyg > .vmd-source-popover {
+  width: min(720px, calc(100vw - 24px));
+  max-height: min(70vh, 620px);
+  padding: 8px;
+  overflow: auto;
+}
+.vmd-source-popover__field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  margin-bottom: 7px;
+}
+.vmd-source-popover__label {
+  color: var(--vscode-descriptionForeground, var(--second-color));
+  font: 11px/1.4 var(--vscode-font-family, sans-serif);
+}
+.vmd-source-popover__input {
+  box-sizing: border-box;
+  width: 100% !important;
+  min-width: 0;
+}
+textarea.vmd-source-popover__input {
+  min-height: 9em;
+  max-height: 52vh;
+  resize: vertical;
+  tab-size: 2;
+  white-space: pre;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: var(--vscode-editor-font-size, 13px);
+  line-height: 1.5;
+}
+.vmd-source-popover__error {
+  margin: 2px 28px 0 0;
+  color: var(--vscode-inputValidation-errorForeground, var(--vscode-errorForeground, #f14c4c));
+  font: 12px/1.4 var(--vscode-font-family, sans-serif);
+}
+.vmd-source-popover > .vmd-popover-close {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+}
+
+/* Serializer-owned source is never allowed to re-enter document layout. */
+.vditor-wysiwyg .vditor-reset [data-type='code-block'] > pre:not(.vditor-wysiwyg__preview),
+.vditor-wysiwyg .vditor-reset [data-type='math-block'] > pre:not(.vditor-wysiwyg__preview),
+.vditor-wysiwyg .vditor-reset [data-type='html-block'] > pre:not(.vditor-wysiwyg__preview),
+.vditor-wysiwyg .vditor-reset [data-type='yaml-front-matter'] > pre:not(.vditor-wysiwyg__preview),
+.vditor-wysiwyg .vditor-reset span[data-type='math-inline'] > code,
+.vditor-wysiwyg .vditor-reset span[data-type='html-entity'] > code,
+.vditor-wysiwyg .vditor-reset code[data-type='html-inline'] {
+  display: none !important;
+}
+
+/* Raw HTML previews use document presentation rather than code-block chrome. */
+.vditor-wysiwyg .vditor-reset [data-type='html-block']
+  > .vditor-wysiwyg__preview.vmd-html-transparent-preview {
+  position: relative;
+  padding: 0 !important;
+  overflow: visible;
+  border: 0 !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  color: inherit;
+  white-space: normal;
+  font-family: inherit;
+}
+.vditor-wysiwyg .vditor-reset [data-type='html-block']
+  > .vmd-html-transparent-preview > :not(.vmd-source-edit-button) {
+  max-width: 100%;
+}
+.vditor-wysiwyg .vditor-reset .vmd-html-align-left { text-align: left; }
+.vditor-wysiwyg .vditor-reset .vmd-html-align-center { text-align: center; }
+.vditor-wysiwyg .vditor-reset .vmd-html-align-right { text-align: right; }
+.vditor-wysiwyg .vditor-reset .vmd-html-align-justify { text-align: justify; }
+
+.vditor-wysiwyg .vditor-reset .vmd-source-edit-button {
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--vscode-descriptionForeground, var(--second-color));
+  background: var(--vscode-editorWidget-background, var(--panel-background-color));
+  font: 14px/1 sans-serif;
+  cursor: pointer;
+  opacity: 0;
+}
+.vditor-wysiwyg .vditor-reset :is(
+  [data-type='html-block'] > .vditor-wysiwyg__preview,
+  .vmd-code-block--rich > .vditor-wysiwyg__preview,
+  [data-type='yaml-front-matter'] > .vditor-wysiwyg__preview
+) > .vmd-source-edit-button {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+.vditor-wysiwyg .vditor-reset :is(
+  [data-type='html-block'] > .vditor-wysiwyg__preview,
+  .vmd-code-block--rich > .vditor-wysiwyg__preview,
+  [data-type='yaml-front-matter'] > .vditor-wysiwyg__preview
+):hover > .vmd-source-edit-button,
+.vditor-wysiwyg .vditor-reset .vmd-source-edit-button:focus-visible,
+.vditor-wysiwyg .vditor-reset .vmd-code-toolbar .vmd-source-edit-button {
+  opacity: 1;
+}
+.vditor-wysiwyg .vditor-reset .vmd-source-edit-button > svg {
+  width: 15px;
+  height: 15px;
+}
+.vditor-wysiwyg .vditor-reset .vmd-source-edit-button:hover,
+.vditor-wysiwyg .vditor-reset .vmd-source-edit-button:focus-visible {
+  border-color: var(--vscode-focusBorder, #007fd4);
+  outline: none;
+}
+.vditor-wysiwyg .vditor-reset .vmd-inline-source-control {
+  position: relative;
+  display: inline-block;
+  width: 0;
+  height: 1em;
+  overflow: visible;
+  vertical-align: text-top;
+}
+.vditor-wysiwyg .vditor-reset .vmd-inline-source-control > .vmd-source-edit-button {
+  position: absolute;
+  right: -11px;
+  bottom: 100%;
+}
+.vditor-wysiwyg .vditor-reset :is(p, h1, h2, h3, h4, h5, h6):hover
+  > .vmd-inline-source-control > .vmd-source-edit-button {
+  opacity: 1;
+}
+
 /* Vditor's pointer cursor implies that an ordinary click opens a link. This
    editor instead treats links as text until the exact platform modifier is held. */
 .vditor-wysiwyg .vditor-reset a {
@@ -378,13 +515,22 @@ body,
 .vditor-wysiwyg .vditor-reset .vmd-front-matter-block--hidden {
   display: none;
 }
+.vditor-wysiwyg .vditor-reset [data-type='yaml-front-matter']
+  > .vditor-wysiwyg__preview {
+  position: relative;
+}
+.vditor-wysiwyg .vditor-reset .vmd-front-matter__code {
+  margin: 0 0 1em;
+  white-space: pre-wrap;
+  cursor: default;
+}
 .vditor-wysiwyg .vditor-reset table.vmd-front-matter {
   display: table;
   width: auto;
   min-width: min(100%, 32em);
   margin: 0 0 1em;
   border-collapse: collapse;
-  cursor: text;
+  cursor: pointer;
   font-size: 0.92em;
 }
 .vditor-wysiwyg .vditor-reset table.vmd-front-matter > caption {
@@ -525,9 +671,8 @@ body,
   color: var(--vscode-testing-iconFailed, #f14c4c);
 }
 
-/* Ordinary WYSIWYG code blocks keep Vditor's native source-above-preview
-   editing behavior while adding a persistent language/copy toolbar. Rich
-   renderers such as Mermaid never receive these classes or controls. */
+/* Code blocks keep a persistent toolbar while all source editing happens in
+   the shared popover. Rich renderers reveal their toolbar on hover. */
 .vditor-wysiwyg .vditor-reset .vmd-code-block--ordinary {
   margin: 1em 0;
 }
@@ -592,49 +737,25 @@ body,
   display: flex;
   align-items: center;
 }
-#vmd-code-language-menu {
-  position: fixed;
-  z-index: 10001;
-  display: none;
-  min-width: 180px;
-  max-height: min(420px, calc(100vh - 16px));
-  padding: 4px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  box-sizing: border-box;
-  border: 1px solid var(--vscode-menu-border, var(--border-color));
-  border-radius: 5px;
-  color: var(--vscode-menu-foreground, var(--toolbar-icon-color));
-  background: var(--vscode-menu-background, var(--panel-background-color));
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
-  font: 13px/1.4 var(--vscode-font-family, sans-serif);
-  user-select: none;
-}
-#vmd-code-language-menu button {
+.vditor-wysiwyg .vditor-reset .vmd-code-block--rich
+  > .vditor-wysiwyg__preview {
   position: relative;
-  display: block;
-  width: 100%;
-  min-height: 28px;
-  padding: 4px 28px 4px 8px;
-  box-sizing: border-box;
-  border: 0;
-  border-radius: 3px;
-  color: inherit;
-  background: transparent;
-  font: inherit;
-  text-align: left;
-  cursor: default;
 }
-#vmd-code-language-menu button:hover,
-#vmd-code-language-menu button:focus-visible {
-  color: var(--vscode-menu-selectionForeground, #fff);
-  background: var(--vscode-menu-selectionBackground, #04395e);
-  outline: none;
-}
-#vmd-code-language-menu .vmd-code-language-menu__current::after {
+.vditor-wysiwyg .vditor-reset .vmd-code-block--rich .vmd-code-toolbar {
   position: absolute;
-  right: 9px;
-  content: '✓';
+  top: 4px;
+  right: 4px;
+  z-index: 3;
+  min-height: 26px;
+  padding: 2px 4px;
+  border: 1px solid var(--vscode-editorWidget-border, var(--border-color));
+  border-radius: 4px;
+  opacity: 0;
+}
+.vditor-wysiwyg .vditor-reset .vmd-code-block--rich
+  > .vditor-wysiwyg__preview:hover > .vmd-code-toolbar,
+.vditor-wysiwyg .vditor-reset .vmd-code-block--rich .vmd-code-toolbar:focus-within {
+  opacity: 1;
 }
 
 /* GitHub Alerts remain ordinary blockquotes in Markdown. The controller hides
