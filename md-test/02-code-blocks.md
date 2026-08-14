@@ -44,7 +44,7 @@ console.log(activate({ id: 1, name: 'Grace' }))
 ```html
 <article class="card" data-state="active">
   <h2>HTML code block</h2>
-  <p title="escaped &amp; safe">Hello <strong>world</strong>.</p>
+  <p title="escaped & safe">Hello <strong>world</strong>.</p>
 </article>
 ```
 
@@ -273,6 +273,8 @@ WHERE users.active = TRUE
 GROUP BY users.id, users.name
 ORDER BY task_count DESC;
 ```
+
+
 
 ## 12. Diff
 

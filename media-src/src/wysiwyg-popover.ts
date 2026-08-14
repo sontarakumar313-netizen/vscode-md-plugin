@@ -4,10 +4,19 @@ import {
   getVditorInternals,
 } from './vditor-adapter'
 
+type SourcePopoverPlacement =
+  | 'center'
+  | 'code'
+  | 'html-block'
+  | 'math-block'
+  | 'target'
+type PopoverPlacement = SourcePopoverPlacement | 'native-above'
+
 let pendingPopoverTarget: HTMLElement | null = null
 let activePopoverPosition: {
   popover: HTMLElement
   target: HTMLElement
+  placement: PopoverPlacement
 } | null = null
 let activeCustomPopover: {
   popover: HTMLElement
@@ -17,6 +26,8 @@ let activeCustomPopover: {
 } | null = null
 let popoverPositionListenersInstalled = false
 let popoverPositionQueued = false
+let sourcePopoverResizeObserver: ResizeObserver | null = null
+let observedSourcePositionTarget: HTMLElement | null = null
 const POPOVER_POSITIONING_CLASS = 'vmd-url-popover--positioning'
 const PERSISTENT_POPOVER_CLASS = 'vmd-url-popover--persistent'
 const SOURCE_POPOVER_CLASS = 'vmd-source-popover'
@@ -36,6 +47,7 @@ interface WysiwygSourcePopoverOptions {
   target: HTMLElement
   fields: WysiwygSourcePopoverField[]
   focusField?: string
+  placement?: SourcePopoverPlacement
   onChange: (values: Readonly<Record<string, string>>) => string | null
   onFinish: (values: Readonly<Record<string, string>>, changed: boolean) => void
 }
@@ -44,6 +56,7 @@ interface WysiwygSourceEditSessionOptions {
   target: HTMLElement
   fields: WysiwygSourcePopoverField[]
   focusField?: string
+  placement?: SourcePopoverPlacement
   unavailableMessage: string
   isAvailable?: () => boolean
   onChange: (values: Readonly<Record<string, string>>) => string | null
@@ -130,7 +143,7 @@ export function closeActiveWysiwygPopover(restoreFocus = false): void {
     active.popover.style.display = 'none'
     active.popover.classList.remove(POPOVER_POSITIONING_CLASS)
     if (activePopoverPosition?.popover === active.popover) {
-      activePopoverPosition = null
+      clearActivePopoverPosition()
     }
     if (pendingPopoverTarget === active.target) pendingPopoverTarget = null
   }
@@ -146,7 +159,8 @@ export function disposeWysiwygPopover(): void {
     window.removeEventListener('resize', queueActivePopoverPosition)
     popoverPositionListenersInstalled = false
   }
-  activePopoverPosition = null
+  clearActivePopoverPosition()
+  sourcePopoverResizeObserver = null
   pendingPopoverTarget = null
   popoverPositionQueued = false
 }
@@ -284,68 +298,262 @@ function hideField(field: HTMLElement | undefined): void {
   field.setAttribute('aria-hidden', 'true')
 }
 
+function clearActivePopoverPosition(): void {
+  const popover = activePopoverPosition?.popover
+  popover?.classList.remove(POPOVER_POSITIONING_CLASS)
+  popover?.style.removeProperty('--vmd-source-popover-available-height')
+  popover?.style.removeProperty('--vmd-source-popover-available-width')
+  popover?.style.removeProperty('transform')
+  sourcePopoverResizeObserver?.disconnect()
+  observedSourcePositionTarget = null
+  activePopoverPosition = null
+}
+
+function renderedMathPositionTarget(target: HTMLElement): HTMLElement | null {
+  return target.querySelector<HTMLElement>(
+    ':scope > .vditor-wysiwyg__preview .katex-display > .katex, ' +
+      ':scope > .vditor-wysiwyg__preview mjx-container, ' +
+      ':scope > .vditor-wysiwyg__preview .MathJax, ' +
+      ':scope > .vditor-wysiwyg__preview .language-math > svg'
+  ) || target.querySelector<HTMLElement>(
+    ':scope > .vditor-wysiwyg__preview'
+  )
+}
+
 function queueActivePopoverPosition(): void {
   if (popoverPositionQueued) return
   popoverPositionQueued = true
-  // Vditor applies its provisional position immediately after invoking the
-  // customization callback. Run at the end of the same task, before the next
-  // browser paint, so only the measured above-target position becomes visible.
+  // Vditor applies provisional coordinates after invoking its customization
+  // callback. Run after that work and keep active source panels in the visible
+  // editor area as their textarea or rendered target changes size.
   queueMicrotask(() => {
     popoverPositionQueued = false
     const active = activePopoverPosition
     if (!active) return
-    const { popover, target } = active
+    const { popover, target, placement } = active
+    const positionTarget = placement === 'code'
+      ? target.querySelector<HTMLElement>(
+        `.${WYSIWYG_SOURCE_EDIT_BUTTON_CLASS}`
+      )
+      : placement === 'html-block'
+        ? target.querySelector<HTMLElement>(
+          ':scope > .vditor-wysiwyg__preview'
+        )
+        : placement === 'math-block'
+          ? renderedMathPositionTarget(target)
+          : target
     if (
       !popover.isConnected ||
-      !target.isConnected ||
-      popover.style.display !== 'block'
+      (placement !== 'center' &&
+        (!target.isConnected || !positionTarget?.isConnected)) ||
+      getComputedStyle(popover).display === 'none'
     ) {
-      popover.classList.remove(POPOVER_POSITIONING_CLASS)
-      activePopoverPosition = null
+      clearActivePopoverPosition()
       return
     }
     const editor = popover.parentElement
     if (!(editor instanceof HTMLElement)) {
-      popover.classList.remove(POPOVER_POSITIONING_CLASS)
-      activePopoverPosition = null
+      clearActivePopoverPosition()
       return
     }
-    const editorRect = editor.getBoundingClientRect()
-    const targetRect = target.getBoundingClientRect()
-    const gap = 6
-    const targetTop = targetRect.top - editorRect.top + editor.scrollTop
-    const targetLeft = targetRect.left - editorRect.left + editor.scrollLeft
-    const maxLeft = Math.max(
-      0,
-      editor.scrollLeft + editor.clientWidth - popover.offsetWidth
-    )
-    popover.style.left = `${Math.max(
-      editor.scrollLeft,
-      Math.min(targetLeft, maxLeft)
-    )}px`
-    const aboveTop = targetTop - popover.offsetHeight - gap
-    if (popover.classList.contains(SOURCE_POPOVER_CLASS)) {
-      const belowTop =
-        targetRect.bottom - editorRect.top + editor.scrollTop + gap
-      const visibleTop = editor.scrollTop - editorRect.top + 8
-      const visibleBottom = visibleTop + window.innerHeight - 16
-      if (aboveTop >= visibleTop) {
-        popover.style.top = `${aboveTop}px`
-        popover.dataset.vmdPosition = 'above'
-      } else if (belowTop + popover.offsetHeight <= visibleBottom) {
-        popover.style.top = `${belowTop}px`
-        popover.dataset.vmdPosition = 'below'
-      } else {
-        popover.style.top = `${Math.max(
-          visibleTop,
-          Math.min(belowTop, visibleBottom - popover.offsetHeight)
-        )}px`
-        popover.dataset.vmdPosition = 'viewport'
+
+    if (
+      placement === 'math-block' &&
+      observedSourcePositionTarget !== positionTarget
+    ) {
+      if (observedSourcePositionTarget) {
+        sourcePopoverResizeObserver?.unobserve(observedSourcePositionTarget)
       }
-    } else {
-      // Link/image popovers retain their established above-target placement.
-      popover.style.top = `${aboveTop}px`
+      sourcePopoverResizeObserver?.observe(positionTarget)
+      observedSourcePositionTarget = positionTarget
+    }
+
+    const editorRect = editor.getBoundingClientRect()
+    const targetRect = positionTarget.getBoundingClientRect()
+    const gap = 6
+    const toLocalLeft = (viewportLeft: number): number =>
+      viewportLeft - editorRect.left + editor.scrollLeft
+    const toLocalTop = (viewportTop: number): number =>
+      viewportTop - editorRect.top + editor.scrollTop
+
+    if (placement === 'native-above') {
+      // Preserve the established Vditor link/image placement.
+      popover.style.removeProperty('transform')
+      const targetLeft = toLocalLeft(targetRect.left)
+      const maxLeft = Math.max(
+        0,
+        editor.scrollLeft + editor.clientWidth - popover.offsetWidth
+      )
+      popover.style.left = `${Math.max(
+        editor.scrollLeft,
+        Math.min(targetLeft, maxLeft)
+      )}px`
+      popover.style.top = `${toLocalTop(
+        targetRect.top - popover.offsetHeight - gap
+      )}px`
       popover.dataset.vmdPosition = 'above'
+    } else {
+      const margin = 8
+      const visibleLeft = editorRect.left + margin
+      const visibleRight = editorRect.left + editor.clientWidth - margin
+      const visibleTop = Math.max(editorRect.top, 0) + margin
+      const editorBottom = editorRect.top + editor.clientHeight
+      const visibleBottom = Math.min(editorBottom, window.innerHeight) - margin
+      const availableHeight = Math.max(1, visibleBottom - visibleTop)
+      const visibleWidth = Math.max(1, visibleRight - visibleLeft)
+      const mathLeftSpace = Math.max(
+        0,
+        Math.min(visibleRight, targetRect.left) - gap - visibleLeft
+      )
+      const placeMathOnLeft =
+        placement === 'math-block' &&
+        mathLeftSpace >= Math.min(320, visibleWidth)
+      const availableWidth = placement === 'code'
+        ? Math.max(1, targetRect.right - visibleLeft)
+        : placement === 'html-block'
+          ? Math.max(1, visibleRight - Math.max(visibleLeft, targetRect.left))
+          : placeMathOnLeft
+            ? mathLeftSpace
+            : visibleWidth
+      popover.style.setProperty(
+        '--vmd-source-popover-available-height',
+        `${availableHeight}px`
+      )
+      popover.style.setProperty(
+        '--vmd-source-popover-available-width',
+        `${availableWidth}px`
+      )
+
+      const clamp = (value: number, minimum: number, maximum: number): number =>
+        Math.max(minimum, Math.min(value, Math.max(minimum, maximum)))
+      let popoverRect = popover.getBoundingClientRect()
+      let popoverWidth = popoverRect.width
+      let popoverHeight = popoverRect.height
+      let viewportLeft: number
+      let viewportTop: number
+
+      if (placement === 'center') {
+        viewportLeft = (visibleLeft + visibleRight) / 2
+        viewportTop = (visibleTop + visibleBottom) / 2
+        popover.style.transform = 'translate(-50%, -50%)'
+        popover.dataset.vmdPosition = 'center'
+      } else if (placement === 'code') {
+        popover.style.removeProperty('transform')
+        const belowTop = targetRect.bottom + gap
+        const aboveBottom = targetRect.top - gap
+        const belowSpace = Math.max(0, visibleBottom - belowTop)
+        const aboveSpace = Math.max(0, aboveBottom - visibleTop)
+        const below = popoverHeight <= belowSpace
+        if (!below && popoverHeight > aboveSpace) {
+          popover.style.setProperty(
+            '--vmd-source-popover-available-height',
+            `${Math.max(1, aboveSpace)}px`
+          )
+          popoverRect = popover.getBoundingClientRect()
+          popoverWidth = popoverRect.width
+          popoverHeight = popoverRect.height
+        }
+        viewportLeft = clamp(
+          targetRect.right - popoverWidth,
+          visibleLeft,
+          visibleRight - popoverWidth
+        )
+        viewportTop = below
+          ? belowTop
+          : aboveBottom - popoverHeight
+        popover.dataset.vmdPosition = below ? 'below' : 'above'
+      } else if (placement === 'html-block') {
+        popover.style.removeProperty('transform')
+        const aboveBottom = targetRect.top - gap
+        const aboveSpace = Math.max(0, aboveBottom - visibleTop)
+        if (popoverHeight > aboveSpace) {
+          popover.style.setProperty(
+            '--vmd-source-popover-available-height',
+            `${Math.max(1, aboveSpace)}px`
+          )
+          popoverRect = popover.getBoundingClientRect()
+          popoverWidth = popoverRect.width
+          popoverHeight = popoverRect.height
+        }
+        viewportLeft = clamp(
+          targetRect.left,
+          visibleLeft,
+          visibleRight - popoverWidth
+        )
+        viewportTop = aboveBottom - popoverHeight
+        popover.dataset.vmdPosition = 'above'
+      } else if (placement === 'math-block') {
+        popover.style.removeProperty('transform')
+        if (placeMathOnLeft) {
+          viewportLeft = clamp(
+            targetRect.left - gap - popoverWidth,
+            visibleLeft,
+            visibleRight - popoverWidth
+          )
+          viewportTop = clamp(
+            targetRect.top + targetRect.height / 2,
+            visibleTop,
+            visibleBottom - popoverHeight
+          )
+          popover.dataset.vmdPosition = 'left'
+        } else {
+          const aboveBottom = targetRect.top - gap
+          const belowTop = targetRect.bottom + gap
+          const aboveSpace = Math.max(0, aboveBottom - visibleTop)
+          const belowSpace = Math.max(0, visibleBottom - belowTop)
+          const above = popoverHeight <= aboveSpace ||
+            (popoverHeight > belowSpace && aboveSpace >= belowSpace)
+          const chosenSpace = above ? aboveSpace : belowSpace
+          if (popoverHeight > chosenSpace) {
+            popover.style.setProperty(
+              '--vmd-source-popover-available-height',
+              `${Math.max(1, chosenSpace)}px`
+            )
+            popoverRect = popover.getBoundingClientRect()
+            popoverWidth = popoverRect.width
+            popoverHeight = popoverRect.height
+          }
+          viewportLeft = clamp(
+            targetRect.left + targetRect.width / 2 - popoverWidth / 2,
+            visibleLeft,
+            visibleRight - popoverWidth
+          )
+          viewportTop = clamp(
+            above ? aboveBottom - popoverHeight : belowTop,
+            visibleTop,
+            visibleBottom - popoverHeight
+          )
+          popover.dataset.vmdPosition = above ? 'above' : 'below'
+        }
+      } else {
+        popover.style.removeProperty('transform')
+        viewportLeft = clamp(
+          targetRect.left,
+          visibleLeft,
+          visibleRight - popoverWidth
+        )
+        const aboveTop = targetRect.top - popoverHeight - gap
+        const belowTop = targetRect.bottom + gap
+        if (aboveTop >= visibleTop) {
+          viewportTop = aboveTop
+          popover.dataset.vmdPosition = 'above'
+        } else if (belowTop + popoverHeight <= visibleBottom) {
+          viewportTop = belowTop
+          popover.dataset.vmdPosition = 'below'
+        } else {
+          viewportTop = clamp(
+            belowTop,
+            visibleTop,
+            visibleBottom - popoverHeight
+          )
+          popover.dataset.vmdPosition = 'viewport'
+        }
+      }
+
+      popover.style.left = placement === 'center'
+        ? `calc(50% + ${editor.scrollLeft}px)`
+        : `${toLocalLeft(viewportLeft)}px`
+      popover.style.top = `${toLocalTop(viewportTop)}px`
     }
     popover.classList.remove(POPOVER_POSITIONING_CLASS)
     if (pendingPopoverTarget === target) pendingPopoverTarget = null
@@ -355,21 +563,38 @@ function queueActivePopoverPosition(): void {
 function installPopoverPositionListeners(): void {
   if (popoverPositionListenersInstalled) return
   popoverPositionListenersInstalled = true
-  // Vditor rewrites the shared panel's top position from a fixed 21px formula
-  // when the editor scrolls. Re-apply measured positioning after its handler.
+  // Vditor rewrites the shared panel's top position while the editor scrolls.
+  // Re-apply the selected placement after its handler.
   document.addEventListener('scroll', queueActivePopoverPosition, true)
   window.addEventListener('resize', queueActivePopoverPosition)
 }
 
-function positionAboveTarget(
+function positionPopover(
   popover: HTMLElement,
-  target: HTMLElement | null
+  target: HTMLElement | null,
+  placement: PopoverPlacement
 ): void {
   if (!target || !target.isConnected) return
+  clearActivePopoverPosition()
   popover.classList.add(POPOVER_POSITIONING_CLASS)
-  activePopoverPosition = { popover, target }
+  activePopoverPosition = { popover, target, placement }
+  if (placement !== 'native-above') {
+    sourcePopoverResizeObserver ??= new ResizeObserver(
+      queueActivePopoverPosition
+    )
+    sourcePopoverResizeObserver.observe(popover)
+    popover
+      .querySelectorAll<HTMLTextAreaElement>('textarea')
+      .forEach((textarea) => sourcePopoverResizeObserver?.observe(textarea))
+    if (popover.parentElement instanceof HTMLElement) {
+      sourcePopoverResizeObserver.observe(popover.parentElement)
+    }
+  }
   installPopoverPositionListeners()
   queueActivePopoverPosition()
+  if (placement !== 'native-above') {
+    window.requestAnimationFrame(queueActivePopoverPosition)
+  }
 }
 
 function getPopoverTarget(type: string): HTMLElement | null {
@@ -428,11 +653,12 @@ function showWysiwygSourcePopover({
   target,
   fields,
   focusField,
+  placement = fields.some((field) => field.multiline) ? 'center' : 'target',
   onChange,
   onFinish,
 }: WysiwygSourcePopoverOptions): void {
   deactivateAndFinishCustomPopover()
-  activePopoverPosition = null
+  clearActivePopoverPosition()
   popover.replaceChildren()
   popover.classList.remove(
     'vmd-url-popover--image',
@@ -467,6 +693,7 @@ function showWysiwygSourcePopover({
     error.textContent = message || ''
     error.hidden = !message
     popover.classList.toggle('vmd-source-popover--invalid', !!message)
+    queueActivePopoverPosition()
   }
 
   for (const field of fields) {
@@ -485,7 +712,7 @@ function showWysiwygSourcePopover({
     control.spellcheck = field.spellcheck ?? false
     control.setAttribute('aria-label', field.label)
     if (control instanceof HTMLTextAreaElement) {
-      control.rows = 4
+      control.rows = 8
       control.wrap = 'off'
     } else {
       control.type = 'text'
@@ -533,7 +760,7 @@ function showWysiwygSourcePopover({
     onFinish(values, changed)
   }
 
-  positionAboveTarget(popover, target)
+  positionPopover(popover, target, placement)
   popover.style.display = 'block'
   activateCustomPopover(popover, target, finish)
   const preferred = focusField ? controls[focusField] : undefined
@@ -578,6 +805,7 @@ export function openWysiwygSourceEditSession({
   target,
   fields,
   focusField,
+  placement,
   unavailableMessage,
   isAvailable,
   onChange,
@@ -594,6 +822,7 @@ export function openWysiwygSourceEditSession({
     target,
     fields,
     focusField,
+    placement,
     onChange: (values) => {
       if (!target.isConnected || (isAvailable && !isAvailable())) {
         return unavailableMessage
@@ -635,7 +864,7 @@ export function customizeWysiwygPopover(
     PERSISTENT_POPOVER_CLASS
   )
   delete popover.dataset.vmdPosition
-  activePopoverPosition = null
+  clearActivePopoverPosition()
   popover
     .querySelectorAll(
       '[data-type="up"], [data-type="down"], [data-type="remove"]'
@@ -669,7 +898,7 @@ export function customizeWysiwygPopover(
       installPopoverTabOrder([urlInput, copyButton, closeButton])
       const target = getPopoverTarget(type)
       redirectHiddenLinkFocus(urlInput, target)
-      positionAboveTarget(popover, target)
+      positionPopover(popover, target, 'native-above')
       activateCustomPopover(popover, target)
     }
   } else if (type === 'image') {
@@ -691,7 +920,7 @@ export function customizeWysiwygPopover(
           : [urlInput, copyButton, closeButton]
       )
       const target = getPopoverTarget(type)
-      positionAboveTarget(popover, target)
+      positionPopover(popover, target, 'native-above')
       activateCustomPopover(popover, target)
     }
     popover.classList.add('vmd-url-popover--image')

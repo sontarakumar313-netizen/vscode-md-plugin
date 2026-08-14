@@ -18,10 +18,11 @@ const ALERT_MARKER_CLASS = 'vmd-alert-marker'
 const ALERT_TITLE_CLASS = 'vmd-alert-title'
 const ALERT_MENU_ID = 'vmd-alert-type-menu'
 const ALERT_MENU_CURRENT_CLASS = 'vmd-alert-type-menu__current'
+const ALERT_CUSTOM_TITLE_INPUT_CLASS = 'vmd-alert-type-menu__custom-title-input'
 const ALERT_TYPE_CLASSES = ALERT_TYPES.map(
   (type) => `${ALERT_CLASS}--${type.toLowerCase()}`
 )
-const ALERT_MARKER_PATTERN = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?:\r?\n|$)/i
+const ALERT_MARKER_PATTERN = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?:[ \t]+([^\r\n]*))?(?:\r?\n|$)/i
 const ALERT_MARKER_TYPE_PATTERN = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i
 
 const ALERT_ICONS: Record<AlertType, string> = {
@@ -47,42 +48,68 @@ function alertTitle(type: AlertType): string {
   return type[0] + type.slice(1).toLowerCase()
 }
 
-function markerType(marker: HTMLElement): AlertType | null {
-  const match = ALERT_MARKER_PATTERN.exec(marker.textContent || '')
-  return alertType(match?.[1])
-}
-
-interface AlertMarkerCandidate {
-  firstText: Text | null
-  marker: HTMLElement | null
+interface ParsedAlertMarker {
+  customTitle: string | null
   matchLength: number
   type: AlertType
+}
+
+function parseAlertMarker(value: string): ParsedAlertMarker | null {
+  const match = ALERT_MARKER_PATTERN.exec(value)
+  const type = alertType(match?.[1])
+  if (!match || !type) return null
+  return {
+    customTitle: match[2]?.trim() || null,
+    matchLength: match[0].length,
+    type,
+  }
+}
+
+function markerType(marker: HTMLElement): AlertType | null {
+  return parseAlertMarker(marker.textContent || '')?.type || null
+}
+
+function markerWithCustomTitle(marker: HTMLElement, title: string): string | null {
+  const value = marker.textContent || ''
+  const typeMarker = ALERT_MARKER_TYPE_PATTERN.exec(value)?.[0]
+  if (!typeMarker) return null
+  const lineEnding = value.endsWith('\r\n')
+    ? '\r\n'
+    : value.endsWith('\n')
+      ? '\n'
+      : ''
+  const normalizedTitle = title.trim()
+  return `${typeMarker}${normalizedTitle ? ` ${normalizedTitle}` : ''}${lineEnding}`
+}
+
+interface AlertMarkerCandidate extends ParsedAlertMarker {
+  firstText: Text | null
+  marker: HTMLElement | null
 }
 
 function findMarker(paragraph: HTMLElement): AlertMarkerCandidate | null {
   const existing = paragraph.querySelector<HTMLElement>(
     `:scope > .${ALERT_MARKER_CLASS}`
   )
-  const existingType = existing ? markerType(existing) : null
-  if (existing && existingType) {
+  const existingMarker = existing
+    ? parseAlertMarker(existing.textContent || '')
+    : null
+  if (existing && existingMarker) {
     return {
+      ...existingMarker,
       firstText: null,
       marker: existing,
-      matchLength: 0,
-      type: existingType,
     }
   }
 
   const first = paragraph.firstChild
   if (!(first instanceof Text)) return null
-  const match = ALERT_MARKER_PATTERN.exec(first.data)
-  const type = alertType(match?.[1])
-  if (!match || !type) return null
+  const parsedMarker = parseAlertMarker(first.data)
+  if (!parsedMarker) return null
   return {
+    ...parsedMarker,
     firstText: first,
     marker: null,
-    matchLength: match[0].length,
-    type,
   }
 }
 
@@ -233,13 +260,26 @@ function decorateAlert(
     'aria-label',
     `${t('changeAlertType')}: ${candidate.type}`
   )
-  if (title.getAttribute('data-vmd-alert-title') !== candidate.type) {
-    title.setAttribute('data-vmd-alert-title', candidate.type)
-    title.innerHTML = `${ALERT_ICONS[candidate.type]}<span>${alertTitle(candidate.type)}</span>`
+  const displayTitle = candidate.customTitle || alertTitle(candidate.type)
+  if (
+    title.getAttribute('data-vmd-alert-type') !== candidate.type ||
+    title.getAttribute('data-vmd-alert-title') !== displayTitle
+  ) {
+    title.setAttribute('data-vmd-alert-type', candidate.type)
+    title.setAttribute('data-vmd-alert-title', displayTitle)
+    title.innerHTML = ALERT_ICONS[candidate.type]
+    const label = document.createElement('span')
+    label.textContent = displayTitle
+    title.appendChild(label)
   }
 }
 
-function createAlertTypeMenu(): HTMLDivElement {
+interface AlertTypeMenu {
+  customTitleInput: HTMLInputElement
+  menu: HTMLDivElement
+}
+
+function createAlertTypeMenu(): AlertTypeMenu {
   const menu = document.createElement('div')
   menu.id = ALERT_MENU_ID
   menu.setAttribute('role', 'menu')
@@ -256,22 +296,62 @@ function createAlertTypeMenu(): HTMLDivElement {
     menu.appendChild(button)
   }
 
+  const separator = document.createElement('div')
+  separator.className = 'vmd-alert-type-menu__separator'
+  separator.setAttribute('role', 'separator')
+  const customTitleInput = document.createElement('input')
+  customTitleInput.type = 'text'
+  customTitleInput.className = ALERT_CUSTOM_TITLE_INPUT_CLASS
+  customTitleInput.placeholder = t('customAlertTitle')
+  customTitleInput.setAttribute('aria-label', t('customAlertTitle'))
+  customTitleInput.autocomplete = 'off'
+  customTitleInput.spellcheck = false
+  const customTitleField = document.createElement('div')
+  customTitleField.className = 'vmd-alert-type-menu__custom-title'
+  customTitleField.setAttribute('role', 'none')
+  customTitleField.appendChild(customTitleInput)
+  menu.append(separator, customTitleField)
+
   document.body.appendChild(menu)
-  return menu
+  return { customTitleInput, menu }
 }
 
 /** Adds GitHub Alert presentation and an in-place type picker. */
 export function initWysiwygAlerts(): void {
-  const menu = createAlertTypeMenu()
+  const { customTitleInput, menu } = createAlertTypeMenu()
   let state: AlertMenuState | null = null
+  let initialMarkerText: string | null = null
   let root: HTMLElement | null = null
 
+  function commitMenuChanges(
+    current: AlertMenuState,
+    initial: string
+  ): void {
+    if ((current.marker.textContent || '') === initial) return
+    const internal = getVditorInternals()
+    if (
+      !root ||
+      !internal ||
+      internal.currentMode !== 'wysiwyg' ||
+      !current.blockquote.isConnected ||
+      !current.marker.isConnected ||
+      !current.blockquote.contains(current.marker)
+    ) {
+      return
+    }
+    commitVditorWysiwygDomEdit(internal)
+  }
+
   function hideMenu(): void {
+    const current = state
+    const initial = initialMarkerText
     deactivateFloatingPanel(menu)
-    state?.title.setAttribute('aria-expanded', 'false')
+    current?.title.setAttribute('aria-expanded', 'false')
     state = null
+    initialMarkerText = null
     menu.style.display = 'none'
     menu.style.visibility = ''
+    if (current && initial !== null) commitMenuChanges(current, initial)
   }
 
   function setCurrentType(type: AlertType): void {
@@ -292,6 +372,11 @@ export function initWysiwygAlerts(): void {
 
     hideMenu()
     state = nextState
+    initialMarkerText = state.marker.textContent || ''
+    customTitleInput.value =
+      parseAlertMarker(initialMarkerText)?.customTitle || ''
+    customTitleInput.setCustomValidity('')
+    customTitleInput.removeAttribute('aria-invalid')
     state.title.setAttribute('aria-expanded', 'true')
     setCurrentType(state.type)
     activateFloatingPanel({
@@ -342,38 +427,78 @@ export function initWysiwygAlerts(): void {
     return { blockquote, marker, title, type }
   }
 
-  function applyType(type: AlertType): void {
+  function updateCustomTitle(): void {
     const current = state
-    hideMenu()
-    const internal = getVditorInternals()
     if (
       !current ||
       !root ||
-      !internal ||
-      internal.currentMode !== 'wysiwyg' ||
       !current.blockquote.isConnected ||
       !current.marker.isConnected ||
       !current.blockquote.contains(current.marker)
     ) {
       return
     }
+    if (/[\u0000-\u001f\u007f]/.test(customTitleInput.value)) {
+      customTitleInput.setCustomValidity('Custom title must be one line')
+      customTitleInput.setAttribute('aria-invalid', 'true')
+      return
+    }
 
-    const previousType = markerType(current.marker)
-    if (!previousType || previousType === type) return
-    const marker = current.marker.textContent || ''
-    const replacement = marker.replace(ALERT_MARKER_TYPE_PATTERN, `[!${type}]`)
-    if (replacement === marker) return
-
+    customTitleInput.setCustomValidity('')
+    customTitleInput.removeAttribute('aria-invalid')
+    const replacement = markerWithCustomTitle(
+      current.marker,
+      customTitleInput.value
+    )
+    if (replacement === null || replacement === current.marker.textContent) {
+      return
+    }
     current.marker.textContent = replacement
     decorateAlert(current.blockquote, root)
-    commitVditorWysiwygDomEdit(internal)
   }
 
+  function applyType(type: AlertType): void {
+    const current = state
+    if (
+      current &&
+      root &&
+      current.blockquote.isConnected &&
+      current.marker.isConnected &&
+      current.blockquote.contains(current.marker)
+    ) {
+      const previousType = markerType(current.marker)
+      const marker = current.marker.textContent || ''
+      const replacement = previousType && previousType !== type
+        ? marker.replace(ALERT_MARKER_TYPE_PATTERN, `[!${type}]`)
+        : marker
+      if (replacement !== marker) {
+        current.marker.textContent = replacement
+        current.type = type
+        decorateAlert(current.blockquote, root)
+      }
+    }
+    hideMenu()
+  }
+
+  customTitleInput.addEventListener('input', (event) => {
+    if (event instanceof InputEvent && event.isComposing) return
+    updateCustomTitle()
+  })
+  customTitleInput.addEventListener('compositionend', updateCustomTitle)
+
   menu.addEventListener('pointerdown', (event) => {
+    if (event.target === customTitleInput) {
+      event.stopPropagation()
+      return
+    }
     event.preventDefault()
     event.stopPropagation()
   })
   menu.addEventListener('click', (event) => {
+    if (event.target === customTitleInput) {
+      event.stopPropagation()
+      return
+    }
     event.preventDefault()
     event.stopPropagation()
     const target = event.target instanceof Element ? event.target : null
@@ -384,6 +509,21 @@ export function initWysiwygAlerts(): void {
     if (type) applyType(type)
   })
   menu.addEventListener('keydown', (event) => {
+    if (event.target === customTitleInput) {
+      if (event.isComposing || event.keyCode === 229) {
+        event.stopPropagation()
+        return
+      }
+      if (event.key === 'Escape' || event.key === 'Enter') {
+        event.preventDefault()
+        event.stopPropagation()
+        hideMenu()
+        return
+      }
+      event.stopPropagation()
+      return
+    }
+
     const buttons = Array.from(
       menu.querySelectorAll<HTMLButtonElement>('button[data-alert-type]')
     )

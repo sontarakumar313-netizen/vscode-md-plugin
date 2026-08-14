@@ -34,7 +34,8 @@ export interface QuoteSourceChange {
   targetSourceOffset: number
 }
 
-const ALERT_MARKER = /^ {0,3}>[ \t]{0,4}\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*$/i
+const ALERT_MARKER = /^ {0,3}>[ \t]{0,4}\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\](?:[ \t]+[^\r\n]*)?$/i
+const ALERT_MARKER_TYPE = /\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i
 const QUOTE_PREFIX = /^ {0,3}> ?/
 const SETEXT_UNDERLINE = /^ {0,3}(?:=+|-+)[ \t]*$/
 const BLOCK_START = /^ {0,3}(?:#{1,6}(?:[ \t]+|$)|(?:[-+*]|\d+[.)])[ \t]+|`{3,}|~{3,}|<|>)/
@@ -239,7 +240,7 @@ function retypeQuoteBlock(
 ): string {
   const lines = block.lines.map((line) => line.text)
   if (block.type !== null && type !== null) {
-    lines[0] = `> [!${type}]`
+    lines[0] = lines[0].replace(ALERT_MARKER_TYPE, `[!${type}]`)
     return lines.join('\n')
   }
   if (block.type !== null) return lines.slice(1).join('\n')

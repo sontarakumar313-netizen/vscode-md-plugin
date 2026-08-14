@@ -8,12 +8,6 @@
 
 预期：显示一张带渐变背景、几何图形和“Local SVG Test”文字的图片，替代文本和标题不会直接出现在正文中。
 
-## 2. 带链接的本地图片
-
-[![点击图片返回测试集入口](./assets/test-image.svg)](./README.md)
-
-预期：图片本身可见，点击后打开同目录下的 `README.md`。
-
 ## 3. 远程图片
 
 ![VS Code 远程徽章](https://img.shields.io/badge/VS%20Code-Markdown%20Interactor-007ACC?logo=visualstudiocode "远程 HTTPS 图片")
@@ -54,17 +48,6 @@ console.log(insideDetails)
 </details>
 
 预期：点击标题可以展开和折叠；内部 Markdown 在展开后正常渲染。
-
-## 7. 常见行内 HTML
-
-- 键盘按键：按 <kbd>Ctrl</kbd> + <kbd>S</kbd> 保存
-- 高亮文本：这是 <mark>重点内容</mark>
-- 上标与下标：H<sub>2</sub>O，x<sup>2</sup>
-- 插入与删除：<ins>新增内容</ins>、<del>删除内容</del>
-- 缩写：<abbr title="HyperText Markup Language">HTML</abbr>
-- 注音：<ruby>汉<rt>hàn</rt>字<rt>zì</rt></ruby>
-- 小号文字：<small>这是一段补充说明</small>
-- 换行标签：第一行<br>第二行
 
 ## 8. HTML 块级元素
 

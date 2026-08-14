@@ -5,7 +5,7 @@
 预期：以下公式与正文位于同一行，且上下标不会导致异常的行高或背景色。
 
 - 勾股定理：$a^2 + b^2 = c^2$
-- 欧拉恒等式：$e^{i\pi} + 1 = 0$
+- 欧拉恒等式：$e^{i\pi} + 1 = 0$ dgxcvgx
 - 求和：$S_n = \sum_{k=1}^{n} k = \frac{n(n+1)}{2}$
 - 希腊字母：$\alpha, \beta, \gamma, \Delta, \Omega$
 - 行内矩阵：$A = \begin{pmatrix} a & b \\ c & d \end{pmatrix}$
@@ -78,7 +78,7 @@ P(A \mid B) = \frac{P(B \mid A)\,P(A)}{P(B)}
 
 ### 3.1 NOTE
 
-> [!NOTE]
+> [!CAUTION] 阿斯蒂芬
 > 这是普通说明信息。
 >
 > 第二段包含 **粗体**、*斜体*、`行内代码` 和 [链接](https://example.com)。
@@ -93,7 +93,7 @@ P(A \mid B) = \frac{P(B \mid A)\,P(A)}{P(B)}
 
 ### 3.3 IMPORTANT
 
-> [!IMPORTANT]
+> [!NOTE] 水电费
 > 这是需要特别注意的重要信息。
 >
 > 数学内容也应正常显示：$E = mc^2$。

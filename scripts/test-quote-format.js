@@ -116,6 +116,24 @@ assert.strictEqual(
   'GitHub Alert types must be recognized case-insensitively'
 )
 
+const customTitleAlert = '> [!NOTE] 自定义标题\n> custom title body'
+assert.strictEqual(
+  findQuoteBlockAt(customTitleAlert, customTitleAlert.indexOf('body'))?.type,
+  'NOTE',
+  'an Alert marker with a custom plain-text title must be recognized'
+)
+assert.strictEqual(
+  content(toggleQuoteAt(
+    customTitleAlert,
+    customTitleAlert.indexOf('body'),
+    'TIP',
+    'Alert content',
+    'custom title body'
+  )),
+  '> [!TIP] 自定义标题\n> custom title body',
+  'switching an Alert type must preserve its custom title'
+)
+
 const markerOnly = '> [!NOTE]'
 assert.strictEqual(
   findQuoteBlockAt(markerOnly, 0)?.type,

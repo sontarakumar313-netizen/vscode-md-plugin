@@ -1,5 +1,6 @@
 import { t } from './lang'
 import {
+  focusVditorRange,
   getVditorInternals,
   refreshVditorWysiwygHtmlPreview,
   refreshVditorWysiwygMathPreview,
@@ -29,6 +30,12 @@ interface SourceParts {
   source: HTMLElement
   code: HTMLElement
   preview: HTMLElement | null
+}
+
+let openBlockEditor: ((owner: HTMLElement) => boolean) | null = null
+
+export function openWysiwygBlockSourceEditor(owner: HTMLElement): boolean {
+  return openBlockEditor?.(owner) ?? false
 }
 
 function cleanSourceText(code: HTMLElement): string {
@@ -98,6 +105,7 @@ function validateInlineHtml(value: string): boolean {
 /** Moves formula, raw HTML, inline HTML and entity source into the shared popover. */
 export function initWysiwygSourceEditors(): void {
   let writing = false
+  let suppressedInlineClick: HTMLElement | null = null
 
   function refresh(root: HTMLElement): void {
     if (writing) return
@@ -169,6 +177,11 @@ export function initWysiwygSourceEditors(): void {
     openWysiwygSourceEditSession({
       target: parts.owner,
       focusField: 'source',
+      placement: parts.kind === 'html-block'
+        ? 'html-block'
+        : parts.kind === 'math-block'
+          ? 'math-block'
+          : undefined,
       fields: [
         {
           name: 'source',
@@ -197,6 +210,20 @@ export function initWysiwygSourceEditors(): void {
       beforeCommit: () => hideWysiwygSerializerSource(parts.source),
       afterCommit: () => registration.requestRefresh(),
     })
+  }
+
+  openBlockEditor = (owner) => {
+    const parts = sourcePartsForOwner(owner)
+    if (
+      !parts ||
+      (parts.kind !== 'html-block' && parts.kind !== 'math-block') ||
+      !owner.isConnected ||
+      !parts.preview
+    ) {
+      return false
+    }
+    openEditor(parts)
+    return true
   }
 
   function textOffsetAt(
@@ -268,7 +295,6 @@ export function initWysiwygSourceEditors(): void {
   function eventParts(event: MouseEvent, target: Element): SourceParts | null {
     const owner = target.closest<HTMLElement>(
       '.vditor-wysiwyg__block[data-type="math-block"], ' +
-        '.vditor-wysiwyg__block[data-type="html-block"], ' +
         'span.vditor-wysiwyg__block[data-type="math-inline"], ' +
         'span.vditor-wysiwyg__block[data-type="html-entity"]'
     )
@@ -277,35 +303,90 @@ export function initWysiwygSourceEditors(): void {
       : nearestInlineHtmlParts(event, target)
   }
 
+  function inlineCaretPlacement(
+    parts: SourceParts,
+    event: PointerEvent
+  ): 'before' | 'after' | null {
+    if (parts.kind !== 'math-inline' && parts.kind !== 'html-entity') return null
+    const rect = parts.owner.getBoundingClientRect()
+    if (rect.width <= 0) return null
+    if (event.clientX <= rect.left + rect.width / 4) return 'before'
+    if (event.clientX >= rect.right - rect.width / 4) return 'after'
+    return null
+  }
+
+  function placeCaretNextToInline(
+    parts: SourceParts,
+    placement: 'before' | 'after'
+  ): void {
+    const range = document.createRange()
+    range.selectNode(parts.owner)
+    range.collapse(placement === 'before')
+    focusVditorRange(range)
+  }
+
   function shouldOpen(parts: SourceParts, target: Element): boolean {
-    if (parts.kind === 'html-block' || parts.kind === 'html-inline') {
+    if (parts.kind === 'html-inline') {
       const interactive = target.closest(INTERACTIVE_HTML_SELECTOR)
-      const interactionScope = parts.kind === 'html-block'
-        ? parts.preview
-        : target.closest<HTMLElement>(INLINE_HTML_SCOPE_SELECTOR)
+      const interactionScope = target.closest<HTMLElement>(
+        INLINE_HTML_SCOPE_SELECTOR
+      )
       if (interactive && interactionScope?.contains(interactive)) return false
+      return true
     }
-    return parts.kind === 'html-inline' || !!parts.preview?.contains(target)
+    return !!parts.preview?.contains(target)
   }
 
   const registration = registerWysiwygDomFeature({
     refresh,
+    beforeRebind: () => {
+      suppressedInlineClick = null
+    },
     onPointerDown: (event) => {
+      suppressedInlineClick = null
       const target = event.target instanceof Element ? event.target : null
       const parts = target ? eventParts(event, target) : null
       if (!target || !parts || !shouldOpen(parts, target)) return false
+
+      const placement = event.button === 0
+        ? inlineCaretPlacement(parts, event)
+        : null
+      if (placement) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        suppressedInlineClick = parts.owner
+        placeCaretNextToInline(parts, placement)
+        return true
+      }
+
       event.preventDefault()
       event.stopImmediatePropagation()
       return true
     },
     onClick: (event) => {
       const target = event.target instanceof Element ? event.target : null
+      if (
+        target &&
+        suppressedInlineClick &&
+        (target === suppressedInlineClick || suppressedInlineClick.contains(target))
+      ) {
+        suppressedInlineClick = null
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        return true
+      }
+      suppressedInlineClick = null
+
       const parts = target ? eventParts(event, target) : null
       if (!target || !parts || !shouldOpen(parts, target)) return false
       event.preventDefault()
       event.stopImmediatePropagation()
       openEditor(parts)
       return true
+    },
+    dispose: () => {
+      suppressedInlineClick = null
+      openBlockEditor = null
     },
   })
 }

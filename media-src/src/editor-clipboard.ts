@@ -1,4 +1,8 @@
 import { getVditorInternals, getVditorMode } from './vditor-adapter'
+import {
+  cutSelectedCodeBlock,
+  selectedCodeBlockClipboardText,
+} from './wysiwyg-code-block'
 
 interface ClipboardLute {
   VditorDOM2HTML(value: string): string
@@ -109,8 +113,9 @@ function writeClipboard(
   const clipboard = event.clipboardData
   if (!clipboard) return false
   try {
+    clipboard.clearData()
     clipboard.setData('text/plain', content.plain)
-    clipboard.setData('text/html', content.html)
+    if (content.html) clipboard.setData('text/html', content.html)
     return true
   } catch (error) {
     console.error('[markdown-interactor] failed to write clipboard data', error)
@@ -198,6 +203,17 @@ export function installEditorClipboard(): EditorClipboardController {
     }
     const range = editorRange(root)
     if (!range || range.collapsed) return
+
+    const selectedBlockSource = selectedCodeBlockClipboardText()
+    if (selectedBlockSource !== null) {
+      if (!writeClipboard(event, { html: '', plain: selectedBlockSource })) return
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation()
+      if (event.type === 'cut') cutSelectedCodeBlock()
+      return
+    }
+
     const content = selectedClipboardContent(range)
     if (!content || !writeClipboard(event, content)) return
 

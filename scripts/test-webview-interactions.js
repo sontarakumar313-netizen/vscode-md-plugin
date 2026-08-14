@@ -409,13 +409,87 @@ function testPage() {
         );
         expect(getComputedStyle(mathSource).display === 'none', 'formula source was initially exposed');
         mathPreview.click();
-        await pause();
+        await pause(60);
         let sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        let sourcePopoverRect = sourcePopover.getBoundingClientRect();
+        const wysiwygElement = sourcePopover.parentElement;
+        const visibleMathBounds = () => {
+          const rect = wysiwygElement.getBoundingClientRect();
+          return {
+            left: rect.left + 8,
+            right: rect.left + wysiwygElement.clientWidth - 8,
+            top: Math.max(rect.top, 0) + 8,
+            bottom: Math.min(rect.top + wysiwygElement.clientHeight, window.innerHeight) - 8,
+          };
+        };
+        const renderedMathTarget = () =>
+          mathPreview.querySelector('.katex-display > .katex') || mathPreview;
+        const isLeftOfMath = () => {
+          const formulaRect = renderedMathTarget().getBoundingClientRect();
+          const bounds = visibleMathBounds();
+          const expectedTop = Math.max(
+            bounds.top,
+            Math.min(
+              formulaRect.top + formulaRect.height / 2,
+              bounds.bottom - sourcePopoverRect.height
+            )
+          );
+          return Math.abs(sourcePopoverRect.right - (formulaRect.left - 6)) <= 3 &&
+            Math.abs(sourcePopoverRect.top - expectedTop) <= 3 &&
+            sourcePopoverRect.left >= bounds.left - 2 &&
+            sourcePopoverRect.bottom <= bounds.bottom + 2;
+        };
+        const initialMathBounds = visibleMathBounds();
+        const initialMathPositioned = sourcePopover.dataset.vmdPosition === 'left'
+          ? isLeftOfMath()
+          : ['above', 'below'].includes(sourcePopover.dataset.vmdPosition) &&
+            sourcePopoverRect.left >= initialMathBounds.left - 2 &&
+            sourcePopoverRect.right <= initialMathBounds.right + 2 &&
+            sourcePopoverRect.top >= initialMathBounds.top - 2 &&
+            sourcePopoverRect.bottom <= initialMathBounds.bottom + 2;
         expect(
           getComputedStyle(mathSource).display === 'none' &&
-            sourcePopover?.style.display === 'block' &&
-            sourcePopover.querySelector('[name="source"]')?.value === 'x^2',
-          'formula preview did not open the shared source popover'
+            sourcePopover.style.display === 'block' &&
+            sourcePopover.querySelector('[name="source"]')?.value === 'x^2' &&
+            initialMathPositioned,
+          'the block formula popover was not aligned with the rendered formula'
+        );
+        const mathSourceInput = sourcePopover.querySelector('[name="source"]');
+        mathSourceInput.style.height = (mathSourceInput.getBoundingClientRect().height + 30) + 'px';
+        await pause(100);
+        sourcePopoverRect = sourcePopover.getBoundingClientRect();
+        const resizedMathBounds = visibleMathBounds();
+        expect(
+          sourcePopover.dataset.vmdPosition === 'left'
+            ? isLeftOfMath()
+            : sourcePopoverRect.left >= resizedMathBounds.left - 2 &&
+              sourcePopoverRect.right <= resizedMathBounds.right + 2 &&
+              sourcePopoverRect.top >= resizedMathBounds.top - 2 &&
+              sourcePopoverRect.bottom <= resizedMathBounds.bottom + 2,
+          'resizing a multiline field moved its popover outside the editor or away from the formula'
+        );
+        mathSourceInput.value = 'x'.repeat(180);
+        mathSourceInput.dispatchEvent(new InputEvent('input', { bubbles: true }));
+        await pause(160);
+        sourcePopoverRect = sourcePopover.getBoundingClientRect();
+        const wideFormulaRect = renderedMathTarget().getBoundingClientRect();
+        const wideBounds = visibleMathBounds();
+        const expectedWideLeft = Math.max(
+          wideBounds.left,
+          Math.min(
+            wideFormulaRect.left + wideFormulaRect.width / 2 - sourcePopoverRect.width / 2,
+            wideBounds.right - sourcePopoverRect.width
+          )
+        );
+        expect(
+          wideFormulaRect.left - 6 - wideBounds.left < 320 &&
+            ['above', 'below'].includes(sourcePopover.dataset.vmdPosition) &&
+            Math.abs(sourcePopoverRect.left - expectedWideLeft) <= 3 &&
+            sourcePopoverRect.left >= wideBounds.left - 2 &&
+            sourcePopoverRect.right <= wideBounds.right + 2 &&
+            sourcePopoverRect.top >= wideBounds.top - 2 &&
+            sourcePopoverRect.bottom <= wideBounds.bottom + 2,
+          'a wide formula did not move its centered popover above or below inside the editor'
         );
         document.dispatchEvent(new KeyboardEvent('keydown', {
           key: 'Escape',
@@ -475,8 +549,13 @@ function testPage() {
         await pause();
         const codeLanguageInput = sourcePopover.querySelector('[name="language"]');
         const codeContentInput = sourcePopover.querySelector('[name="content"]');
+        const codePopoverRect = sourcePopover.getBoundingClientRect();
+        const codeEditButtonRect = codeEditButton.getBoundingClientRect();
         expect(
           sourcePopover.style.display === 'block' &&
+            sourcePopover.dataset.vmdPosition === 'below' &&
+            Math.abs(codePopoverRect.right - codeEditButtonRect.right) <= 2 &&
+            Math.abs(codePopoverRect.top - codeEditButtonRect.bottom - 6) <= 2 &&
             sourcePopover.querySelectorAll('.vmd-source-popover__field').length === 2 &&
             codeLanguageInput.value === 'js' &&
             codeContentInput.value === 'const a = 1;' &&
@@ -498,12 +577,13 @@ function testPage() {
           fontFamily: compactContentStyle.fontFamily,
         };
         expect(
-          Number.parseFloat(compactPopoverStyle.maxHeight) <= 310 &&
-            codeContentInput.rows === 4 &&
+          Number.parseFloat(compactPopoverStyle.maxHeight) > 310 &&
+            Number.parseFloat(compactPopoverStyle.maxHeight) <= 620 &&
+            codeContentInput.rows === 8 &&
             Number.parseFloat(compactContentStyle.fontSize) <= 12 &&
             Number.parseFloat(compactContentStyle.lineHeight) /
               Number.parseFloat(compactContentStyle.fontSize) <= 1.31,
-          'the shared source popover did not use the compact half-height styling: ' +
+          'the shared source popover did not double its height while preserving compact typography: ' +
             JSON.stringify({
               maxHeight: compactPopoverStyle.maxHeight,
               rows: codeContentInput.rows,
@@ -619,7 +699,7 @@ function testPage() {
         // popover while serializer-owned source remains out of layout.
         await setMarkdown(
           '# <p align="center">Centered title</p>\\n\\n' +
-            '<p align="center"><a href="https://example.com/raw" target="_blank"><img src="assets/raw.png" alt="raw"></a></p>\\n\\n' +
+            '<p align="center">Selectable HTML <a href="https://example.com/raw" target="_blank"><img src="assets/raw.png" alt="raw"></a></p>\\n\\n' +
             'Inline $x$ and &copy; and <span>word</span>.'
         );
         await pause(160);
@@ -629,6 +709,7 @@ function testPage() {
         );
         const htmlSource = htmlBlock.querySelector(':scope > pre:not(.vditor-wysiwyg__preview)');
         const htmlPreview = htmlBlock.querySelector(':scope > .vditor-wysiwyg__preview');
+        const htmlBlockRect = htmlBlock.getBoundingClientRect();
         expect(
           centeredHeading.classList.contains('vmd-html-align-center') &&
             Array.from(centeredHeading.querySelectorAll('code[data-type="html-inline"]')).every(
@@ -644,14 +725,116 @@ function testPage() {
             background: htmlPreview ? getComputedStyle(htmlPreview).backgroundColor : 'missing',
           })
         );
-        (htmlPreview.querySelector('p') || htmlPreview).click();
+        const htmlParagraph = htmlPreview.querySelector('p') || htmlPreview;
+        const htmlSelectableText = textNode(htmlParagraph);
+        select(htmlSelectableText, 0, htmlSelectableText, 'Selectable HTML'.length);
+        const htmlPointerDown = new PointerEvent('pointerdown', {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          clientX: htmlBlockRect.left + htmlBlockRect.width / 2,
+          clientY: htmlBlockRect.top + htmlBlockRect.height / 2,
+          pointerType: 'mouse',
+        });
+        htmlParagraph.dispatchEvent(htmlPointerDown);
+        const htmlSelectionBeforeClick = window.getSelection()?.toString();
+        const htmlCopyTransfer = new DataTransfer();
+        const htmlCopy = new ClipboardEvent('copy', {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: htmlCopyTransfer,
+        });
+        htmlSelectableText.dispatchEvent(htmlCopy);
+        htmlParagraph.click();
+        await pause();
+        sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        expect(
+          !htmlPointerDown.defaultPrevented &&
+            sourcePopover?.style.display !== 'block' &&
+            htmlSelectionBeforeClick === 'Selectable HTML' &&
+            htmlCopy.defaultPrevented &&
+            htmlCopyTransfer.getData('text/plain').includes('Selectable HTML'),
+          'HTML preview text selection was intercepted by direct source editing: ' +
+            JSON.stringify({
+              prevented: htmlPointerDown.defaultPrevented,
+              popover: sourcePopover?.style.display,
+              selection: htmlSelectionBeforeClick,
+              copied: htmlCopyTransfer.getData('text/plain'),
+              preview: htmlPreview?.outerHTML.slice(0, 1500),
+            })
+        );
+        const htmlRightEdge = new PointerEvent('pointerdown', {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          clientX: htmlBlockRect.right - 2,
+          clientY: htmlBlockRect.top + htmlBlockRect.height / 2,
+          pointerType: 'mouse',
+        });
+        htmlPreview.dispatchEvent(htmlRightEdge);
+        const htmlRightRange = window.getSelection()?.getRangeAt(0);
+        const htmlBlockIndex = Array.from(htmlBlock.parentNode.childNodes).indexOf(htmlBlock);
+        expect(
+          htmlRightEdge.defaultPrevented &&
+            htmlRightRange?.collapsed &&
+            htmlRightRange.startContainer === htmlBlock.parentNode &&
+            htmlRightRange.startOffset === htmlBlockIndex + 1,
+          'clicking the HTML block right edge did not place the caret after the block: ' +
+            JSON.stringify({
+              prevented: htmlRightEdge.defaultPrevented,
+              button: htmlRightEdge.button,
+              block: htmlBlock.outerHTML.slice(0, 1000),
+              previewConnected: htmlPreview.isConnected,
+              rect: htmlBlockRect,
+              range: htmlRightRange && {
+                container: htmlRightRange.startContainer.nodeName,
+                offset: htmlRightRange.startOffset,
+                expectedOffset: htmlBlockIndex + 1,
+                parentMatches: htmlRightRange.startContainer === htmlBlock.parentNode,
+              },
+            })
+        );
+
+        htmlParagraph.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          button: 2,
+          clientX: 45,
+          clientY: 45,
+        }));
+        await pause();
+        const htmlContextMenu = document.getElementById('vmd-block-context-menu');
+        const htmlEditSource = htmlContextMenu?.querySelector(
+          'button[data-type="edit-block-source"]'
+        );
+        const htmlDeleteBlock = htmlContextMenu?.querySelector(
+          'button[data-type="delete-block"]'
+        );
+        const visibleHtmlActions = Array.from(
+          htmlContextMenu?.querySelectorAll('button[data-type]') || []
+        ).filter((button) => getComputedStyle(button).display !== 'none');
+        expect(
+          htmlContextMenu?.dataset.kind === 'html-block' &&
+            getComputedStyle(htmlContextMenu).display !== 'none' &&
+            visibleHtmlActions.length === 2 &&
+            htmlEditSource?.textContent.trim() === 'Edit HTML source' &&
+            htmlDeleteBlock?.textContent.trim() === 'Delete HTML block',
+          'the HTML context menu did not expose complete edit and delete actions: ' +
+            JSON.stringify(visibleHtmlActions.map((button) => button.textContent.trim()))
+        );
+        htmlEditSource.click();
         await pause();
         sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
         const htmlInput = sourcePopover.querySelector('[name="source"]');
+        const htmlPopoverRect = sourcePopover.getBoundingClientRect();
+        const htmlPreviewRect = htmlPreview.getBoundingClientRect();
         expect(
           htmlInput?.value.includes('<p align="center">') &&
+            sourcePopover.dataset.vmdPosition === 'above' &&
+            Math.abs(htmlPopoverRect.left - htmlPreviewRect.left) <= 2 &&
+            Math.abs(htmlPopoverRect.bottom - htmlPreviewRect.top + 6) <= 2 &&
             getComputedStyle(htmlSource).display === 'none',
-          'clicking non-interactive HTML content did not open sanitized source editing'
+          'the HTML context-menu action did not open sanitized source editing'
         );
         htmlInput.value = htmlInput.value.replace('align="center"', 'align="right"');
         htmlInput.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'right' }));
@@ -671,7 +854,35 @@ function testPage() {
 
         const inlineMath = root().querySelector('span[data-type="math-inline"]');
         const inlineMathSource = inlineMath.querySelector(':scope > code');
-        inlineMath.querySelector('.vditor-wysiwyg__preview').click();
+        const inlineMathPreview = inlineMath.querySelector('.vditor-wysiwyg__preview');
+        const inlineMathRect = inlineMath.getBoundingClientRect();
+        const inlineMathRightEdge = new PointerEvent('pointerdown', {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          clientX: inlineMathRect.right - 1,
+          clientY: inlineMathRect.top + inlineMathRect.height / 2,
+          pointerType: 'mouse',
+        });
+        inlineMathPreview.dispatchEvent(inlineMathRightEdge);
+        const inlineMathRightRange = window.getSelection()?.getRangeAt(0);
+        const inlineMathIndex = Array.from(inlineMath.parentNode.childNodes).indexOf(inlineMath);
+        expect(
+          inlineMathRightEdge.defaultPrevented &&
+            inlineMathRightRange?.collapsed &&
+            inlineMathRightRange.startContainer === inlineMath.parentNode &&
+            inlineMathRightRange.startOffset === inlineMathIndex + 1,
+          'clicking the inline-formula right side did not place the caret after it'
+        );
+        inlineMathPreview.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          clientX: inlineMathRect.left + inlineMathRect.width / 2,
+          clientY: inlineMathRect.top + inlineMathRect.height / 2,
+          pointerType: 'mouse',
+        }));
+        inlineMathPreview.click();
         await pause();
         sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
         const inlineMathInput = sourcePopover.querySelector('[name="source"]');
@@ -706,7 +917,33 @@ function testPage() {
 
         const htmlEntity = root().querySelector('span[data-type="html-entity"]');
         const entitySource = htmlEntity.querySelector(':scope > code');
-        htmlEntity.querySelector('.vditor-wysiwyg__preview').click();
+        const entityPreview = htmlEntity.querySelector('.vditor-wysiwyg__preview');
+        const entityRect = htmlEntity.getBoundingClientRect();
+        entityPreview.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          clientX: entityRect.left + 1,
+          clientY: entityRect.top + entityRect.height / 2,
+          pointerType: 'mouse',
+        }));
+        const entityLeftRange = window.getSelection()?.getRangeAt(0);
+        const entityIndex = Array.from(htmlEntity.parentNode.childNodes).indexOf(htmlEntity);
+        expect(
+          entityLeftRange?.collapsed &&
+            entityLeftRange.startContainer === htmlEntity.parentNode &&
+            entityLeftRange.startOffset === entityIndex,
+          'clicking the HTML-entity left side did not place the caret before it'
+        );
+        entityPreview.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          clientX: entityRect.left + entityRect.width / 2,
+          clientY: entityRect.top + entityRect.height / 2,
+          pointerType: 'mouse',
+        }));
+        entityPreview.click();
         await pause();
         sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
         const entityInput = sourcePopover.querySelector('[name="source"]');
@@ -2293,6 +2530,89 @@ function testPage() {
           'Escape did not close the Alert type menu without changing Markdown'
         );
 
+        await setMarkdown('> [!NOTE] 自定义标题\\n> custom title body');
+        await pause(80);
+        let customTitleAlert = root().querySelector(':scope > blockquote.vmd-alert');
+        expect(
+          customTitleAlert?.dataset.vmdAlert === 'NOTE' &&
+            customTitleAlert.querySelector(':scope > .vmd-alert-title')?.textContent === '自定义标题' &&
+            customTitleAlert.querySelector('.vmd-alert-marker')?.textContent.includes('自定义标题') &&
+            window.vditor.getValue().includes('[!NOTE] 自定义标题'),
+          'the custom Alert title did not replace the default type title without changing Markdown: ' +
+            JSON.stringify({
+              alert: customTitleAlert?.outerHTML,
+              markdown: window.vditor.getValue(),
+              root: root().innerHTML,
+            })
+        );
+        customTitleAlert.querySelector(':scope > .vmd-alert-title').click();
+        await pause();
+        const customTitleMenu = document.getElementById('vmd-alert-type-menu');
+        const customTitleInput = customTitleMenu.querySelector(
+          '.vmd-alert-type-menu__custom-title-input'
+        );
+        expect(
+          customTitleInput?.value === '自定义标题' &&
+            customTitleInput.placeholder &&
+            customTitleMenu.querySelectorAll('[aria-checked="true"]').length === 1,
+          'the Alert menu did not expose a plain custom-title input beside one checked type'
+        );
+        customTitleInput.value = '可视化标题';
+        customTitleInput.dispatchEvent(new InputEvent('input', {
+          bubbles: true,
+          data: '可视化标题',
+        }));
+        expect(
+          customTitleAlert.querySelector(':scope > .vmd-alert-title')?.textContent === '可视化标题' &&
+            window.vditor.getValue().includes('[!NOTE] 可视化标题'),
+          'typing in the Alert custom-title input did not update the title immediately'
+        );
+        customTitleInput.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause(80);
+        expect(
+          getComputedStyle(customTitleMenu).display === 'none' &&
+            window.vditor.getValue().includes('[!NOTE] 可视化标题'),
+          'Escape discarded the current Alert custom title'
+        );
+        window.vditor.vditor.undo.undo(window.vditor.vditor);
+        await pause(100);
+        customTitleAlert = root().querySelector(':scope > blockquote.vmd-alert');
+        expect(
+          window.vditor.getValue().includes('[!NOTE] 自定义标题') &&
+            customTitleAlert.querySelector(':scope > .vmd-alert-title')?.textContent === '自定义标题',
+          'the live Alert title edit was not grouped into one undo step'
+        );
+        await selectAlertType(customTitleAlert, 'WARNING');
+        customTitleAlert = root().querySelector(':scope > blockquote.vmd-alert');
+        expect(
+          customTitleAlert?.dataset.vmdAlert === 'WARNING' &&
+            customTitleAlert.querySelector(':scope > .vmd-alert-title')?.textContent === '自定义标题' &&
+            window.vditor.getValue().includes('[!WARNING] 自定义标题'),
+          'switching an Alert type did not preserve its custom title'
+        );
+        customTitleAlert.querySelector(':scope > .vmd-alert-title').click();
+        await pause();
+        const clearCustomTitleInput = document.querySelector(
+          '#vmd-alert-type-menu .vmd-alert-type-menu__custom-title-input'
+        );
+        clearCustomTitleInput.value = '';
+        clearCustomTitleInput.dispatchEvent(new InputEvent('input', { bubbles: true }));
+        expect(
+          customTitleAlert.querySelector(':scope > .vmd-alert-title')?.textContent === 'Warning' &&
+            !window.vditor.getValue().includes('[!WARNING] 自定义标题'),
+          'clearing the custom-title input did not restore the default Alert title'
+        );
+        clearCustomTitleInput.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause(80);
+
         await setMarkdown(
           '>[!note]\\n>lowercase body\\n\\n' +
             '> [!WaRnInG]\\n> mixed-case body\\n\\n' +
@@ -2422,6 +2742,19 @@ function testPage() {
               getComputedStyle(menu).display !== 'none',
             'the block context menu did not target ' + expectedKind
           );
+          const visibleActions = Array.from(
+            menu.querySelectorAll('button[data-type]')
+          ).filter((item) => getComputedStyle(item).display !== 'none');
+          const editableKind = ['code-block', 'math-block', 'html-block'].includes(
+            expectedKind
+          );
+          expect(
+            visibleActions.length === (editableKind ? 2 : 1) &&
+              visibleActions.every((item) => item.textContent.trim()),
+            'the block context menu exposed stale or incomplete actions for ' +
+              expectedKind + ': ' +
+              JSON.stringify(visibleActions.map((item) => item.textContent.trim()))
+          );
           const button = menu.querySelector('button[data-type="delete-block"]');
           expect(button, 'the block context menu has no whole-region delete action');
           button.click();
@@ -2546,6 +2879,20 @@ function testPage() {
         expect(
           previousMathSelectionElement?.closest('p')?.textContent.includes('before delete math'),
           'deleting the final region did not move the caret to the preceding block'
+        );
+
+        await setMarkdown(
+          'before delete html\\n\\n<div>delete HTML block</div>\\n\\nafter delete html'
+        );
+        const deletedHtml = root().querySelector(
+          ':scope > .vditor-wysiwyg__block[data-type="html-block"]'
+        );
+        await deleteThroughBlockMenu(deletedHtml, 'html-block');
+        expect(
+          window.vditor.getValue().replace(/\\n+$/, '') ===
+            'before delete html\\n\\nafter delete html',
+          'deleting an HTML block left its source in the document: ' +
+            JSON.stringify(window.vditor.getValue())
         );
 
         await setMarkdown('| menu | priority |\\n| --- | --- |\\n| table | cell |');
@@ -3003,6 +3350,307 @@ function testPage() {
             caretInsertionValue.indexOf('<details>') < caretInsertionValue.indexOf('after block'),
           'the WYSIWYG toolbar lost the middle-document caret and appended details at the end'
         );
+
+        // A caret can land inside serializer-owned code previews. The first
+        // destructive key must select the complete source block without editing
+        // it; a repeated key can then remove the selected block deliberately.
+        const protectedCodeMarkdown =
+          markerFence + 'js\\nconst protectedValue = true;\\n' + markerFence;
+        await setMarkdown(protectedCodeMarkdown);
+        await pause(100);
+        let protectedCodeBlock = root().querySelector(
+          ':scope > .vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        const protectedCodeText = textNode(
+          protectedCodeBlock.querySelector(':scope > .vditor-wysiwyg__preview > code')
+        );
+        select(protectedCodeText, 6, protectedCodeText, 6);
+        const firstProtectedDelete = new KeyboardEvent('keydown', {
+          key: 'Backspace',
+          bubbles: true,
+          cancelable: true,
+        });
+        protectedCodeText.dispatchEvent(firstProtectedDelete);
+        await pause(80);
+        protectedCodeBlock = root().querySelector(
+          ':scope > .vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        expect(
+          firstProtectedDelete.defaultPrevented &&
+            window.vditor.getValue().replace(/\\n+$/, '') === protectedCodeMarkdown &&
+            protectedCodeBlock?.classList.contains('vmd-code-block--selected'),
+          'the first destructive key inside a code preview did not select the whole block safely: ' +
+            JSON.stringify({
+              prevented: firstProtectedDelete.defaultPrevented,
+              value: window.vditor.getValue(),
+              block: protectedCodeBlock?.outerHTML.slice(0, 1200),
+            })
+        );
+        const protectedCopyTransfer = new DataTransfer();
+        const protectedCopy = new ClipboardEvent('copy', {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: protectedCopyTransfer,
+        });
+        root().dispatchEvent(protectedCopy);
+        expect(
+          protectedCopy.defaultPrevented &&
+            protectedCopyTransfer.getData('text/plain') === protectedCodeMarkdown &&
+            protectedCopyTransfer.getData('text/html') === '',
+          'whole-code-block copy did not preserve its complete Markdown as plain text: ' +
+            JSON.stringify({
+              plain: protectedCopyTransfer.getData('text/plain'),
+              types: Array.from(protectedCopyTransfer.types),
+            })
+        );
+
+        const afterProtectedRange = document.createRange();
+        afterProtectedRange.selectNode(protectedCodeBlock);
+        afterProtectedRange.collapse(false);
+        const afterProtectedSelection = window.getSelection();
+        afterProtectedSelection.removeAllRanges();
+        afterProtectedSelection.addRange(afterProtectedRange);
+        const enterAfterProtectedBlock = new KeyboardEvent('keydown', {
+          key: 'Enter',
+          bubbles: true,
+          cancelable: true,
+        });
+        root().dispatchEvent(enterAfterProtectedBlock);
+        await pause(80);
+        protectedCodeBlock = root().querySelector(
+          ':scope > .vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        const paragraphAfterProtectedBlock = protectedCodeBlock?.nextElementSibling;
+        expect(
+          enterAfterProtectedBlock.defaultPrevented &&
+            paragraphAfterProtectedBlock?.tagName === 'P' &&
+            !window.vditor.getValue().replace(/\\n+$/, '').localeCompare(protectedCodeMarkdown),
+          'Enter on a selected code block did not create an editable paragraph after it'
+        );
+
+        const pasteProtectedTransfer = new DataTransfer();
+        pasteProtectedTransfer.setData('text/plain', protectedCodeMarkdown);
+        const pasteProtectedBlock = new ClipboardEvent('paste', {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: pasteProtectedTransfer,
+        });
+        paragraphAfterProtectedBlock.dispatchEvent(pasteProtectedBlock);
+        await pause(120);
+        expect(
+          root().querySelectorAll(
+            ':scope > .vditor-wysiwyg__block[data-type="code-block"]'
+          ).length === 2 &&
+            window.vditor.getValue().split(protectedCodeMarkdown).length === 3,
+          'pasting copied whole-block plain text did not recreate the same code block: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
+
+        await setMarkdown(protectedCodeMarkdown);
+        protectedCodeBlock = root().querySelector(
+          ':scope > .vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        const repeatedDeleteText = textNode(
+          protectedCodeBlock.querySelector(':scope > .vditor-wysiwyg__preview > code')
+        );
+        select(repeatedDeleteText, 5, repeatedDeleteText, 5);
+        repeatedDeleteText.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Delete',
+          bubbles: true,
+          cancelable: true,
+        }));
+        root().dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Delete',
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause(100);
+        expect(
+          !window.vditor.getValue().trim() &&
+            !root().querySelector('[data-type="code-block"]') &&
+            root().firstElementChild?.tagName === 'P',
+          'the repeated destructive key did not remove only the selected code block'
+        );
+
+        const cutBlockMarkdown =
+          markerFence + 'python\\nprint("cut block")\\n' + markerFence;
+        await setMarkdown('before cut block\\n\\n' + cutBlockMarkdown + '\\n\\nafter cut block');
+        const cutCodeBlock = root().querySelector(
+          ':scope > .vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        const cutCodeText = textNode(
+          cutCodeBlock.querySelector(':scope > .vditor-wysiwyg__preview > code')
+        );
+        select(cutCodeText, 3, cutCodeText, 3);
+        cutCodeText.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Backspace',
+          bubbles: true,
+          cancelable: true,
+        }));
+        const wholeBlockCutTransfer = new DataTransfer();
+        const wholeBlockCut = new ClipboardEvent('cut', {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: wholeBlockCutTransfer,
+        });
+        root().dispatchEvent(wholeBlockCut);
+        await pause(100);
+        expect(
+          wholeBlockCut.defaultPrevented &&
+            wholeBlockCutTransfer.getData('text/plain') === cutBlockMarkdown &&
+            wholeBlockCutTransfer.getData('text/html') === '' &&
+            window.vditor.getValue().replace(/\\n+$/, '') ===
+              'before cut block\\n\\nafter cut block',
+          'cutting a selected code block did not copy exact plain Markdown and remove the block safely'
+        );
+
+        await setMarkdown(protectedCodeMarkdown);
+        const draggedOrdinaryBlock = root().querySelector(
+          ':scope > .vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        const draggedOrdinaryCode = draggedOrdinaryBlock.querySelector(
+          ':scope > .vditor-wysiwyg__preview > code'
+        );
+        const draggedOrdinaryRange = document.createRange();
+        draggedOrdinaryRange.selectNodeContents(draggedOrdinaryCode);
+        const draggedOrdinarySelection = window.getSelection();
+        draggedOrdinarySelection.removeAllRanges();
+        draggedOrdinarySelection.addRange(draggedOrdinaryRange);
+        await pause(40);
+        expect(
+          draggedOrdinaryBlock.classList.contains('vmd-code-block--selected'),
+          'selecting all visible ordinary-code text did not promote to whole-block selection'
+        );
+
+        const mermaidBlockMarkdown =
+          markerFence + 'mermaid\\ngraph TD\\n  A --> B\\n' + markerFence;
+        await setMarkdown(mermaidBlockMarkdown);
+        await pause(120);
+        const mermaidBlock = root().querySelector(
+          ':scope > .vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        const mermaidPreview = mermaidBlock.querySelector(
+          ':scope > .vditor-wysiwyg__preview'
+        );
+        const mermaidRect = mermaidBlock.getBoundingClientRect();
+        const mermaidDragX = mermaidRect.left + mermaidRect.width / 2;
+        const mermaidDragY = mermaidRect.top + mermaidRect.height / 2;
+        mermaidPreview.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: mermaidDragX,
+          clientY: mermaidDragY,
+          pointerId: 27,
+          pointerType: 'mouse',
+        }));
+        document.dispatchEvent(new PointerEvent('pointermove', {
+          bubbles: true,
+          clientX: mermaidDragX + 20,
+          clientY: mermaidDragY + 20,
+          pointerId: 27,
+          pointerType: 'mouse',
+        }));
+        document.dispatchEvent(new PointerEvent('pointerup', {
+          bubbles: true,
+          button: 0,
+          clientX: mermaidDragX + 20,
+          clientY: mermaidDragY + 20,
+          pointerId: 27,
+          pointerType: 'mouse',
+        }));
+        await pause(40);
+        expect(
+          mermaidBlock.classList.contains('vmd-code-block--rich') &&
+            mermaidBlock.classList.contains('vmd-code-block--selected'),
+          'dragging a Mermaid preview did not select its complete source block'
+        );
+        const mermaidCopyTransfer = new DataTransfer();
+        const mermaidCopy = new ClipboardEvent('copy', {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: mermaidCopyTransfer,
+        });
+        root().dispatchEvent(mermaidCopy);
+        expect(
+          mermaidCopyTransfer.getData('text/plain') === mermaidBlockMarkdown &&
+            mermaidCopyTransfer.getData('text/html') === '',
+          'whole-block Mermaid copy did not preserve its complete source'
+        );
+
+        for (const atomicFixture of [
+          {
+            source: '$$\\natomicMath\\n$$',
+            selector: '[data-type="math-block"]',
+            label: 'formula',
+          },
+          {
+            source: '<div>atomic HTML source</div>',
+            selector: '[data-type="html-block"]',
+            label: 'HTML',
+          },
+        ]) {
+          await setMarkdown(atomicFixture.source);
+          await pause(80);
+          const atomicBlock = root().querySelector(
+            ':scope > .vditor-wysiwyg__block' + atomicFixture.selector
+          );
+          const atomicPreview = atomicBlock.querySelector(
+            ':scope > .vditor-wysiwyg__preview'
+          );
+          const atomicRect = atomicBlock.getBoundingClientRect();
+          atomicPreview.dispatchEvent(new PointerEvent('pointerdown', {
+            bubbles: true,
+            cancelable: true,
+            button: 0,
+            clientX: atomicRect.right - 2,
+            clientY: atomicRect.top + atomicRect.height / 2,
+            pointerType: 'mouse',
+          }));
+          root().dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'Backspace',
+            bubbles: true,
+            cancelable: true,
+          }));
+          const atomicCopyTransfer = new DataTransfer();
+          root().dispatchEvent(new ClipboardEvent('copy', {
+            bubbles: true,
+            cancelable: true,
+            clipboardData: atomicCopyTransfer,
+          }));
+          expect(
+            atomicBlock.classList.contains('vmd-code-block--selected') &&
+              atomicCopyTransfer.getData('text/plain') === atomicFixture.source &&
+              atomicCopyTransfer.getData('text/html') === '',
+            atomicFixture.label +
+              ' did not reuse whole-block selection and exact plain-source copy'
+          );
+
+          root().dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'Escape',
+            bubbles: true,
+            cancelable: true,
+          }));
+          atomicPreview.dispatchEvent(new PointerEvent('pointerdown', {
+            bubbles: true,
+            cancelable: true,
+            button: 0,
+            clientX: atomicRect.left + 2,
+            clientY: atomicRect.top + atomicRect.height / 2,
+            pointerType: 'mouse',
+          }));
+          root().dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'Enter',
+            bubbles: true,
+            cancelable: true,
+          }));
+          await pause(80);
+          expect(
+            atomicBlock.previousElementSibling?.tagName === 'P' &&
+              window.vditor.getValue().includes(atomicFixture.source),
+            'Enter at the left edge did not insert a paragraph before the ' +
+              atomicFixture.label + ' block'
+          );
+        }
 
         // Clipboard behavior is normalized per mode. WYSIWYG exports Markdown
         // plus rich HTML, and cut falls back when Electron rejects execCommand.
