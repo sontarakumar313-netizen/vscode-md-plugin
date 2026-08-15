@@ -61,6 +61,7 @@ interface WysiwygSourceEditSessionOptions {
   focusField?: string
   placement?: SourcePopoverPlacement
   unavailableMessage: string
+  resolveTarget?: () => HTMLElement | null
   isAvailable?: () => boolean
   onChange: (values: Readonly<Record<string, string>>) => string | null
   isSourceChanged: () => boolean
@@ -659,6 +660,38 @@ function positionPopover(
   }
 }
 
+export function retargetActiveWysiwygCodeOverlay(
+  previousTarget: HTMLElement,
+  nextTarget: HTMLElement
+): boolean {
+  const active = activeCustomPopover
+  if (
+    !active ||
+    active.target !== previousTarget ||
+    !nextTarget.isConnected ||
+    !active.popover.classList.contains(CODE_OVERLAY_POPOVER_CLASS)
+  ) {
+    return false
+  }
+
+  active.target = nextTarget
+  if (pendingPopoverTarget === previousTarget) {
+    pendingPopoverTarget = nextTarget
+  }
+
+  if (activePopoverPosition?.popover === active.popover) {
+    if (observedSourcePositionTarget) {
+      sourcePopoverResizeObserver?.unobserve(observedSourcePositionTarget)
+      observedSourcePositionTarget = null
+    }
+    activePopoverPosition.target = nextTarget
+    queueActivePopoverPosition()
+  } else {
+    positionPopover(active.popover, nextTarget, 'code-overlay')
+  }
+  return true
+}
+
 function getPopoverTarget(type: string): HTMLElement | null {
   const selection = window.getSelection()
   let element = selection?.anchorNode instanceof Element
@@ -897,6 +930,7 @@ export function openWysiwygSourceEditSession({
   focusField,
   placement,
   unavailableMessage,
+  resolveTarget,
   isAvailable,
   onChange,
   isSourceChanged,
@@ -915,16 +949,21 @@ export function openWysiwygSourceEditSession({
     focusField,
     placement,
     onChange: (values) => {
-      if (!target.isConnected || (isAvailable && !isAvailable())) {
+      const currentTarget = resolveTarget ? resolveTarget() : target
+      if (
+        !currentTarget?.isConnected ||
+        (isAvailable && !isAvailable())
+      ) {
         return unavailableMessage
       }
       return onChange(values)
     },
     onFinish: (_values, changed) => {
       try {
+        const currentTarget = resolveTarget ? resolveTarget() : target
         if (
           !changed ||
-          !target.isConnected ||
+          !currentTarget?.isConnected ||
           (isAvailable && !isAvailable()) ||
           !isSourceChanged()
         ) {

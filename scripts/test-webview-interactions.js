@@ -5431,10 +5431,17 @@ function testPage() {
           'clicking highlighted code or its language opened an editor or exposed source'
         );
 
-        // IME composition enters the exact editor without canceling the
-        // browser's composition default. Ordinary activation keys still open
-        // the editor without being replayed into its content.
+        // A real IME sequence ends composition on Vditor's original preview
+        // after the 229 key opens the overlay. Vditor then replaces the code
+        // block, so the live source session must rebind without losing its
+        // textarea, selection, focus, or exact block-sized placement.
         selectTextOccurrence(codePreviewCode, 'const a', true);
+        const imeOriginalBlock = codeBlock;
+        const imeTargetRect = codeBlock.getBoundingClientRect();
+        codePreviewCode.dispatchEvent(new CompositionEvent('compositionstart', {
+          bubbles: true,
+          data: '',
+        }));
         const imeCodeActivation = new KeyboardEvent('keydown', {
           key: 'Process',
           bubbles: true,
@@ -5443,23 +5450,67 @@ function testPage() {
         Object.defineProperty(imeCodeActivation, 'isComposing', { value: true });
         Object.defineProperty(imeCodeActivation, 'keyCode', { value: 229 });
         codePreviewCode.dispatchEvent(imeCodeActivation);
-        await pause();
+        codePreviewCode.dispatchEvent(new CompositionEvent('compositionend', {
+          bubbles: true,
+          data: '测',
+        }));
+        await pause(100);
+        codeBlock = root().querySelector(
+          '.vditor-wysiwyg__block[data-type="code-block"]'
+        );
         sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
         let keyboardContent = sourcePopover.querySelector('[name="content"]');
+        let imePopoverRect = sourcePopover.getBoundingClientRect();
         expect(
           !imeCodeActivation.defaultPrevented &&
+            !imeOriginalBlock.isConnected &&
+            codeBlock !== imeOriginalBlock &&
             sourcePopover.dataset.vmdPosition === 'code-overlay' &&
             keyboardContent.value.includes('const a = 1;') &&
             keyboardContent.selectionStart === 7 &&
             keyboardContent.selectionEnd === 7 &&
-            document.activeElement === keyboardContent,
-          'IME composition did not enter the ordinary code editor safely'
+            document.activeElement === keyboardContent &&
+            Math.abs(imePopoverRect.left - imeTargetRect.left) <= 2 &&
+            Math.abs(imePopoverRect.top - imeTargetRect.top) <= 2 &&
+            Math.abs(imePopoverRect.width - imeTargetRect.width) <= 2 &&
+            Math.abs(imePopoverRect.height - imeTargetRect.height) <= 2,
+          'IME replacement lost the code session or its exact overlay size: ' +
+            JSON.stringify({
+              blockConnected: imeOriginalBlock.isConnected,
+              block: codeBlock.getBoundingClientRect(),
+              target: imeTargetRect,
+              popover: imePopoverRect,
+              style: {
+                width: sourcePopover.style.width,
+                height: sourcePopover.style.height,
+              },
+            })
         );
+        keyboardContent.value = keyboardContent.value.replace(
+          'const a = 1;',
+          'const a = 10;'
+        );
+        keyboardContent.dispatchEvent(new InputEvent('input', {
+          bubbles: true,
+          data: '0',
+          inputType: 'insertText',
+        }));
         document.dispatchEvent(new KeyboardEvent('keydown', {
           key: 'Escape',
           bubbles: true,
         }));
         await pause(100);
+        expect(
+          window.vditor.getValue().includes('const a = 10;'),
+          'the rebound IME code session did not commit its draft'
+        );
+        window.vditor.vditor.undo.undo(window.vditor.vditor);
+        await pause(100);
+        expect(
+          window.vditor.getValue().includes('const a = 1;') &&
+            !window.vditor.getValue().includes('const a = 10;'),
+          'the rebound IME code edit could not be undone in one step'
+        );
 
         codeBlock = root().querySelector(
           '.vditor-wysiwyg__block[data-type="code-block"]'

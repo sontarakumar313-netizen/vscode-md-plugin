@@ -10,6 +10,7 @@ import {
   getSharedWysiwygPopover,
   hideWysiwygSerializerSource,
   openWysiwygSourceEditSession,
+  retargetActiveWysiwygCodeOverlay,
 } from './wysiwyg-popover'
 import { deleteWysiwygBlocks } from './block-context-menu'
 import {
@@ -65,6 +66,13 @@ interface CodeSourceSelection {
 
 interface KeyboardCodeEditRequest {
   allowDefault: boolean
+}
+
+interface CodeEditorSession {
+  parts: CodeBlockParts
+  root: HTMLElement | null
+  blockIndex: number
+  overlay: boolean
 }
 
 function getCodeBlockParts(block: HTMLElement): CodeBlockParts | null {
@@ -343,6 +351,7 @@ export function initWysiwygCodeBlocks(): void {
   const guardedPreviews = new Set<HTMLElement>()
   const renderTimers = new WeakMap<HTMLElement, number>()
   const renderVersions = new WeakMap<HTMLElement, number>()
+  let activeOverlayEditor: CodeEditorSession | null = null
 
   const stopVditorPreviewEvent = (event: Event): void => {
     // Target handlers and browser defaults have already run by the time a
@@ -442,6 +451,42 @@ export function initWysiwygCodeBlocks(): void {
     syncCopyTextarea(parts)
   }
 
+  function rebindReplacedCodeEditor(root: HTMLElement): void {
+    const session = activeOverlayEditor
+    if (
+      !session ||
+      session.root !== root ||
+      session.parts.block.isConnected ||
+      session.blockIndex < 0
+    ) {
+      return
+    }
+
+    const replacementBlock = root.querySelectorAll<HTMLElement>(
+      '.vditor-wysiwyg__block[data-type="code-block"]'
+    )[session.blockIndex]
+    const replacementParts = replacementBlock
+      ? getCodeBlockParts(replacementBlock)
+      : null
+    if (!replacementParts) return
+
+    replacementBlock.classList.add(OVERLAY_EDITING_CLASS)
+    if (
+      !retargetActiveWysiwygCodeOverlay(
+        session.parts.block,
+        replacementBlock
+      )
+    ) {
+      replacementBlock.classList.remove(OVERLAY_EDITING_CLASS)
+      return
+    }
+
+    session.parts = replacementParts
+    getSharedWysiwygPopover()
+      ?.querySelector<HTMLTextAreaElement>('textarea[name="content"]')
+      ?.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+
   function refresh(root: HTMLElement): void {
     guardAtomicPreviews(root)
     const selectedBlock = getSelectedAtomicBlock()
@@ -451,6 +496,7 @@ export function initWysiwygCodeBlocks(): void {
     if (writing) return
     writing = true
     try {
+      rebindReplacedCodeEditor(root)
       root
         .querySelectorAll<HTMLElement>(
           '.vditor-wysiwyg__block[data-type="code-block"]'
@@ -505,10 +551,23 @@ export function initWysiwygCodeBlocks(): void {
       currentCodeSourceSelection(parts)
     const initialLanguage = languageFromCode(parts.sourceCode)
     const initialContent = sourceText(parts.sourceCode)
-    if (overlay) parts.block.classList.add(OVERLAY_EDITING_CLASS)
+    const root = parts.block.closest<HTMLElement>('.vditor-reset')
+    const blockIndex = root
+      ? Array.from(root.querySelectorAll<HTMLElement>(
+        '.vditor-wysiwyg__block[data-type="code-block"]'
+      )).indexOf(parts.block)
+      : -1
+    const session: CodeEditorSession = {
+      parts,
+      root,
+      blockIndex,
+      overlay,
+    }
+    if (overlay) session.parts.block.classList.add(OVERLAY_EDITING_CLASS)
 
     const opened = openWysiwygSourceEditSession({
-      target: parts.block,
+      target: session.parts.block,
+      resolveTarget: () => session.parts.block,
       focusField,
       placement: overlay ? 'code-overlay' : 'code',
       fields: [
@@ -526,60 +585,66 @@ export function initWysiwygCodeBlocks(): void {
         },
       ],
       unavailableMessage: 'The code block is no longer available',
-      isAvailable: () => parts.sourceCode.isConnected,
+      isAvailable: () => session.parts.sourceCode.isConnected,
       onChange: (values) => {
+        const currentParts = session.parts
         const language = normalizeLanguage(values.language ?? '')
         const content = values.content ?? ''
-        if (sourceText(parts.sourceCode) !== content) {
-          setSourceText(parts.sourceCode, content)
+        if (sourceText(currentParts.sourceCode) !== content) {
+          setSourceText(currentParts.sourceCode, content)
         }
         if (language === null) {
-          hideWysiwygSerializerSource(parts.source)
+          hideWysiwygSerializerSource(currentParts.source)
           return (
             t('invalidCodeLanguage') ||
             'Language cannot contain whitespace, control characters, or backticks'
           )
         }
-        if (languageFromCode(parts.sourceCode) !== language) {
-          setSourceLanguage(parts.sourceCode, language)
+        if (languageFromCode(currentParts.sourceCode) !== language) {
+          setSourceLanguage(currentParts.sourceCode, language)
           internal.hint.recentLanguage = language
         }
-        if (!overlay) {
-          schedulePreviewRender(parts, () => {
+        if (!session.overlay) {
+          schedulePreviewRender(currentParts, () => {
             refreshVditorWysiwygCodePreview(
               internal,
-              parts.source,
-              parts.preview
+              currentParts.source,
+              currentParts.preview
             )
-            hideWysiwygSerializerSource(parts.source)
+            hideWysiwygSerializerSource(currentParts.source)
             registration.requestRefresh()
           })
         }
         return null
       },
       isSourceChanged: () =>
-        languageFromCode(parts.sourceCode) !== initialLanguage ||
-        sourceText(parts.sourceCode) !== initialContent,
+        languageFromCode(session.parts.sourceCode) !== initialLanguage ||
+        sourceText(session.parts.sourceCode) !== initialContent,
       beforeCommit: () => {
-        flushPreviewRender(parts, () => {
+        const currentParts = session.parts
+        flushPreviewRender(currentParts, () => {
           refreshVditorWysiwygCodePreview(
             internal,
-            parts.source,
-            parts.preview
+            currentParts.source,
+            currentParts.preview
           )
         })
-        hideWysiwygSerializerSource(parts.source)
+        hideWysiwygSerializerSource(currentParts.source)
       },
       afterCommit: () => registration.requestRefresh(),
       afterFinish: () => {
-        if (!overlay) return
-        parts.block.classList.remove(OVERLAY_EDITING_CLASS)
+        if (activeOverlayEditor === session) activeOverlayEditor = null
+        if (!session.overlay) return
+        session.parts.block.classList.remove(OVERLAY_EDITING_CLASS)
         registration.requestRefresh()
       },
     })
     if (!opened) {
-      parts.block.classList.remove(OVERLAY_EDITING_CLASS)
+      session.parts.block.classList.remove(OVERLAY_EDITING_CLASS)
       return
+    }
+    if (session.overlay && session.root && session.blockIndex >= 0) {
+      activeOverlayEditor = session
     }
     if (!overlay || focusField !== 'content' || !sourceSelection) return
     const contentControl = getSharedWysiwygPopover()
