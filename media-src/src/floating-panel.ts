@@ -41,7 +41,16 @@ function onDocumentPointerDown(event: PointerEvent): void {
   dismissActivePanel('outside')
 }
 
-function onDocumentScroll(): void {
+function onDocumentScroll(event: Event): void {
+  const active = activePanel
+  const target = event.target
+  if (
+    active &&
+    target instanceof Node &&
+    (target === active.panel || active.panel.contains(target))
+  ) {
+    return
+  }
   dismissActivePanel('scroll')
 }
 

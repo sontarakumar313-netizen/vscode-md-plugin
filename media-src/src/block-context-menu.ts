@@ -8,6 +8,7 @@ import {
 import { t } from './lang'
 import { getWysiwygRoot } from './wysiwyg-dom'
 import { findInnermostDetailsBlocks } from './wysiwyg-details'
+import { openWysiwygFrontMatterSourceEditor } from './wysiwyg-front-matter'
 import { closeActiveWysiwygPopover } from './wysiwyg-popover'
 import { openWysiwygBlockSourceEditor } from './wysiwyg-source-editor'
 import {
@@ -20,12 +21,15 @@ const MENU_ID = 'vmd-block-context-menu'
 const DIRECT_BLOCK_SELECTOR = [
   'blockquote',
   WYSIWYG_ATOMIC_BLOCK_SELECTOR,
+  '.vditor-wysiwyg__block[data-type="yaml-front-matter"]',
 ].join(', ')
 
 type BlockContextKind =
   | 'quote'
   | 'alert'
   | 'details'
+  | 'details-title'
+  | 'front-matter'
   | WysiwygAtomicBlockKind
 
 interface BlockContextTarget {
@@ -51,7 +55,10 @@ function deleteLabelFor(kind: BlockContextKind): string {
     case 'alert':
       return t('deleteAlert')
     case 'details':
+    case 'details-title':
       return t('deleteDetails')
+    case 'front-matter':
+      return t('deleteFrontMatter')
     case 'code-block':
       return t('deleteCodeBlock')
     case 'math-block':
@@ -62,7 +69,10 @@ function deleteLabelFor(kind: BlockContextKind): string {
 }
 
 function editLabelFor(kind: BlockContextKind): string | null {
-  if (kind === 'html-block') return t('editHtmlSource')
+  if (kind === 'front-matter') return t('editSource')
+  if (kind === 'html-block' || kind === 'details-title') {
+    return t('editHtmlSource')
+  }
   return kind === 'code-block' || kind === 'math-block'
     ? t('editSource')
     : null
@@ -102,6 +112,7 @@ function createMenu(): HTMLDivElement {
 }
 
 function directBlockKind(block: HTMLElement): BlockContextKind | null {
+  if (block.dataset.type === 'yaml-front-matter') return 'front-matter'
   if (block.tagName === 'BLOCKQUOTE') {
     return block.classList.contains('vmd-alert') ||
       block.hasAttribute('data-vmd-alert')
@@ -126,9 +137,13 @@ function resolveContextTarget(target: Element): BlockContextTarget | null {
   }
 
   const detailsBlocks = findInnermostDetailsBlocks(root, target)
-  return detailsBlocks && detailsBlocks.length > 0
-    ? { kind: 'details', blocks: detailsBlocks }
-    : null
+  if (!detailsBlocks || detailsBlocks.length === 0) return null
+  const summary = target.closest<HTMLElement>('summary')
+  const titleHit = summary && detailsBlocks[0]?.contains(summary)
+  return {
+    kind: titleHit ? 'details-title' : 'details',
+    blocks: detailsBlocks,
+  }
 }
 
 function canReceiveCaret(
@@ -253,9 +268,13 @@ export function initBlockContextMenu(): void {
         block
           ?.querySelector<HTMLButtonElement>('.vmd-source-edit-button')
           ?.click()
+      } else if (block && current.kind === 'front-matter') {
+        openWysiwygFrontMatterSourceEditor(block)
       } else if (
         block &&
-        (current.kind === 'math-block' || current.kind === 'html-block')
+        (current.kind === 'details-title' ||
+          current.kind === 'math-block' ||
+          current.kind === 'html-block')
       ) {
         openWysiwygBlockSourceEditor(block)
       }
@@ -297,7 +316,8 @@ export function initBlockContextMenu(): void {
         return
       }
 
-      // The table menu is registered first and owns table-cell events.
+      // The table menu is registered first and owns Markdown table cells. Raw
+      // HTML table cells deliberately fall through to their HTML block here.
       if (event.defaultPrevented || !eventTarget) {
         hide()
         return

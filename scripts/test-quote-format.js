@@ -22,7 +22,9 @@ const {
   isTopLevelAlertLocation,
   sourceLineAt,
   toggleDefaultAlertAt,
+  toggleDefaultAlertRangeAt,
   toggleQuoteAt,
+  toggleQuoteRangeAt,
 } = compiledModule.exports
 
 function content(change) {
@@ -40,6 +42,66 @@ assert.strictEqual(
   content(toggleQuoteAt(nonEmpty, currentLine.start, 'NOTE', 'Alert content', 'current line')),
   'before\n> [!NOTE]\n> current line\nafter',
   'GitHub Alert must transform the caret line instead of inserting a template'
+)
+
+const selectedParagraphs = 'before\nfirst selected\n\nsecond selected\nafter'
+const selectedStart = selectedParagraphs.indexOf('first selected')
+const selectedEnd = selectedParagraphs.indexOf('second selected') +
+  'second selected'.length
+assert.strictEqual(
+  content(toggleQuoteRangeAt(
+    selectedParagraphs,
+    selectedStart,
+    selectedEnd,
+    null,
+    'first selected'
+  )),
+  'before\n> first selected\n>\n> second selected\nafter',
+  'plain quote must format every complete line in a multi-line selection'
+)
+assert.strictEqual(
+  content(toggleDefaultAlertRangeAt(
+    selectedParagraphs,
+    selectedStart,
+    selectedEnd,
+    'first selected'
+  )),
+  'before\n> [!NOTE]\n> first selected\n>\n> second selected\nafter',
+  'GitHub Alert must format every complete line in a multi-line selection'
+)
+const selectedQuote = '> first selected\n>\n> second selected'
+assert.strictEqual(
+  content(toggleQuoteRangeAt(
+    selectedQuote,
+    0,
+    selectedQuote.length,
+    null,
+    'first selected'
+  )),
+  'first selected\n\nsecond selected',
+  'quoting an entirely selected plain quote must toggle the complete range off'
+)
+const selectedAlert = '> [!WARNING] Custom title\n> first selected\n>\n> second selected'
+assert.strictEqual(
+  content(toggleQuoteRangeAt(
+    selectedAlert,
+    0,
+    selectedAlert.length,
+    null,
+    'first selected'
+  )),
+  '> first selected\n>\n> second selected',
+  'converting a selected Alert to a plain quote must remove its complete marker'
+)
+assert.strictEqual(
+  content(toggleDefaultAlertRangeAt(
+    selectedAlert,
+    0,
+    selectedAlert.length,
+    'first selected'
+  )),
+  'first selected\n\nsecond selected',
+  'toggling a selected active Alert must unwrap its complete body'
 )
 
 const empty = 'before\n\nafter'
@@ -180,14 +242,44 @@ assert.strictEqual(
 const multiLine = '> first\n> second'
 assert.strictEqual(
   content(adjustPlainQuoteDepthAt(multiLine, multiLine.indexOf('second'), false)),
-  '> first\n> > second',
-  'Tab must add one marker only to the caret line'
+  '> > first\n> > second',
+  'Tab must indent every line in one compact quote paragraph'
 )
 const nested = '> first\n> > second'
 assert.strictEqual(
   content(adjustPlainQuoteDepthAt(nested, nested.indexOf('second'), true)),
   '> first\n> second',
   'Shift+Tab must remove one marker only from the caret line'
+)
+const renderedNested = '> first\n>\n> > second\n> >'
+assert.strictEqual(
+  content(adjustPlainQuoteDepthAt(
+    renderedNested,
+    renderedNested.indexOf('second'),
+    true
+  )),
+  '> first\n>\n> second',
+  'Shift+Tab must preserve the blank line before a loose quote paragraph'
+)
+const renderedCompactNested = '> > first\n> > second\n> > third\n> >'
+assert.strictEqual(
+  content(adjustPlainQuoteDepthAt(
+    renderedCompactNested,
+    renderedCompactNested.indexOf('second'),
+    true
+  )),
+  '> first\n> second\n> third',
+  'Shift+Tab must outdent every line in one compact nested paragraph'
+)
+const renderedSingleNested = '> > only nested line\n> >'
+assert.strictEqual(
+  content(adjustPlainQuoteDepthAt(
+    renderedSingleNested,
+    renderedSingleNested.indexOf('only nested line'),
+    true
+  )),
+  '> only nested line',
+  'Shift+Tab must not retain a trailing empty nested quote'
 )
 assert.strictEqual(
   adjustPlainQuoteDepthAt('> only', 0, true),

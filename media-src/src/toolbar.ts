@@ -9,6 +9,7 @@ import {
 	restoreCaretAnchor,
 } from './caret-anchor'
 import { resolveDetailsSelectionRange } from './details-selection'
+import type { DetailsSelectionRange } from './details-selection'
 import { findInnermostDetailsBlocks } from './wysiwyg-details'
 import { t } from './lang'
 import { getScrollElement } from './scroll-target'
@@ -21,7 +22,11 @@ import {
 } from './quote-caret'
 import {
 	isTopLevelAlertLocation,
+	sourceLineAt,
 	toggleDefaultAlertAt,
+	toggleDefaultAlertRangeAt,
+	toggleQuoteAt,
+	toggleQuoteRangeAt,
 } from './quote-format'
 import type { QuoteSourceChange } from './quote-format'
 import { confirm } from './utils'
@@ -117,10 +122,40 @@ function applyQuoteSourceChange(
 	;(window as any).__vmdCommitProgrammaticEdit?.()
 }
 
-function canToggleTopLevelAlert(
+function multilineSelectionRange(
 	source: string,
 	context: NonNullable<ReturnType<typeof getEditorSelectionContext>>
+): DetailsSelectionRange | null {
+	if (context.range.collapsed) return null
+	const range = resolveDetailsSelectionRange(source, context)
+	return range && source.slice(range.start, range.end).includes('\n')
+		? range
+		: null
+}
+
+function rangeSupportsTopLevelAlert(
+	source: string,
+	range: DetailsSelectionRange
 ): boolean {
+	let line = sourceLineAt(source, range.start)
+	while (line.start < range.end) {
+		if (line.text.trim() && !isTopLevelAlertLocation(source, line.start)) {
+			return false
+		}
+		if (line.end >= source.length) break
+		line = sourceLineAt(source, line.end + 1)
+	}
+	return true
+}
+
+function canToggleTopLevelAlert(
+	source: string,
+	context: NonNullable<ReturnType<typeof getEditorSelectionContext>>,
+	selectionRange: DetailsSelectionRange | null
+): boolean {
+	if (selectionRange && !rangeSupportsTopLevelAlert(source, selectionRange)) {
+		return false
+	}
 	if (context.mode !== 'wysiwyg') {
 		const caret = resolveCaretLine(source, context)
 		return Boolean(
@@ -143,17 +178,56 @@ function canToggleTopLevelAlert(
 function toggleDefaultAlert(editor: typeof window.vditor): void {
 	const source = String(editor.getValue?.() || '')
 	const context = getEditorSelectionContext(editor)
-	if (!context || !canToggleTopLevelAlert(source, context)) return
+	if (!context) return
+	const selectionRange = multilineSelectionRange(source, context)
+	if (!canToggleTopLevelAlert(source, context, selectionRange)) return
 	const caret = resolveCaretLine(source, context)
 	if (!caret) return
 
-	const change = toggleDefaultAlertAt(
-		source,
-		caret.line.start,
-		t('alertContent'),
-		caret.renderedText
-	)
+	const change = selectionRange
+		? toggleDefaultAlertRangeAt(
+			source,
+			selectionRange.start,
+			selectionRange.end,
+			caret.renderedText
+		)
+		: toggleDefaultAlertAt(
+			source,
+			caret.line.start,
+			t('alertContent'),
+			caret.renderedText
+		)
 	applyQuoteSourceChange(editor, change, context, caret.renderedOffset)
+}
+
+/** Handles Alert conversion and multi-line ranges before Vditor's quote click. */
+function toggleSpecialPlainQuote(editor: typeof window.vditor): boolean {
+	const source = String(editor.getValue?.() || '')
+	const context = getEditorSelectionContext(editor)
+	if (!context) return false
+	const caret = resolveCaretLine(source, context)
+	if (!caret) return false
+	const selectionRange = multilineSelectionRange(source, context)
+	if (!selectionRange && caret.quoteBlock?.type === null) return false
+	if (!selectionRange && !caret.quoteBlock) return false
+
+	const change = selectionRange
+		? toggleQuoteRangeAt(
+			source,
+			selectionRange.start,
+			selectionRange.end,
+			null,
+			caret.renderedText
+		)
+		: toggleQuoteAt(
+			source,
+			caret.line.start,
+			null,
+			'',
+			caret.renderedText
+		)
+	applyQuoteSourceChange(editor, change, context, caret.renderedOffset)
+	return true
 }
 
 function gapBeforeBlock(value: string): string {
@@ -255,6 +329,25 @@ export function installToolbarSelectionPreserver(editor: any): void {
 	toolbarElement.addEventListener(
 		'pointerdown',
 		() => preserveEditorSelectionForToolbar(editor),
+		true
+	)
+	toolbarElement.addEventListener(
+		'click',
+		(event) => {
+			const target = event.target
+			const quoteButton = target instanceof Element
+				? target.closest<HTMLElement>('[data-type="quote"]')
+				: null
+			if (
+				!quoteButton ||
+				!toolbarElement.contains(quoteButton) ||
+				!toggleSpecialPlainQuote(editor)
+			) {
+				return
+			}
+			event.preventDefault()
+			event.stopImmediatePropagation()
+		},
 		true
 	)
 	selectionPreserverToolbars.add(toolbarElement)

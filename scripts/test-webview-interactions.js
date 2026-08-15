@@ -783,6 +783,20 @@ function testPage() {
             headingLevelButton.getAttribute('aria-haspopup') === 'menu',
           'the heading pseudo label was not replaced by an accessible level control'
         );
+        heading.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          button: 2,
+          clientX: 44,
+          clientY: 44,
+        }));
+        await pause();
+        expect(
+          getComputedStyle(
+            document.getElementById('vmd-block-context-menu')
+          ).display === 'none',
+          'a Markdown heading exposed the removed block context menu'
+        );
         const headingText = Array.from(heading.childNodes).find(
           (node) => node.nodeType === Node.TEXT_NODE && node.textContent.includes('Heading')
         );
@@ -1685,6 +1699,10 @@ function testPage() {
         // and retain title editing without discarding the existing alt value.
         await setMarkdown('before ![kept alt](assets/a-very-long-image-file-name.png "Old title") after');
         const renderedImage = root().querySelector('img');
+        expect(
+          getComputedStyle(renderedImage).display !== 'block',
+          'an ordinary local Markdown image retained the removed centered layout'
+        );
         renderedImage.dispatchEvent(new MouseEvent('click', {
           bubbles: true,
           cancelable: true,
@@ -2375,6 +2393,52 @@ function testPage() {
             getComputedStyle(detailsTitleButton).display !== 'none' &&
             !detailsOpener.querySelector('.vmd-details-title-edit'),
           'closed details did not provide the separate title popover control'
+        );
+        detailsSummary.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          button: 2,
+          clientX: 48,
+          clientY: 48,
+        }));
+        await pause();
+        const detailsTitleContextMenu = document.getElementById(
+          'vmd-block-context-menu'
+        );
+        const detailsTitleContextActions = Array.from(
+          detailsTitleContextMenu.querySelectorAll('button[data-type]')
+        );
+        expect(
+          detailsTitleContextMenu.dataset.kind === 'details-title' &&
+            getComputedStyle(detailsTitleContextMenu).display !== 'none' &&
+            detailsTitleContextActions.length === 2 &&
+            detailsTitleContextActions[0].dataset.type === 'edit-block-source' &&
+            detailsTitleContextActions[1].dataset.type === 'delete-block',
+          'the details title context menu did not expose source editing and deletion'
+        );
+        detailsTitleContextActions[0].click();
+        await pause();
+        const detailsSourcePopover = document.querySelector(
+          '.vditor-wysiwyg > .vmd-source-popover'
+        );
+        const detailsSourceInput = detailsSourcePopover?.querySelector(
+          '[name="source"]'
+        );
+        expect(
+          detailsSourceInput instanceof HTMLTextAreaElement &&
+            detailsSourceInput.value.includes('<details>') &&
+            detailsSourceInput.value.includes('<summary>Title</summary>'),
+          'the details title source action did not expose its HTML opener source'
+        );
+        document.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause();
+        expect(
+          window.vditor.getValue().includes('<summary>Title</summary>'),
+          'closing an unchanged details source editor changed the document'
         );
         collapsedToggle.click();
         await pause(100);
@@ -3382,6 +3446,146 @@ function testPage() {
             JSON.stringify(window.vditor.getValue())
         );
 
+        await setMarkdown(lines(
+          '---',
+          'title: Front Matter menu',
+          'published: true',
+          '---',
+          '',
+          'Front Matter body'
+        ));
+        await pause(100);
+        let frontMatterBlock = root().querySelector(
+          ':scope > .vditor-wysiwyg__block[data-type="yaml-front-matter"]'
+        );
+        let frontMatterPreview = frontMatterBlock.querySelector(
+          ':scope > .vditor-wysiwyg__preview'
+        );
+        const frontMatterCell = frontMatterPreview.querySelector('td');
+        const frontMatterPointer = new PointerEvent('pointerdown', {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        });
+        frontMatterCell.dispatchEvent(frontMatterPointer);
+        const frontMatterClick = new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        });
+        frontMatterCell.dispatchEvent(frontMatterClick);
+        await pause();
+        sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        expect(
+          !frontMatterPointer.defaultPrevented &&
+            !frontMatterClick.defaultPrevented &&
+            getComputedStyle(frontMatterCell).cursor === 'text' &&
+            sourcePopover?.style.display !== 'block',
+          'Front Matter did not preserve native text selection without opening source'
+        );
+        frontMatterCell.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          button: 2,
+          clientX: 48,
+          clientY: 48,
+        }));
+        await pause();
+        const frontMatterBlockMenu = document.getElementById(
+          'vmd-block-context-menu'
+        );
+        const frontMatterTableMenu = document.getElementById(
+          'vmd-table-context-menu'
+        );
+        let frontMatterActions = Array.from(
+          frontMatterBlockMenu.querySelectorAll('button[data-type]')
+        );
+        expect(
+          frontMatterBlockMenu.dataset.kind === 'front-matter' &&
+            getComputedStyle(frontMatterBlockMenu).display !== 'none' &&
+            getComputedStyle(frontMatterTableMenu).display === 'none' &&
+            frontMatterActions.length === 2 &&
+            frontMatterActions[0].dataset.type === 'edit-block-source' &&
+            frontMatterActions[1].dataset.type === 'delete-block',
+          'Front Matter did not use its dedicated source/delete block menu'
+        );
+        frontMatterActions[0].click();
+        await pause();
+        sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        const frontMatterSource = sourcePopover.querySelector('[name="source"]');
+        expect(
+          frontMatterSource instanceof HTMLTextAreaElement &&
+            frontMatterSource.value.includes('title: Front Matter menu') &&
+            frontMatterSource.value.includes('published: true'),
+          'the Front Matter context action did not open its YAML source'
+        );
+        document.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause(80);
+        frontMatterBlock = root().querySelector(
+          ':scope > .vditor-wysiwyg__block[data-type="yaml-front-matter"]'
+        );
+        frontMatterPreview = frontMatterBlock.querySelector(
+          ':scope > .vditor-wysiwyg__preview'
+        );
+        frontMatterPreview.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          button: 2,
+          clientX: 48,
+          clientY: 48,
+        }));
+        await pause();
+        frontMatterActions = Array.from(
+          frontMatterBlockMenu.querySelectorAll('button[data-type]')
+        );
+        frontMatterActions[1].click();
+        await pause(100);
+        expect(
+          window.vditor.getValue().replace(/\\n+$/, '') === 'Front Matter body' &&
+            !root().querySelector('[data-type="yaml-front-matter"]'),
+          'deleting Front Matter left its YAML block in the document: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
+
+        await setMarkdown(
+          '<table><thead><tr><th>HTML heading</th></tr></thead>' +
+            '<tbody><tr><td>HTML cell</td></tr></tbody></table>'
+        );
+        await pause(80);
+        const rawHtmlTableCell = root().querySelector('table td');
+        rawHtmlTableCell.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          button: 2,
+          clientX: 48,
+          clientY: 48,
+        }));
+        await pause();
+        const rawHtmlTableBlockMenu = document.getElementById(
+          'vmd-block-context-menu'
+        );
+        const rawHtmlTableMenu = document.getElementById(
+          'vmd-table-context-menu'
+        );
+        expect(
+          rawHtmlTableBlockMenu.dataset.kind === 'html-block' &&
+            getComputedStyle(rawHtmlTableBlockMenu).display !== 'none' &&
+            getComputedStyle(rawHtmlTableMenu).display === 'none' &&
+            rawHtmlTableBlockMenu.querySelector(
+              'button[data-type="edit-block-source"]'
+            ),
+          'a raw HTML table cell did not fall through to HTML source editing'
+        );
+        document.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }));
+
         await setMarkdown('| menu | priority |\\n| --- | --- |\\n| table | cell |');
         const contextTableCell = root().querySelector('td');
         contextTableCell.dispatchEvent(new MouseEvent('contextmenu', {
@@ -3400,6 +3604,20 @@ function testPage() {
               .classList.contains('vmd-table-context-menu__current'),
           'the table menu lost priority or did not recognize implicit default alignment'
         );
+        expect(
+          !tableContextMenu.querySelector('button[data-type="editSource"]'),
+          'the Markdown table menu retained its removed source action'
+        );
+        tableContextMenu.style.maxHeight = '120px';
+        tableContextMenu.scrollTop = 64;
+        tableContextMenu.dispatchEvent(new Event('scroll'));
+        await pause();
+        expect(
+          tableContextMenu.scrollTop > 0 &&
+            getComputedStyle(tableContextMenu).display !== 'none',
+          'scrolling inside the table menu closed it or reset its scroll position'
+        );
+        tableContextMenu.style.removeProperty('max-height');
         const tableMenuArrowDown = () =>
           (document.activeElement instanceof HTMLElement
             ? document.activeElement
@@ -3581,6 +3799,107 @@ function testPage() {
           'the independent Alert button did not remove an active non-Note Alert'
         );
 
+        await setMarkdown(
+          'before alert quote\\n\\n> [!WARNING] Custom title\\n' +
+            '> alert converted to quote\\n\\nafter alert quote'
+        );
+        await pause(80);
+        const alertToQuoteBlock = root().querySelector(
+          ':scope > blockquote.vmd-alert--warning'
+        );
+        const alertToQuoteWalker = document.createTreeWalker(
+          alertToQuoteBlock,
+          NodeFilter.SHOW_TEXT
+        );
+        let alertToQuoteText = alertToQuoteWalker.nextNode();
+        while (
+          alertToQuoteText &&
+          !alertToQuoteText.data.includes('alert converted to quote')
+        ) {
+          alertToQuoteText = alertToQuoteWalker.nextNode();
+        }
+        expect(alertToQuoteText, 'the Alert-to-Quote fixture has no body text');
+        select(alertToQuoteText, 6, alertToQuoteText, 6);
+        nativeQuoteButton.click();
+        await pause(80);
+        expect(
+          currentQuoteValue() ===
+            'before alert quote\\n\\n> alert converted to quote\\n\\nafter alert quote' &&
+            !currentQuoteValue().includes('[!WARNING]') &&
+            caretBlockquote()?.textContent.includes('alert converted to quote'),
+          'the Quote button retained an Alert marker instead of converting it in place: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
+
+        const selectAcrossParagraphs = (firstText, secondText) => {
+          const paragraphs = Array.from(root().querySelectorAll(':scope > p'));
+          const first = paragraphs.find((item) => item.textContent === firstText);
+          const second = paragraphs.find((item) => item.textContent === secondText);
+          expect(first && second, 'the multi-line quote fixture lost a paragraph');
+          const firstNode = textNode(first);
+          const secondNode = textNode(second);
+          select(firstNode, 0, secondNode, secondNode.data.length);
+        };
+        const multiLinePlainSource =
+          'before multi-line\\n\\nfirst selected paragraph\\n\\n' +
+          'second selected paragraph\\n\\nafter multi-line';
+        const multiLinePlainExpected =
+          'before multi-line\\n\\nfirst selected paragraph\\n\\n' +
+          'second selected paragraph\\n\\nafter multi-line';
+
+        await setMarkdown(multiLinePlainSource);
+        selectAcrossParagraphs(
+          'first selected paragraph',
+          'second selected paragraph'
+        );
+        nativeQuoteButton.click();
+        await pause(80);
+        expect(
+          currentQuoteValue() ===
+            'before multi-line\\n\\n> first selected paragraph\\n>\\n' +
+              '> second selected paragraph\\n\\nafter multi-line',
+          'the Quote button did not format the complete multi-line selection: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
+        const selectedQuoteParagraphs = root().querySelectorAll(
+          ':scope > blockquote > p'
+        );
+        const selectedQuoteFirst = textNode(selectedQuoteParagraphs[0]);
+        const selectedQuoteSecond = textNode(selectedQuoteParagraphs[1]);
+        select(
+          selectedQuoteFirst,
+          0,
+          selectedQuoteSecond,
+          selectedQuoteSecond.data.length
+        );
+        nativeQuoteButton.click();
+        await pause(80);
+        expect(
+          currentQuoteValue() === multiLinePlainExpected,
+          'the Quote button did not toggle the complete selected quote off'
+        );
+
+        await setMarkdown(multiLinePlainSource);
+        selectAcrossParagraphs(
+          'first selected paragraph',
+          'second selected paragraph'
+        );
+        alertButton.click();
+        await pause(80);
+        expect(
+          currentQuoteValue() ===
+            'before multi-line\\n\\n> [!NOTE]\\n> first selected paragraph\\n>\\n' +
+              '> second selected paragraph\\n\\nafter multi-line',
+          'the Alert button did not format the complete multi-line selection: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
+        alertButton.click();
+        await pause(80);
+        expect(
+          currentQuoteValue() === multiLinePlainExpected,
+          'the Alert button did not toggle the complete selected Alert off'
+        );
+
         await setMarkdown('> [!NOTE]\\n> first duplicate alert\\n\\n> [!NOTE]\\n> second duplicate alert');
         await pause(80);
         const duplicateAlerts = root().querySelectorAll(':scope > blockquote.vmd-alert');
@@ -3624,8 +3943,8 @@ function testPage() {
           .filter((line) => !/^>+\\s*$/.test(line));
         expect(
           quoteContentLines().join('\\n').replace(/> >/g, '>>') ===
-            '> first quote line\\n>> second quote line',
-          'Tab indented more than the caret line in a plain quote: ' +
+            '>> first quote line\\n>> second quote line',
+          'Tab did not indent the complete compact quote paragraph: ' +
             JSON.stringify(window.vditor.getValue())
         );
         secondQuoteText = textNode(root().querySelector('blockquote blockquote p'));
@@ -3638,9 +3957,89 @@ function testPage() {
         }));
         await pause(80);
         expect(
-          quoteContentLines().join('\\n') === '> first quote line\\n> second quote line',
-          'Shift+Tab did not remove exactly one quote marker from the caret line: ' +
+          currentQuoteValue() === '> first quote line\\n> second quote line' &&
+            !root().querySelector('blockquote blockquote:empty'),
+          'Shift+Tab retained a structural line or empty nested quote: ' +
+            JSON.stringify({
+              value: window.vditor.getValue(),
+              block: root().querySelector(':scope > blockquote')?.outerHTML,
+            })
+        );
+
+        await setMarkdown('> loose first\\n>\\n> loose second');
+        let looseQuoteParagraphs = root().querySelectorAll(
+          ':scope > blockquote > p'
+        );
+        let looseQuoteText = textNode(looseQuoteParagraphs[1]);
+        select(looseQuoteText, 4, looseQuoteText, 4);
+        looseQuoteText.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Tab',
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause(80);
+        expect(
+          quoteContentLines().join('\\n').replace(/> >/g, '>>') ===
+            '> loose first\\n>> loose second',
+          'Tab changed a different loose quote paragraph: ' +
             JSON.stringify(window.vditor.getValue())
+        );
+        looseQuoteText = textNode(root().querySelector('blockquote blockquote p'));
+        select(looseQuoteText, 4, looseQuoteText, 4);
+        looseQuoteText.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Tab',
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause(80);
+        expect(
+          currentQuoteValue() === '> loose first\\n>\\n> loose second',
+          'Tab followed by Shift+Tab compacted a loose quote: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
+
+        await setMarkdown('> only quote Tab cycle');
+        let quoteTabCycleText = textNode(root().querySelector('blockquote p'));
+        select(quoteTabCycleText, 4, quoteTabCycleText, 4);
+        quoteTabCycleText.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Tab',
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause(80);
+        expect(
+          quoteContentLines().join('\\n').replace(/> >/g, '>>') ===
+            '>> only quote Tab cycle',
+          'Tab did not create exactly one nested quote level'
+        );
+        quoteTabCycleText = textNode(root().querySelector('blockquote blockquote p'));
+        select(quoteTabCycleText, 4, quoteTabCycleText, 4);
+        quoteTabCycleText.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Tab',
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause(80);
+        expect(
+          currentQuoteValue() === '> only quote Tab cycle' &&
+            !root().querySelector('blockquote blockquote:empty'),
+          'Tab followed by Shift+Tab left an empty second-level quote: ' +
+            JSON.stringify(root().querySelector(':scope > blockquote')?.outerHTML)
+        );
+        window.vditor.vditor.undo.undo(window.vditor.vditor);
+        await pause(80);
+        expect(
+          quoteContentLines().join('\\n').replace(/> >/g, '>>') ===
+            '>> only quote Tab cycle',
+          'one undo did not restore the Tab quote indentation'
+        );
+        window.vditor.vditor.undo.undo(window.vditor.vditor);
+        await pause(80);
+        expect(
+          currentQuoteValue() === '> only quote Tab cycle',
+          'the second undo did not restore the original quote depth'
         );
 
         await setMarkdown('> first formatted quote\\n> **second formatted quote**');
@@ -3657,10 +4056,11 @@ function testPage() {
           .split('\\n')
           .filter((line) => !/^>+\\s*$/.test(line));
         expect(
-          formattedQuoteLines[0] === '> first formatted quote' &&
+          formattedQuoteLines[0]?.replace(/> >/g, '>>') ===
+            '>> first formatted quote' &&
             formattedQuoteLines[1]?.replace(/> >/g, '>>') ===
               '>> **second formatted quote**',
-          'Tab changed the wrong source line for formatted quote text: ' +
+          'Tab did not indent the complete formatted quote paragraph: ' +
             JSON.stringify(window.vditor.getValue())
         );
 
@@ -3865,9 +4265,9 @@ function testPage() {
         );
 
         // A caret can land inside serializer-owned ordinary-code previews.
-        // Destructive input now opens the exact in-place editor and edits at
-        // that caret; whole-block clipboard/deletion remains available after an
-        // explicit complete-code selection.
+        // Destructive input opens the exact in-place editor at that caret but
+        // does not replay the activation key; whole-block clipboard/deletion
+        // remains available after an explicit complete-code selection.
         const protectedCodeMarkdown =
           markerFence + 'js\\nconst protectedValue = true;\\n' + markerFence;
         await setMarkdown(protectedCodeMarkdown);
@@ -3892,13 +4292,17 @@ function testPage() {
         const protectedSourcePopover = document.querySelector(
           '.vmd-source-popover--code-overlay'
         );
+        const protectedOverlayContent = protectedSourcePopover?.querySelector(
+          '[name="content"]'
+        );
         expect(
           firstProtectedDelete.defaultPrevented &&
             protectedSourcePopover?.style.display === 'block' &&
-            protectedSourcePopover.querySelector('[name="content"]')?.value ===
-              'constprotectedValue = true;' &&
+            protectedOverlayContent?.value === 'const protectedValue = true;' &&
+            protectedOverlayContent.selectionStart === 6 &&
+            protectedOverlayContent.selectionEnd === 6 &&
             !protectedCodeBlock?.classList.contains('vmd-code-block--selected'),
-          'Backspace inside ordinary code did not edit at the caret in place: ' +
+          'Backspace inside ordinary code did not enter editing without replay: ' +
             JSON.stringify({
               prevented: firstProtectedDelete.defaultPrevented,
               value: window.vditor.getValue(),
@@ -3911,8 +4315,6 @@ function testPage() {
           bubbles: true,
           cancelable: true,
         }));
-        await pause(80);
-        window.vditor.vditor.undo.undo(window.vditor.vditor);
         await pause(100);
         protectedCodeBlock = root().querySelector(
           ':scope > .vditor-wysiwyg__block[data-type="code-block"]'
@@ -4568,6 +4970,7 @@ function testPage() {
           'disabled Split View shortcuts emitted save-options'
         );
         const svQuoteValue = () => window.vditor.getValue().replace(/\\n+$/, '');
+        const normalizedSvQuoteValue = () => svQuoteValue().replace(/^> +$/gm, '>');
         const findSvText = (value) => {
           const walker = document.createTreeWalker(svRoot, NodeFilter.SHOW_TEXT);
           for (let node = walker.nextNode(); node; node = walker.nextNode()) {
@@ -4644,6 +5047,49 @@ function testPage() {
         expect(
           svQuoteValue() === 'SV before\\n\\nSV current\\nSV after',
           'Split View active Alert did not toggle off in place: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
+
+        const svMultiLineSource =
+          'SV multi before\\n\\nSV first selected\\n\\n' +
+          'SV second selected\\n\\nSV multi after';
+        await setMarkdown(svMultiLineSource);
+        let svFirstSelected = findSvText('SV first selected');
+        let svSecondSelected = findSvText('SV second selected');
+        select(
+          svFirstSelected,
+          svFirstSelected.data.indexOf('SV first selected'),
+          svSecondSelected,
+          svSecondSelected.data.indexOf('SV second selected') +
+            'SV second selected'.length
+        );
+        nativeQuoteButton.click();
+        await pause(80);
+        expect(
+          normalizedSvQuoteValue() ===
+            'SV multi before\\n\\n> SV first selected\\n>\\n' +
+              '> SV second selected\\n\\nSV multi after',
+          'Split View Quote did not format the complete multi-line selection: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
+
+        await setMarkdown(svMultiLineSource);
+        svFirstSelected = findSvText('SV first selected');
+        svSecondSelected = findSvText('SV second selected');
+        select(
+          svFirstSelected,
+          svFirstSelected.data.indexOf('SV first selected'),
+          svSecondSelected,
+          svSecondSelected.data.indexOf('SV second selected') +
+            'SV second selected'.length
+        );
+        alertButton.click();
+        await pause(80);
+        expect(
+          normalizedSvQuoteValue() ===
+            'SV multi before\\n\\n> [!NOTE]\\n> SV first selected\\n>\\n' +
+              '> SV second selected\\n\\nSV multi after',
+          'Split View Alert did not format the complete multi-line selection: ' +
             JSON.stringify(window.vditor.getValue())
         );
 
@@ -4985,29 +5431,65 @@ function testPage() {
           'clicking highlighted code or its language opened an editor or exposed source'
         );
 
-        // Delete and printable input at a rendered-code selection enter the
-        // exact in-place editor and apply the triggering key. They must not use
-        // the atomic block's former select-first deletion path.
-        selectTextOccurrence(codePreviewCode, 'a');
-        const deleteTargetRect = codeBlock.getBoundingClientRect();
-        codePreviewCode.dispatchEvent(new KeyboardEvent('keydown', {
-          key: 'Delete',
+        // IME composition enters the exact editor without canceling the
+        // browser's composition default. Ordinary activation keys still open
+        // the editor without being replayed into its content.
+        selectTextOccurrence(codePreviewCode, 'const a', true);
+        const imeCodeActivation = new KeyboardEvent('keydown', {
+          key: 'Process',
           bubbles: true,
           cancelable: true,
-        }));
+        });
+        Object.defineProperty(imeCodeActivation, 'isComposing', { value: true });
+        Object.defineProperty(imeCodeActivation, 'keyCode', { value: 229 });
+        codePreviewCode.dispatchEvent(imeCodeActivation);
         await pause();
         sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
         let keyboardContent = sourcePopover.querySelector('[name="content"]');
+        expect(
+          !imeCodeActivation.defaultPrevented &&
+            sourcePopover.dataset.vmdPosition === 'code-overlay' &&
+            keyboardContent.value.includes('const a = 1;') &&
+            keyboardContent.selectionStart === 7 &&
+            keyboardContent.selectionEnd === 7 &&
+            document.activeElement === keyboardContent,
+          'IME composition did not enter the ordinary code editor safely'
+        );
+        document.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+        }));
+        await pause(100);
+
+        codeBlock = root().querySelector(
+          '.vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        codePreview = codeBlock.querySelector(':scope > .vditor-wysiwyg__preview');
+        codePreviewCode = codePreview.querySelector(':scope > code');
+        selectTextOccurrence(codePreviewCode, 'a');
+        const deleteTargetRect = codeBlock.getBoundingClientRect();
+        const deleteActivation = new KeyboardEvent('keydown', {
+          key: 'Delete',
+          bubbles: true,
+          cancelable: true,
+        });
+        codePreviewCode.dispatchEvent(deleteActivation);
+        await pause();
+        sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        keyboardContent = sourcePopover.querySelector('[name="content"]');
         let keyboardPopoverRect = sourcePopover.getBoundingClientRect();
         expect(
-          sourcePopover.dataset.vmdPosition === 'code-overlay' &&
-            keyboardContent.value.includes('const  = 1;') &&
+          deleteActivation.defaultPrevented &&
+            sourcePopover.dataset.vmdPosition === 'code-overlay' &&
+            keyboardContent.value.includes('const a = 1;') &&
+            keyboardContent.selectionStart === 6 &&
+            keyboardContent.selectionEnd === 7 &&
             !codeBlock.classList.contains('vmd-code-block--selected') &&
             Math.abs(keyboardPopoverRect.left - deleteTargetRect.left) <= 2 &&
             Math.abs(keyboardPopoverRect.top - deleteTargetRect.top) <= 2 &&
             Math.abs(keyboardPopoverRect.width - deleteTargetRect.width) <= 2 &&
             Math.abs(keyboardPopoverRect.height - deleteTargetRect.height) <= 2,
-          'Delete inside ordinary code selected the whole block or failed to open an exact editor: ' +
+          'Delete inside ordinary code replayed the key or failed to open an exact editor: ' +
             JSON.stringify({
               content: keyboardContent?.value,
               selected: codeBlock.className,
@@ -5023,8 +5505,6 @@ function testPage() {
         );
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
         await pause(100);
-        window.vditor.vditor.undo.undo(window.vditor.vditor);
-        await pause(100);
 
         codeBlock = root().querySelector(
           '.vditor-wysiwyg__block[data-type="code-block"]'
@@ -5033,24 +5513,59 @@ function testPage() {
         codePreview = codeBlock.querySelector(':scope > .vditor-wysiwyg__preview');
         codePreviewCode = codePreview.querySelector(':scope > code');
         selectTextOccurrence(codePreviewCode, 'const a', true);
-        codePreviewCode.dispatchEvent(new KeyboardEvent('keydown', {
+        const printableActivation = new KeyboardEvent('keydown', {
           key: 'X',
           bubbles: true,
           cancelable: true,
-        }));
+        });
+        codePreviewCode.dispatchEvent(printableActivation);
         await pause();
         sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
         keyboardContent = sourcePopover.querySelector('[name="content"]');
         expect(
-          sourcePopover.dataset.vmdPosition === 'code-overlay' &&
-            keyboardContent.value.includes('const aX = 1;') &&
+          printableActivation.defaultPrevented &&
+            sourcePopover.dataset.vmdPosition === 'code-overlay' &&
+            keyboardContent.value.includes('const a = 1;') &&
+            keyboardContent.selectionStart === 7 &&
+            keyboardContent.selectionEnd === 7 &&
             document.activeElement === keyboardContent,
-          'printable input inside ordinary code did not enter editing at the rendered caret'
+          'printable input inside ordinary code replayed the key or lost the caret'
         );
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
         await pause(100);
-        window.vditor.vditor.undo.undo(window.vditor.vditor);
-        await pause(100);
+
+        for (const activationKey of ['Enter', 'Tab']) {
+          codeBlock = root().querySelector(
+            '.vditor-wysiwyg__block[data-type="code-block"]'
+          );
+          codePreviewCode = codeBlock.querySelector(
+            ':scope > .vditor-wysiwyg__preview > code'
+          );
+          selectTextOccurrence(codePreviewCode, 'const a', true);
+          const activationEvent = new KeyboardEvent('keydown', {
+            key: activationKey,
+            bubbles: true,
+            cancelable: true,
+          });
+          codePreviewCode.dispatchEvent(activationEvent);
+          await pause();
+          sourcePopover = document.querySelector(
+            '.vditor-wysiwyg > .vmd-source-popover'
+          );
+          keyboardContent = sourcePopover.querySelector('[name="content"]');
+          expect(
+            activationEvent.defaultPrevented &&
+              keyboardContent.value.includes('const a = 1;') &&
+              keyboardContent.selectionStart === 7 &&
+              keyboardContent.selectionEnd === 7,
+            activationKey + ' was replayed after opening the code editor'
+          );
+          document.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'Escape',
+            bubbles: true,
+          }));
+          await pause(100);
+        }
 
         codeBlock = root().querySelector(
           '.vditor-wysiwyg__block[data-type="code-block"]'

@@ -435,11 +435,6 @@ body {
   box-shadow: 0 12px 30px rgba(72, 61, 43, 0.14);
 }
 
-#app.vditor .vditor-reset img:not(.emoji) {
-  display: block;
-  margin-inline: auto;
-}
-
 #app.vditor .vditor-reset kbd {
   color: var(--paper-text);
   background: #eee8dc;

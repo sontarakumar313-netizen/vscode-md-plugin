@@ -54,6 +54,16 @@ export function attachFrontMatterSeparator(
 const BLOCK_SELECTOR =
   '.vditor-wysiwyg__block[data-type="yaml-front-matter"]'
 const PREVIEW_CLASS = 'vditor-wysiwyg__preview'
+const sourceEditorOpeners = new WeakMap<HTMLElement, () => void>()
+
+export function openWysiwygFrontMatterSourceEditor(
+  block: HTMLElement
+): boolean {
+  const open = sourceEditorOpeners.get(block)
+  if (!open || !block.isConnected) return false
+  open()
+  return true
+}
 
 /** The `<pre><code>` Vditor rendered, i.e. the editable source. */
 function getSourcePre(block: HTMLElement): HTMLElement | null {
@@ -118,6 +128,7 @@ export function initWysiwygFrontMatter(display: FrontMatterDisplay = 'table') {
     if (writing) return
     const block = findBlock(root)
     if (!block) return
+    sourceEditorOpeners.set(block, () => openEditor(block))
 
     writing = true
     try {
@@ -175,12 +186,11 @@ export function initWysiwygFrontMatter(display: FrontMatterDisplay = 'table') {
   const registration = registerWysiwygDomFeature({
     refresh,
     onPointerDown: (event, root) => {
-      if (mode === 'hide') return false
+      if (mode === 'hide' || event.button !== 0) return false
       const target = event.target instanceof Element ? event.target : null
       const block = findBlock(root)
       const preview = block ? getPreview(block) : null
       if (!target || !preview?.contains(target)) return false
-      event.preventDefault()
       event.stopImmediatePropagation()
       return true
     },
@@ -190,9 +200,7 @@ export function initWysiwygFrontMatter(display: FrontMatterDisplay = 'table') {
       const preview = block ? getPreview(block) : null
       const target = event.target instanceof Element ? event.target : null
       if (!block || !target || !preview?.contains(target)) return false
-      event.preventDefault()
       event.stopImmediatePropagation()
-      openEditor(block)
       return true
     },
   })

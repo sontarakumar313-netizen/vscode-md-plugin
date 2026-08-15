@@ -48,11 +48,31 @@ function isSourceListMarker(element: Element | null): boolean {
   return type === 'li-marker' || type === 'task-marker'
 }
 
+function removeEmptyNestedQuoteAfterCaret(editor: HTMLElement): void {
+  const selection = window.getSelection()
+  const focusNode = selection?.focusNode
+  if (!focusNode || !editor.contains(focusNode)) return
+  const line = closestInEditor(
+    focusNode,
+    'p, h1, h2, h3, h4, h5, h6, pre',
+    editor
+  )
+  const candidate = line?.nextElementSibling
+  if (
+    candidate?.matches('blockquote') &&
+    candidate.childElementCount === 0 &&
+    !candidate.textContent?.trim()
+  ) {
+    candidate.remove()
+  }
+}
+
 // ── Blockquote Tab indent / outdent ──────────────────────────────────────────
 
 /**
- * Adds or removes one marker on the caret line of a plain quote. GitHub Alerts
- * and a single remaining quote marker deliberately fall through as no-ops.
+ * Adds or removes one marker on every source line in the caret's compact plain
+ * quote paragraph. GitHub Alerts and a single remaining quote level deliberately
+ * fall through as no-ops.
  */
 function handleBlockquoteTab(vditor: any, event: KeyboardEvent): boolean {
   const editor = getVditorEditorElement(vditor)
@@ -88,6 +108,7 @@ function handleBlockquoteTab(vditor: any, event: KeyboardEvent): boolean {
       text: change.targetText,
       offset: Math.min(caret.renderedOffset, change.targetText.length),
     })
+    if (event.shiftKey) removeEmptyNestedQuoteAfterCaret(editor)
   }
   ;(window as any).__vmdCommitProgrammaticEdit?.()
   return true

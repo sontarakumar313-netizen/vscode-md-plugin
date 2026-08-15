@@ -80,6 +80,10 @@ function nextSourceLine(source: string, line: SourceLine): SourceLine | null {
   return sourceLineAt(source, line.end + 1)
 }
 
+function previousSourceLine(source: string, line: SourceLine): SourceLine | null {
+  return line.start > 0 ? sourceLineAt(source, line.start - 1) : null
+}
+
 function isQuoteLine(line: SourceLine): boolean {
   return QUOTE_PREFIX.test(line.text)
 }
@@ -288,6 +292,100 @@ export function toggleQuoteAt(
   }
 }
 
+function quoteRangeBounds(
+  source: string,
+  start: number,
+  end: number
+): { start: number; end: number } {
+  const first = sourceLineAt(source, start)
+  const last = sourceLineAt(
+    source,
+    end > first.start ? Math.max(first.start, end - 1) : first.start
+  )
+  return { start: first.start, end: last.end }
+}
+
+function quoteBlockForRange(
+  source: string,
+  start: number,
+  end: number
+): QuoteBlock | null {
+  return findQuoteBlocks(source).find(
+    (block) => block.start === start && block.end === end
+  ) || null
+}
+
+function isAlertMarkerLine(line: string): boolean {
+  return alertMarkerType(line) !== null
+}
+
+function normalizeQuotedRangeLine(line: string): string {
+  const content = stripQuotePrefixes(line)
+  return content.trim() ? quoteBodyLine(content) : '>'
+}
+
+function buildQuotedRange(lines: string[], type: QuoteType): string {
+  const bodyLines = lines.filter((line) => !isAlertMarkerLine(line))
+  const body = bodyLines.map(normalizeQuotedRangeLine).join('\n')
+  return type === null ? body : `> [!${type}]\n${body}`
+}
+
+/** Toggles every complete source line touched by a multi-line selection. */
+export function toggleQuoteRangeAt(
+  source: string,
+  start: number,
+  end: number,
+  type: QuoteType,
+  targetText: string
+): QuoteSourceChange {
+  const range = quoteRangeBounds(source, start, end)
+  const block = quoteBlockForRange(source, range.start, range.end)
+  if (block) {
+    return toggleQuoteAt(source, block.start, type, '', targetText)
+  }
+
+  const lines = source.slice(range.start, range.end).split('\n')
+  const hasAlertMarker = lines.some(isAlertMarkerLine)
+  const allQuoted = lines.every(
+    (line) => !line.trim() || QUOTE_PREFIX.test(line)
+  )
+  const replacement =
+    type === null && allQuoted && !hasAlertMarker
+      ? lines
+        .map((line) => line.trim() ? removeOneQuotePrefix(line) : '')
+        .join('\n')
+      : buildQuotedRange(lines, type)
+  const targetInReplacement = findTargetOffset(replacement, targetText, 0)
+  return {
+    content: replaceSourceRange(
+      source,
+      range.start,
+      range.end,
+      replacement
+    ),
+    targetText,
+    targetSourceOffset: range.start + targetInReplacement,
+  }
+}
+
+/** Toggles one default NOTE Alert over a complete multi-line selection. */
+export function toggleDefaultAlertRangeAt(
+  source: string,
+  start: number,
+  end: number,
+  targetText: string
+): QuoteSourceChange {
+  const range = quoteRangeBounds(source, start, end)
+  const activeType = quoteBlockForRange(source, range.start, range.end)?.type
+  return toggleQuoteRangeAt(
+    source,
+    range.start,
+    range.end,
+    activeType ?? 'NOTE',
+    targetText
+  )
+}
+
 /** Toggles one default NOTE Alert button, regardless of the active Alert type. */
 export function toggleDefaultAlertAt(
   source: string,
@@ -305,6 +403,41 @@ export function toggleDefaultAlertAt(
   )
 }
 
+function hasQuoteParagraphContent(line: SourceLine): boolean {
+  return Boolean(stripQuotePrefixes(line.text).trim())
+}
+
+/** Complete source lines represented by the same compact quote paragraph. */
+function quoteParagraphAt(source: string, line: SourceLine): SourceLine[] {
+  const depth = quoteDepth(line.text)
+  let first = line
+  let previous = previousSourceLine(source, first)
+  while (
+    previous &&
+    quoteDepth(previous.text) === depth &&
+    hasQuoteParagraphContent(previous) &&
+    hasQuoteParagraphContent(first)
+  ) {
+    first = previous
+    previous = previousSourceLine(source, first)
+  }
+
+  const lines = [first]
+  let current = first
+  let next = nextSourceLine(source, current)
+  while (
+    next &&
+    quoteDepth(next.text) === depth &&
+    hasQuoteParagraphContent(current) &&
+    hasQuoteParagraphContent(next)
+  ) {
+    lines.push(next)
+    current = next
+    next = nextSourceLine(source, current)
+  }
+  return lines
+}
+
 export function adjustPlainQuoteDepthAt(
   source: string,
   lineStart: number,
@@ -317,16 +450,48 @@ export function adjustPlainQuoteDepthAt(
   const depth = quoteDepth(line.text)
   if (depth === 0 || (outdent && depth === 1)) return null
 
-  const replacement = outdent
-    ? removeOneQuotePrefix(line.text)
-    : `> ${line.text}`
+  const paragraph = quoteParagraphAt(source, line)
+  const targetLineIndex = paragraph.findIndex(
+    (candidate) => candidate.start === line.start
+  )
+  if (targetLineIndex < 0) return null
+
+  const transformedLines = paragraph.map((candidate) =>
+    outdent
+      ? removeOneQuotePrefix(candidate.text)
+      : `> ${candidate.text}`
+  )
+  const replacement = transformedLines.join('\n')
   const targetText = stripQuotePrefixes(line.text)
-  const targetInReplacement = replacement.indexOf(targetText)
+  const precedingLength = transformedLines
+    .slice(0, targetLineIndex)
+    .reduce((length, text) => length + text.length + 1, 0)
+  const targetInLine = transformedLines[targetLineIndex]?.indexOf(targetText) ?? -1
+
+  const first = paragraph[0]
+  const last = paragraph[paragraph.length - 1]
+  let replacementEnd = last.end
+  if (outdent) {
+    const next = nextSourceLine(source, last)
+    if (
+      next &&
+      quoteDepth(next.text) >= depth &&
+      !hasQuoteParagraphContent(next)
+    ) {
+      replacementEnd = next.end
+    }
+  }
+
   return {
-    content: replaceSourceRange(source, line.start, line.end, replacement),
+    content: replaceSourceRange(
+      source,
+      first.start,
+      replacementEnd,
+      replacement
+    ),
     targetText,
     targetSourceOffset:
-      line.start + (targetInReplacement < 0 ? 0 : targetInReplacement),
+      first.start + precedingLength + Math.max(0, targetInLine),
   }
 }
 

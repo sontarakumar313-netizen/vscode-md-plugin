@@ -127,7 +127,9 @@ export function createMenuController<Item extends HTMLElement>({
     if (nextIndex < 0) return
     event.preventDefault()
     event.stopPropagation()
-    items[nextIndex]?.focus({ preventScroll: true })
+    const nextItem = items[nextIndex]
+    nextItem?.focus({ preventScroll: true })
+    nextItem?.scrollIntoView({ block: 'nearest' })
   }
 
   menu.addEventListener('pointerdown', preserveSelection)

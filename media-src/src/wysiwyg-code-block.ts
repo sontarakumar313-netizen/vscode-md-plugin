@@ -63,13 +63,7 @@ interface CodeSourceSelection {
   end: number
 }
 
-type InitialCodeEdit =
-  | { kind: 'insert'; text: string; inputType: 'insertText' | 'insertLineBreak' }
-  | { kind: 'deleteBackward' }
-  | { kind: 'deleteForward' }
-
 interface KeyboardCodeEditRequest {
-  action: InitialCodeEdit | null
   allowDefault: boolean
 }
 
@@ -177,68 +171,16 @@ function currentCodeSourceSelection(
     : null
 }
 
-function previousCharacterStart(value: string, offset: number): number {
-  if (offset <= 0) return 0
-  const last = value.charCodeAt(offset - 1)
-  return (
-    last >= 0xdc00 &&
-    last <= 0xdfff &&
-    offset >= 2 &&
-    value.charCodeAt(offset - 2) >= 0xd800 &&
-    value.charCodeAt(offset - 2) <= 0xdbff
-  )
-    ? offset - 2
-    : offset - 1
-}
-
-function nextCharacterEnd(value: string, offset: number): number {
-  if (offset >= value.length) return value.length
-  const first = value.charCodeAt(offset)
-  return (
-    first >= 0xd800 &&
-    first <= 0xdbff &&
-    offset + 1 < value.length &&
-    value.charCodeAt(offset + 1) >= 0xdc00 &&
-    value.charCodeAt(offset + 1) <= 0xdfff
-  )
-    ? offset + 2
-    : offset + 1
-}
-
-function applyInitialCodeEdit(
+function focusCodeSourceSelection(
   control: HTMLTextAreaElement,
-  selection: CodeSourceSelection,
-  action: InitialCodeEdit | null
+  selection: CodeSourceSelection
 ): void {
   const length = control.value.length
-  let start = Math.min(selection.start, length)
-  let end = Math.min(selection.end, length)
   control.focus({ preventScroll: true })
-  control.setSelectionRange(start, end)
-  if (!action) return
-
-  let replacement = ''
-  let inputType: string
-  let data: string | null = null
-  if (action.kind === 'insert') {
-    replacement = action.text
-    inputType = action.inputType
-    data = action.text
-  } else if (action.kind === 'deleteBackward') {
-    if (start === end) start = previousCharacterStart(control.value, start)
-    inputType = 'deleteContentBackward'
-  } else {
-    if (start === end) end = nextCharacterEnd(control.value, end)
-    inputType = 'deleteContentForward'
-  }
-
-  if (start === end && replacement === '') return
-  control.setRangeText(replacement, start, end, 'end')
-  control.dispatchEvent(new InputEvent('input', {
-    bubbles: true,
-    data,
-    inputType,
-  }))
+  control.setSelectionRange(
+    Math.min(selection.start, length),
+    Math.min(selection.end, length)
+  )
 }
 
 function keyboardCodeEditRequest(
@@ -250,45 +192,21 @@ function keyboardCodeEditRequest(
     event.key === 'Process' ||
     event.key === 'Dead'
   ) {
-    return { action: null, allowDefault: true }
+    return { allowDefault: true }
   }
 
+  if (event.key === 'Backspace' || event.key === 'Delete') {
+    return { allowDefault: false }
+  }
   const altGraph = event.getModifierState('AltGraph')
   const hasCommandModifier =
     event.metaKey ||
     (event.ctrlKey && !altGraph) ||
     (event.altKey && !altGraph)
-  if (event.key === 'Backspace') {
-    return {
-      action: hasCommandModifier ? null : { kind: 'deleteBackward' },
-      allowDefault: false,
-    }
-  }
-  if (event.key === 'Delete') {
-    return {
-      action: hasCommandModifier ? null : { kind: 'deleteForward' },
-      allowDefault: false,
-    }
-  }
   if (hasCommandModifier) return null
-  if (event.key === 'Enter') {
-    return {
-      action: { kind: 'insert', text: '\n', inputType: 'insertLineBreak' },
-      allowDefault: false,
-    }
-  }
-  if (event.key === 'Tab' && !event.shiftKey) {
-    return {
-      action: { kind: 'insert', text: '\t', inputType: 'insertText' },
-      allowDefault: false,
-    }
-  }
-  return event.key.length === 1
-    ? {
-      action: { kind: 'insert', text: event.key, inputType: 'insertText' },
-      allowDefault: false,
-    }
-    : null
+  if (event.key === 'Enter') return { allowDefault: false }
+  if (event.key === 'Tab' && !event.shiftKey) return { allowDefault: false }
+  return event.key.length === 1 ? { allowDefault: false } : null
 }
 
 function setSourceText(sourceCode: HTMLElement, value: string): void {
@@ -578,8 +496,7 @@ export function initWysiwygCodeBlocks(): void {
   function openEditor(
     parts: CodeBlockParts,
     focusField: 'language' | 'content',
-    requestedSelection?: CodeSourceSelection,
-    initialEdit: InitialCodeEdit | null = null
+    requestedSelection?: CodeSourceSelection
   ): void {
     const internal = getVditorInternals()
     if (!internal || internal.currentMode !== 'wysiwyg') return
@@ -668,7 +585,7 @@ export function initWysiwygCodeBlocks(): void {
     const contentControl = getSharedWysiwygPopover()
       ?.querySelector<HTMLTextAreaElement>('textarea[name="content"]')
     if (contentControl) {
-      applyInitialCodeEdit(contentControl, sourceSelection, initialEdit)
+      focusCodeSourceSelection(contentControl, sourceSelection)
     }
   }
 
@@ -813,12 +730,7 @@ export function initWysiwygCodeBlocks(): void {
       if (rangeParts && sourceSelection && editRequest) {
         if (!editRequest.allowDefault) event.preventDefault()
         event.stopImmediatePropagation()
-        openEditor(
-          rangeParts,
-          'content',
-          sourceSelection,
-          editRequest.action
-        )
+        openEditor(rangeParts, 'content', sourceSelection)
         return true
       }
       if (event.isComposing) return false

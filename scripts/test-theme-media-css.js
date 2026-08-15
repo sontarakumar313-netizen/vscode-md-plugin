@@ -22,20 +22,17 @@ function declarationsFor(css, selector, relativePath) {
   return css.slice(start + marker.length, end)
 }
 
-const centeredImageSelector = '#app.vditor .vditor-reset img:not(.emoji)'
-for (const relativePath of [
-  'media/markdown-interactor.default.css',
-  '00-styles/dark-graphite-ember.css',
-  '00-styles/dark-midnight-neon.css',
-  '00-styles/light-paper-day.css',
+for (const [relativePath, selector] of [
+  ['media-src/src/main.css', '#app.vditor .vditor-reset :where(img:not(.emoji))'],
+  ['media/markdown-interactor.default.css', '#app.vditor .vditor-reset img:not(.emoji)'],
+  ['00-styles/dark-graphite-ember.css', '#app.vditor .vditor-reset img:not(.emoji)'],
+  ['00-styles/dark-midnight-neon.css', '#app.vditor .vditor-reset img:not(.emoji)'],
+  ['00-styles/light-paper-day.css', '#app.vditor .vditor-reset img:not(.emoji)'],
 ]) {
-  const declarations = declarationsFor(
-    read(relativePath),
-    centeredImageSelector,
-    relativePath
+  assert.ok(
+    !read(relativePath).includes(`${selector} {`),
+    `${relativePath} still forces ordinary images into a centered layout`
   )
-  assert.match(declarations, /\bdisplay\s*:\s*block\s*;/)
-  assert.match(declarations, /\bmargin-inline\s*:\s*auto\s*;/)
 }
 
 const mainCssPath = 'media-src/src/main.css'

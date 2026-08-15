@@ -55,8 +55,12 @@ function getActionRange(state: MenuState): Range {
   return range
 }
 
-function isWysiwygCell(cell: HTMLTableCellElement): boolean {
-  return !!cell.closest('.vditor-wysiwyg .vditor-reset')
+function isMarkdownTableCell(cell: HTMLTableCellElement): boolean {
+  return !!cell.closest('.vditor-wysiwyg .vditor-reset') &&
+    !cell.closest(
+      '.vditor-wysiwyg__block[data-type="html-block"], ' +
+        '.vditor-wysiwyg__block[data-type="yaml-front-matter"]'
+    )
 }
 
 function createMenu(): HTMLDivElement {
@@ -270,7 +274,7 @@ export function initTableContextMenu(): void {
       }
 
       const cell = target?.closest<HTMLTableCellElement>('td, th') || null
-      if (!cell || !isWysiwygCell(cell)) {
+      if (!cell || !isMarkdownTableCell(cell)) {
         hide()
         return
       }
