@@ -3,7 +3,7 @@
   "displayName": "Markdown Interactor",
   "icon": "media/logo.png",
   "description": "An interactive WYSIWYG Markdown editor with live rendering, diagrams, math, and custom themes.",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "publisher": "sontarakumar313-netizen",
   "author": {
     "name": "sontarakumar313-netizen",
@@ -175,13 +175,14 @@
     "test:quote-format": "node scripts/test-quote-format.js",
     "test:vditor-options": "node scripts/test-vditor-options.js",
     "test:vditor-runtime": "node scripts/test-vditor-runtime.js",
+    "test:theme-media-css": "node scripts/test-theme-media-css.js",
     "test:session": "node scripts/test-host-update-policy.js",
     "test:custom-editor-startup": "node scripts/test-custom-editor-startup.js",
     "test:single-custom-editor": "node scripts/test-single-custom-editor.js",
     "test:link-handler": "node scripts/test-link-handler.js",
     "test:webview-controller": "node scripts/test-webview-controller.js",
     "test:webview-interactions": "npm run build:webview && node scripts/test-webview-interactions.js",
-    "test": "npm run test:sync && npm run test:lute-reflow && npm run test:math && npm run test:upload-timestamp && npm run test:sv-code-indent && npm run test:quote-format && npm run test:vditor-options && npm run test:session && npm run test:custom-editor-startup && npm run test:single-custom-editor && npm run test:link-handler && npm run test:webview-controller && npm run test:webview-interactions",
+    "test": "npm run test:sync && npm run test:lute-reflow && npm run test:math && npm run test:upload-timestamp && npm run test:sv-code-indent && npm run test:quote-format && npm run test:vditor-options && npm run test:theme-media-css && npm run test:session && npm run test:custom-editor-startup && npm run test:single-custom-editor && npm run test:link-handler && npm run test:webview-controller && npm run test:webview-interactions",
     "pub": "npm run build && npm version patch && vsce package && vsce publish && git push origin main --tags"
   },
   "devDependencies": {

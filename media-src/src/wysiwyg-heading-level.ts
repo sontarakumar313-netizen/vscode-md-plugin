@@ -1,8 +1,5 @@
-import {
-  activateFloatingPanel,
-  deactivateFloatingPanel,
-  positionFloatingPanelAtTarget,
-} from './floating-panel'
+import { positionFloatingPanelAtTarget } from './floating-panel'
+import { createMenuController } from './menu-controller'
 import { t } from './lang'
 import { commitVditorWysiwygHeadingEdit } from './vditor-adapter'
 import { registerWysiwygDomFeature } from './wysiwyg-dom'
@@ -105,7 +102,7 @@ export function initWysiwygHeadingLevels(): void {
   let state: MenuState | null = null
 
   const hideMenu = (restoreFocus = false): void => {
-    deactivateFloatingPanel(menu)
+    menuController.close()
     const previous = state
     state = null
     menu.style.display = 'none'
@@ -175,8 +172,7 @@ export function initWysiwygHeadingLevels(): void {
         item.setAttribute('aria-checked', String(current))
       })
     button.setAttribute('aria-expanded', 'true')
-    activateFloatingPanel({
-      panel: menu,
+    menuController.open({
       safeTargets: [button],
       onDismiss: (reason) => hideMenu(reason === 'escape'),
     })
@@ -226,45 +222,14 @@ export function initWysiwygHeadingLevels(): void {
     window.setTimeout(restoreCaret, 0)
   }
 
-  const onMenuKeydown = (event: KeyboardEvent): void => {
-    const buttons = Array.from(
-      menu.querySelectorAll<HTMLButtonElement>('button[data-heading-level]')
-    )
-    const activeIndex = document.activeElement instanceof HTMLButtonElement
-      ? buttons.indexOf(document.activeElement)
-      : -1
-    let nextIndex = -1
-    if (event.key === 'ArrowDown') {
-      nextIndex = activeIndex < 0 ? 0 : (activeIndex + 1) % buttons.length
-    } else if (event.key === 'ArrowUp') {
-      nextIndex = activeIndex <= 0 ? buttons.length - 1 : activeIndex - 1
-    } else if (event.key === 'Home') {
-      nextIndex = 0
-    } else if (event.key === 'End') {
-      nextIndex = buttons.length - 1
-    } else if (event.key === 'Escape') {
-      event.preventDefault()
-      event.stopPropagation()
-      hideMenu(true)
-      return
-    }
-    if (nextIndex < 0) return
-    event.preventDefault()
-    event.stopPropagation()
-    buttons[nextIndex]?.focus()
-  }
-
-  menu.addEventListener('pointerdown', (event) => event.preventDefault())
-  menu.addEventListener('click', (event) => {
-    event.preventDefault()
-    event.stopPropagation()
-    const button = event.target instanceof Element
-      ? event.target.closest<HTMLButtonElement>('button[data-heading-level]')
-      : null
-    const level = Number(button?.dataset.headingLevel)
-    if (Number.isInteger(level)) applyLevel(level)
+  const menuController = createMenuController<HTMLButtonElement>({
+    itemSelector: 'button[data-heading-level]',
+    menu,
+    onActivate: (button) => {
+      const level = Number(button.dataset.headingLevel)
+      if (Number.isInteger(level)) applyLevel(level)
+    },
   })
-  menu.addEventListener('keydown', onMenuKeydown)
 
   registerWysiwygDomFeature({
     refresh,
@@ -309,6 +274,7 @@ export function initWysiwygHeadingLevels(): void {
     },
     dispose: () => {
       hideMenu()
+      menuController.dispose()
       menu.remove()
       root = null
     },

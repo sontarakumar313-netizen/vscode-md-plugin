@@ -417,6 +417,11 @@ body {
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.32);
 }
 
+#app.vditor .vditor-reset img:not(.emoji) {
+  display: block;
+  margin-inline: auto;
+}
+
 #app.vditor .vditor-reset kbd {
   color: var(--ember-text);
   background: var(--ember-surface-3);

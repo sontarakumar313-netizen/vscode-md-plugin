@@ -7,7 +7,7 @@ import {
 } from './alert-presentation'
 import type { ParsedAlertMarker } from './alert-presentation'
 import { findFrontMatter } from './front-matter'
-import { buildFrontMatterTable } from './front-matter-presentation'
+import { buildFrontMatterPresentation } from './front-matter-presentation'
 import { ALERT_TYPES } from './quote-format'
 import type { FrontMatterDisplay } from './wysiwyg-front-matter'
 import {
@@ -61,14 +61,9 @@ function renderFrontMatter(
   presentation.setAttribute('data-vmd-source', frontMatter.body)
   presentation.setAttribute('data-vmd-mode', display)
 
-  if (display === 'codeBlock') {
-    const raw = document.createElement('pre')
-    raw.className = 'vmd-front-matter__code'
-    raw.textContent = frontMatter.body
-    presentation.appendChild(raw)
-  } else {
-    presentation.appendChild(buildFrontMatterTable(frontMatter.body))
-  }
+  presentation.appendChild(
+    buildFrontMatterPresentation(frontMatter.body, display)
+  )
 
   existing?.remove()
   if (native) {

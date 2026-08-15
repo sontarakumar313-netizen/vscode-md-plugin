@@ -17,6 +17,13 @@ body,
 .vditor .vditor-reset {
   font-family: var(--vscode-editor-font-family);
 }
+/* Mermaid renders an inline SVG inside its block container. Make only that
+   generated SVG block-level to remove the browser baseline gap while leaving
+   Vditor's normal block/paragraph margins unchanged. */
+#app.vditor .vditor-reset .language-mermaid > svg {
+  display: block;
+  margin-inline: auto;
+}
 /* fix code block color in dark mode */
 .vditor--dark .vditor-reset code:not(.hljs):not(.highlight-chroma) {
   background-color: rgba(66,133,244,.1);
@@ -191,6 +198,96 @@ textarea.vmd-source-popover__input {
   position: absolute;
   top: 5px;
   right: 5px;
+}
+
+/* Ordinary fenced code opens an editor over the complete rendered frame. The
+   positioner supplies the block's exact border-box width and height, including
+   heights larger than the editor viewport. */
+.vditor-wysiwyg
+  > .vmd-url-popover.vmd-source-popover--code-overlay.vmd-url-popover--persistent {
+  position: fixed;
+  display: grid !important;
+  grid-template-rows: 28px minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 5px;
+}
+.vmd-source-popover--code-overlay
+  > .vmd-source-popover__field[data-vmd-source-field='language'] {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  padding: 3px 36px 3px 8px;
+  box-sizing: border-box;
+  border-bottom: 1px solid
+    var(--vscode-editorWidget-border, var(--border-color, rgba(127, 127, 127, 0.35)));
+  background: var(
+    --vmd-code-block-background,
+    var(--vmd-content-code-background, rgba(127, 127, 127, 0.08))
+  );
+}
+.vmd-source-popover--code-overlay
+  > .vmd-source-popover__field[data-vmd-source-field='content'] {
+  display: block;
+  min-height: 0;
+  margin: 0;
+}
+.vmd-source-popover--code-overlay .vmd-source-popover__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.vmd-source-popover--code-overlay
+  [data-vmd-source-field='language'] > .vmd-source-popover__input {
+  height: 22px;
+  padding: 1px 4px;
+  border-color: transparent;
+  color: var(--vmd-code-block-foreground, inherit);
+  background: transparent;
+}
+.vmd-source-popover--code-overlay
+  [data-vmd-source-field='content'] > textarea.vmd-source-popover__input {
+  display: block;
+  width: 100% !important;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  padding: 8px;
+  resize: none;
+  border: 0;
+  border-radius: 0;
+  color: var(--vmd-code-block-foreground, inherit);
+  background: var(
+    --vmd-code-block-background,
+    var(--vmd-content-code-background, rgba(127, 127, 127, 0.08))
+  );
+}
+.vmd-source-popover--code-overlay > .vmd-source-popover__error:not([hidden]) {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  left: 4px;
+  margin: 0;
+  padding: 3px 6px;
+  background: var(
+    --vscode-inputValidation-errorBackground,
+    var(--vscode-editorWidget-background, #fff)
+  );
+}
+.vmd-source-popover--code-overlay > .vmd-popover-close {
+  top: 3px;
+  right: 5px;
+  width: 22px;
+  height: 22px;
 }
 
 /* Serializer-owned source is never allowed to re-enter document layout. */

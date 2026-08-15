@@ -140,7 +140,11 @@ function allowsTabInEditor(vditor: any, event: KeyboardEvent): boolean | null {
     return canHandleSourceListTab(range, editor)
   }
 
-  return !!closestInEditor(range.startContainer, 'li, td, th', editor)
+  return !!closestInEditor(
+    range.startContainer,
+    'li, td, th, .vmd-code-block--ordinary > .vditor-wysiwyg__preview > code',
+    editor
+  )
 }
 
 /**

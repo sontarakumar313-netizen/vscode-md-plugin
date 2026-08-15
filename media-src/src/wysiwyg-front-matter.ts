@@ -2,7 +2,8 @@ import {
   frontMatterSeparator,
   restoreFrontMatterSeparator,
 } from './front-matter'
-import { buildFrontMatterTable } from './front-matter-presentation'
+import { buildFrontMatterPresentation } from './front-matter-presentation'
+import type { FrontMatterPresentationMode } from './front-matter-presentation'
 import { registerWysiwygDomFeature } from './wysiwyg-dom'
 import {
   closeActiveWysiwygPopover,
@@ -17,7 +18,7 @@ import {
  * serializes the DOM, so display-only controls cannot leak into Markdown.
  */
 
-export type FrontMatterDisplay = 'table' | 'codeBlock' | 'hide'
+export type FrontMatterDisplay = FrontMatterPresentationMode | 'hide'
 
 interface ValueApi {
   getValue(): string
@@ -101,14 +102,12 @@ export function initWysiwygFrontMatter(display: FrontMatterDisplay = 'table') {
     preview.setAttribute('contenteditable', 'false')
     preview.setAttribute('data-vmd-source', source)
     preview.setAttribute('data-vmd-mode', mode)
-    if (mode === 'codeBlock') {
-      const raw = document.createElement('pre')
-      raw.className = 'vmd-front-matter__code'
-      raw.textContent = source
-      preview.appendChild(raw)
-    } else {
-      preview.appendChild(buildFrontMatterTable(source))
-    }
+    preview.appendChild(
+      buildFrontMatterPresentation(
+        source,
+        mode === 'codeBlock' ? 'codeBlock' : 'table'
+      )
+    )
     block.appendChild(preview)
     block.classList.add('vmd-front-matter-block--rendered')
     const sourcePre = getSourcePre(block)

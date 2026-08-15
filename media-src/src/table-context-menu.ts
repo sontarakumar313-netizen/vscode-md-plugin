@@ -1,8 +1,5 @@
-import {
-  activateFloatingPanel,
-  deactivateFloatingPanel,
-  positionFloatingPanelAtPoint,
-} from './floating-panel'
+import { positionFloatingPanelAtPoint } from './floating-panel'
+import { createMenuController } from './menu-controller'
 import {
   focusVditorRange,
   getVditorInternals,
@@ -12,18 +9,25 @@ import { t } from './lang'
 
 const MENU_ID = 'vmd-table-context-menu'
 
-type TableAction =
-  | 'default'
-  | 'left'
-  | 'center'
-  | 'right'
-  | 'insertRowAbove'
-  | 'insertRowBelow'
-  | 'insertColumnLeft'
-  | 'insertColumnRight'
-  | 'deleteRow'
-  | 'deleteColumn'
-  | 'deleteTable'
+const TABLE_ACTIONS = [
+  'default',
+  'left',
+  'center',
+  'right',
+  'insertRowAbove',
+  'insertRowBelow',
+  'insertColumnLeft',
+  'insertColumnRight',
+  'deleteRow',
+  'deleteColumn',
+  'deleteTable',
+] as const
+
+type TableAction = (typeof TABLE_ACTIONS)[number]
+
+function tableAction(value: string | undefined): TableAction | null {
+  return TABLE_ACTIONS.find((action) => action === value) || null
+}
 
 interface MenuState {
   cell: HTMLTableCellElement
@@ -146,8 +150,17 @@ export function initTableContextMenu(): void {
   const menu = createMenu()
   let state: MenuState | null = null
 
+  const menuController = createMenuController<HTMLButtonElement>({
+    itemSelector: 'button[data-type]',
+    menu,
+    onActivate: (button) => {
+      const action = tableAction(button.dataset.type)
+      if (action) execute(action)
+    },
+  })
+
   const hide = () => {
-    deactivateFloatingPanel(menu)
+    menuController.close()
     menu.style.display = 'none'
     menu.style.visibility = ''
     state = null
@@ -175,11 +188,11 @@ export function initTableContextMenu(): void {
       deleteRowButton.disabled = cell.tagName === 'TH'
     }
 
-    activateFloatingPanel({ panel: menu, onDismiss: hide })
+    menuController.open({ onDismiss: hide })
     positionFloatingPanelAtPoint(menu, event.clientX, event.clientY)
   }
 
-  const execute = (action: TableAction) => {
+  function execute(action: TableAction): void {
     const current = state
     const internal = getVditorInternals()
     if (
@@ -268,16 +281,6 @@ export function initTableContextMenu(): void {
     },
     true
   )
-
-  menu.addEventListener('mousedown', (event) => event.preventDefault())
-  menu.addEventListener('click', (event) => {
-    event.preventDefault()
-    event.stopPropagation()
-    const target = event.target instanceof Element ? event.target : null
-    const button = target?.closest<HTMLButtonElement>('button[data-type]')
-    if (!button || button.disabled) return
-    execute(button.dataset.type as TableAction)
-  })
 
   hideContextMenu = hide
 }

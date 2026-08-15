@@ -1,8 +1,5 @@
-import {
-  activateFloatingPanel,
-  deactivateFloatingPanel,
-  positionFloatingPanelAtPoint,
-} from './floating-panel'
+import { positionFloatingPanelAtPoint } from './floating-panel'
+import { createMenuController } from './menu-controller'
 import {
   commitVditorWysiwygDomEdit,
   focusVditorRange,
@@ -13,22 +10,23 @@ import { getWysiwygRoot } from './wysiwyg-dom'
 import { findInnermostDetailsBlocks } from './wysiwyg-details'
 import { closeActiveWysiwygPopover } from './wysiwyg-popover'
 import { openWysiwygBlockSourceEditor } from './wysiwyg-source-editor'
+import {
+  WYSIWYG_ATOMIC_BLOCK_SELECTOR,
+  wysiwygBlockKind,
+} from './wysiwyg-atomic-block'
+import type { WysiwygAtomicBlockKind } from './wysiwyg-atomic-block'
 
 const MENU_ID = 'vmd-block-context-menu'
 const DIRECT_BLOCK_SELECTOR = [
   'blockquote',
-  '.vditor-wysiwyg__block[data-type="code-block"]',
-  '.vditor-wysiwyg__block[data-type="math-block"]',
-  '.vditor-wysiwyg__block[data-type="html-block"]',
+  WYSIWYG_ATOMIC_BLOCK_SELECTOR,
 ].join(', ')
 
 type BlockContextKind =
   | 'quote'
   | 'alert'
   | 'details'
-  | 'code-block'
-  | 'math-block'
-  | 'html-block'
+  | WysiwygAtomicBlockKind
 
 interface BlockContextTarget {
   kind: BlockContextKind
@@ -111,17 +109,7 @@ function directBlockKind(block: HTMLElement): BlockContextKind | null {
       : 'quote'
   }
 
-  const type = block.dataset.type
-  if (type === 'html-block') {
-    return block.classList.contains('vmd-details-opener') ||
-      block.classList.contains('vmd-details-closer')
-      ? null
-      : type
-  }
-  if (type === 'code-block' || type === 'math-block') {
-    return type
-  }
-  return null
+  return wysiwygBlockKind(block)
 }
 
 function resolveContextTarget(target: Element): BlockContextTarget | null {
@@ -133,13 +121,6 @@ function resolveContextTarget(target: Element): BlockContextTarget | null {
   // the quote, while right-clicking ordinary details content deletes details.
   const direct = target.closest<HTMLElement>(DIRECT_BLOCK_SELECTOR)
   if (direct && root.contains(direct)) {
-    if (
-      direct.dataset.type === 'html-block' &&
-      !direct.classList.contains('vmd-details-opener') &&
-      !direct.classList.contains('vmd-details-closer')
-    ) {
-      return { kind: 'html-block', blocks: [direct] }
-    }
     const kind = directBlockKind(direct)
     if (kind) return { kind, blocks: [direct] }
   }
@@ -248,12 +229,39 @@ export function initBlockContextMenu(): void {
   const menu = createMenu()
   let state: BlockContextTarget | null = null
 
+  const menuController = createMenuController<HTMLButtonElement>({
+    itemSelector: 'button[data-type]',
+    menu,
+    onActivate: executeAction,
+  })
+
   const hide = () => {
-    deactivateFloatingPanel(menu)
+    menuController.close()
     menu.style.display = 'none'
     menu.style.visibility = ''
     menu.removeAttribute('data-kind')
     state = null
+  }
+
+  function executeAction(button: HTMLButtonElement): void {
+    const current = state
+    if (!current) return
+    hide()
+    if (button.dataset.type === 'edit-block-source') {
+      const block = current.blocks[0]
+      if (current.kind === 'code-block') {
+        block
+          ?.querySelector<HTMLButtonElement>('.vmd-source-edit-button')
+          ?.click()
+      } else if (
+        block &&
+        (current.kind === 'math-block' || current.kind === 'html-block')
+      ) {
+        openWysiwygBlockSourceEditor(block)
+      }
+    } else if (button.dataset.type === 'delete-block') {
+      deleteWysiwygBlocks(current.blocks)
+    }
   }
 
   const show = (target: BlockContextTarget, event: MouseEvent) => {
@@ -275,7 +283,7 @@ export function initBlockContextMenu(): void {
       editLabel ? `${editLabel}; ${deleteLabel}` : deleteLabel
     )
     menu.dataset.kind = target.kind
-    activateFloatingPanel({ panel: menu, onDismiss: hide })
+    menuController.open({ onDismiss: hide })
     positionFloatingPanelAtPoint(menu, event.clientX, event.clientY)
   }
 
@@ -307,33 +315,6 @@ export function initBlockContextMenu(): void {
     },
     true
   )
-
-  menu.addEventListener('mousedown', (event) => event.preventDefault())
-  menu.addEventListener('click', (event) => {
-    event.preventDefault()
-    event.stopPropagation()
-    const eventTarget =
-      event.target instanceof Element ? event.target : null
-    const button = eventTarget?.closest<HTMLButtonElement>('button[data-type]')
-    const current = state
-    if (!button || !current) return
-    hide()
-    if (button.dataset.type === 'edit-block-source') {
-      const block = current.blocks[0]
-      if (current.kind === 'code-block') {
-        block
-          ?.querySelector<HTMLButtonElement>('.vmd-source-edit-button')
-          ?.click()
-      } else if (
-        block &&
-        (current.kind === 'math-block' || current.kind === 'html-block')
-      ) {
-        openWysiwygBlockSourceEditor(block)
-      }
-    } else if (button.dataset.type === 'delete-block') {
-      deleteWysiwygBlocks(current.blocks)
-    }
-  })
 
   hideContextMenu = hide
 }

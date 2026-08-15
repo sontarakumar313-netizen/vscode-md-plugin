@@ -7,6 +7,7 @@ import {
 type SourcePopoverPlacement =
   | 'center'
   | 'code'
+  | 'code-overlay'
   | 'html-block'
   | 'math-block'
   | 'target'
@@ -31,6 +32,7 @@ let observedSourcePositionTarget: HTMLElement | null = null
 const POPOVER_POSITIONING_CLASS = 'vmd-url-popover--positioning'
 const PERSISTENT_POPOVER_CLASS = 'vmd-url-popover--persistent'
 const SOURCE_POPOVER_CLASS = 'vmd-source-popover'
+const CODE_OVERLAY_POPOVER_CLASS = 'vmd-source-popover--code-overlay'
 export const WYSIWYG_SOURCE_EDIT_BUTTON_CLASS = 'vmd-source-edit-button'
 
 interface WysiwygSourcePopoverField {
@@ -40,6 +42,7 @@ interface WysiwygSourcePopoverField {
   multiline?: boolean
   spellcheck?: boolean
   closeOnEnter?: boolean
+  acceptsTab?: boolean
 }
 
 interface WysiwygSourcePopoverOptions {
@@ -63,6 +66,7 @@ interface WysiwygSourceEditSessionOptions {
   isSourceChanged: () => boolean
   beforeCommit?: () => void
   afterCommit?: () => void
+  afterFinish?: () => void
 }
 
 /** Records a click target before Vditor constructs its shared popover. */
@@ -141,7 +145,10 @@ export function closeActiveWysiwygPopover(restoreFocus = false): void {
   const active = deactivateAndFinishCustomPopover()
   if (active) {
     active.popover.style.display = 'none'
-    active.popover.classList.remove(POPOVER_POSITIONING_CLASS)
+    active.popover.classList.remove(
+      POPOVER_POSITIONING_CLASS,
+      CODE_OVERLAY_POPOVER_CLASS
+    )
     if (activePopoverPosition?.popover === active.popover) {
       clearActivePopoverPosition()
     }
@@ -303,6 +310,12 @@ function clearActivePopoverPosition(): void {
   popover?.classList.remove(POPOVER_POSITIONING_CLASS)
   popover?.style.removeProperty('--vmd-source-popover-available-height')
   popover?.style.removeProperty('--vmd-source-popover-available-width')
+  popover?.style.removeProperty('width')
+  popover?.style.removeProperty('max-width')
+  popover?.style.removeProperty('height')
+  popover?.style.removeProperty('max-height')
+  popover?.style.removeProperty('position')
+  popover?.style.removeProperty('clip-path')
   popover?.style.removeProperty('transform')
   sourcePopoverResizeObserver?.disconnect()
   observedSourcePositionTarget = null
@@ -335,7 +348,9 @@ function queueActivePopoverPosition(): void {
       ? target.querySelector<HTMLElement>(
         `.${WYSIWYG_SOURCE_EDIT_BUTTON_CLASS}`
       )
-      : placement === 'html-block'
+      : placement === 'code-overlay'
+        ? target
+        : placement === 'html-block'
         ? target.querySelector<HTMLElement>(
           ':scope > .vditor-wysiwyg__preview'
         )
@@ -358,7 +373,7 @@ function queueActivePopoverPosition(): void {
     }
 
     if (
-      placement === 'math-block' &&
+      (placement === 'math-block' || placement === 'code-overlay') &&
       observedSourcePositionTarget !== positionTarget
     ) {
       if (observedSourcePositionTarget) {
@@ -392,6 +407,42 @@ function queueActivePopoverPosition(): void {
         targetRect.top - popover.offsetHeight - gap
       )}px`
       popover.dataset.vmdPosition = 'above'
+    } else if (placement === 'code-overlay') {
+      // Ordinary fenced code is edited in place. Keep the shared panel in the
+      // same document coordinate space as the block so oversized editors move
+      // with the block instead of being clamped to the viewport.
+      popover.style.removeProperty('transform')
+      popover.style.position = 'fixed'
+      popover.style.width = `${targetRect.width}px`
+      popover.style.maxWidth = 'none'
+      popover.style.height = `${targetRect.height}px`
+      popover.style.maxHeight = 'none'
+      popover.style.left = `${targetRect.left}px`
+      popover.style.top = `${targetRect.top}px`
+      const root = target.closest<HTMLElement>('.vditor-reset')
+      if (root) {
+        const rootRect = root.getBoundingClientRect()
+        const visibleLeft = Math.max(0, rootRect.left)
+        const visibleTop = Math.max(0, rootRect.top)
+        const visibleRight = Math.min(window.innerWidth, rootRect.right)
+        const visibleBottom = Math.min(window.innerHeight, rootRect.bottom)
+        popover.style.clipPath = `inset(${Math.max(
+          0,
+          visibleTop - targetRect.top
+        )}px ${Math.max(
+          0,
+          targetRect.right - visibleRight
+        )}px ${Math.max(
+          0,
+          targetRect.bottom - visibleBottom
+        )}px ${Math.max(
+          0,
+          visibleLeft - targetRect.left
+        )}px)`
+      } else {
+        popover.style.removeProperty('clip-path')
+      }
+      popover.dataset.vmdPosition = 'code-overlay'
     } else {
       const margin = 8
       const visibleLeft = editorRect.left + margin
@@ -674,10 +725,14 @@ function showWysiwygSourcePopover({
   popover.classList.remove(
     'vmd-url-popover--image',
     'vmd-wysiwyg-popover--empty',
+    CODE_OVERLAY_POPOVER_CLASS,
     POPOVER_POSITIONING_CLASS,
     PERSISTENT_POPOVER_CLASS
   )
   popover.classList.add('vmd-url-popover', SOURCE_POPOVER_CLASS)
+  if (placement === 'code-overlay') {
+    popover.classList.add(CODE_OVERLAY_POPOVER_CLASS)
+  }
   delete popover.dataset.vmdPosition
 
   const initialValues: Record<string, string> = {}
@@ -711,6 +766,7 @@ function showWysiwygSourcePopover({
     initialValues[field.name] = field.value
     const row = document.createElement('label')
     row.className = 'vmd-source-popover__field'
+    row.dataset.vmdSourceField = field.name
     const label = document.createElement('span')
     label.className = 'vmd-source-popover__label'
     label.textContent = field.label
@@ -736,6 +792,26 @@ function showWysiwygSourcePopover({
     control.addEventListener('keydown', (event: KeyboardEvent) => {
       if (event.isComposing || event.keyCode === 229) {
         event.stopImmediatePropagation()
+        return
+      }
+      if (
+        event.key === 'Tab' &&
+        !event.shiftKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        field.acceptsTab &&
+        control instanceof HTMLTextAreaElement
+      ) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        control.setRangeText(
+          '\t',
+          control.selectionStart,
+          control.selectionEnd,
+          'end'
+        )
+        applyChange()
         return
       }
       if (
@@ -784,7 +860,10 @@ function showWysiwygSourcePopover({
   focusPreferredField()
   // Vditor's originating click may restore the editor selection after the
   // capture listener returns. Re-assert the requested field once that work ends.
-  window.setTimeout(focusPreferredField, 0)
+  window.setTimeout(() => {
+    focusPreferredField()
+    queueActivePopoverPosition()
+  }, 0)
 }
 
 export function getSharedWysiwygPopover(): HTMLElement | null {
@@ -823,6 +902,7 @@ export function openWysiwygSourceEditSession({
   isSourceChanged,
   beforeCommit,
   afterCommit,
+  afterFinish,
 }: WysiwygSourceEditSessionOptions): boolean {
   const popover = getSharedWysiwygPopover()
   const internal = getVditorInternals()
@@ -841,17 +921,21 @@ export function openWysiwygSourceEditSession({
       return onChange(values)
     },
     onFinish: (_values, changed) => {
-      if (
-        !changed ||
-        !target.isConnected ||
-        (isAvailable && !isAvailable()) ||
-        !isSourceChanged()
-      ) {
-        return
+      try {
+        if (
+          !changed ||
+          !target.isConnected ||
+          (isAvailable && !isAvailable()) ||
+          !isSourceChanged()
+        ) {
+          return
+        }
+        beforeCommit?.()
+        commitVditorWysiwygDomEdit(internal)
+        afterCommit?.()
+      } finally {
+        afterFinish?.()
       }
-      beforeCommit?.()
-      commitVditorWysiwygDomEdit(internal)
-      afterCommit?.()
     },
   })
   return true
@@ -871,6 +955,7 @@ export function customizeWysiwygPopover(
     'vmd-url-popover',
     'vmd-url-popover--image',
     SOURCE_POPOVER_CLASS,
+    CODE_OVERLAY_POPOVER_CLASS,
     POPOVER_POSITIONING_CLASS,
     PERSISTENT_POPOVER_CLASS
   )

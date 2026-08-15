@@ -1,59 +1,15 @@
-const TOOLBAR_ACTION_IDS = [
-  'outline',
-  'save',
-  'headings',
-  'heading-1',
-  'heading-2',
-  'heading-3',
-  'heading-4',
-  'heading-5',
-  'heading-6',
-  'bold',
-  'italic',
-  'strike',
-  'link',
-  'list',
-  'ordered-list',
-  'check',
-  'outdent',
-  'indent',
-  'quote',
-  'vmd-alert',
-  'line',
-  'code',
-  'inline-code',
-  'math-block',
-  'math-inline',
-  'details',
-  'insert-before',
-  'insert-after',
-  'upload',
-  'table',
-  'vmd-edit-mode',
-  'vmd-mode-wysiwyg',
-  'vmd-mode-sv',
-  'more',
-  'copy-markdown',
-  'copy-html',
-  'reload-workspace-style',
-  'normalize-formatting',
-  'reset-config',
-  'devtools',
-  'info',
-  'help',
-] as const
+import {
+  TOOLBAR_ACTION_IDS,
+  isReservedToolbarShortcut,
+  normalizeToolbarShortcutKey,
+  parseToolbarShortcut,
+} from '../../src/toolbar-shortcut-core'
+import type {
+  ParsedToolbarShortcut,
+  ToolbarActionId,
+} from '../../src/toolbar-shortcut-core'
 
-type ToolbarActionId = (typeof TOOLBAR_ACTION_IDS)[number]
-
-interface ParsedShortcut {
-  alt: boolean
-  canonical: string
-  ctrl: boolean
-  display: string
-  key: string
-  meta: boolean
-  shift: boolean
-}
+type ParsedShortcut = ParsedToolbarShortcut & { display: string }
 
 export interface ToolbarShortcutController {
   dispose(): void
@@ -64,16 +20,6 @@ export interface ToolbarShortcutController {
 const TOOLBAR_ACTION_ID_SET = new Set<string>(TOOLBAR_ACTION_IDS)
 const HEADING_ACTION_PATTERN = /^heading-([1-6])$/
 const INPUT_SAFE_ACTIONS = new Set<ToolbarActionId>(['save'])
-const KEY_ALIASES: Readonly<Record<string, string>> = {
-  down: 'arrowdown',
-  esc: 'escape',
-  left: 'arrowleft',
-  option: 'alt',
-  return: 'enter',
-  right: 'arrowright',
-  spacebar: 'space',
-  up: 'arrowup',
-}
 const CODE_KEYS: Readonly<Record<string, string>> = {
   Backquote: '`',
   Backslash: '\\',
@@ -87,42 +33,12 @@ const CODE_KEYS: Readonly<Record<string, string>> = {
   Semicolon: ';',
   Slash: '/',
 }
-const NAMED_KEYS = new Set([
-  'arrowdown',
-  'arrowleft',
-  'arrowright',
-  'arrowup',
-  'backspace',
-  'delete',
-  'end',
-  'enter',
-  'escape',
-  'home',
-  'pagedown',
-  'pageup',
-  'space',
-  'tab',
-])
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function isMacPlatform(): boolean {
   return /Mac|iPhone|iPad/.test(navigator.platform)
-}
-
-function normalizeKey(value: string): string | null {
-  const lower = value.toLowerCase()
-  const alias = KEY_ALIASES[lower] || lower
-  if (
-    alias.length === 1 &&
-    "abcdefghijklmnopqrstuvwxyz0123456789,./;'[]\\-=`".includes(alias)
-  ) {
-    return alias
-  }
-  if (/^f(?:[1-9]|1[0-9]|2[0-4])$/.test(alias)) return alias
-  return NAMED_KEYS.has(alias) ? alias : null
 }
 
 function keyLabel(key: string): string {
@@ -146,76 +62,16 @@ function keyLabel(key: string): string {
 }
 
 function parseShortcut(value: string): ParsedShortcut | null {
-  if (!value || value.length > 80 || /\s/.test(value)) return null
-
-  let ctrl = false
-  let meta = false
-  let alt = false
-  let shift = false
-  let key: string | null = null
-  const seen = new Set<string>()
-
-  for (const rawPart of value.split('+')) {
-    if (!rawPart) return null
-    const lower = rawPart.toLowerCase()
-    const part = KEY_ALIASES[lower] || lower
-    if (seen.has(part)) return null
-    seen.add(part)
-
-    if (part === 'mod') {
-      if (isMacPlatform()) meta = true
-      else ctrl = true
-    } else if (part === 'ctrl' || part === 'control') {
-      ctrl = true
-    } else if (part === 'cmd' || part === 'command' || part === 'meta') {
-      meta = true
-    } else if (part === 'alt') {
-      alt = true
-    } else if (part === 'shift') {
-      shift = true
-    } else {
-      if (key !== null) return null
-      key = normalizeKey(part)
-      if (!key) return null
-    }
-  }
-
-  if (!key) return null
-  if (!ctrl && !meta && !alt && !shift && !/^f(?:[1-9]|1[0-9]|2[0-4])$/.test(key)) {
-    return null
-  }
+  const parsed = parseToolbarShortcut(value, isMacPlatform())
+  if (!parsed) return null
 
   const displayParts: string[] = []
-  if (ctrl) displayParts.push('Ctrl')
-  if (meta) displayParts.push(isMacPlatform() ? 'Cmd' : 'Meta')
-  if (alt) displayParts.push(isMacPlatform() ? 'Option' : 'Alt')
-  if (shift) displayParts.push('Shift')
-  displayParts.push(keyLabel(key))
-
-  return {
-    alt,
-    canonical: `${ctrl ? '1' : '0'}${meta ? '1' : '0'}${
-      alt ? '1' : '0'
-    }${shift ? '1' : '0'}:${key}`,
-    ctrl,
-    display: displayParts.join('+'),
-    key,
-    meta,
-    shift,
-  }
-}
-
-function isReservedShortcut(shortcut: ParsedShortcut): boolean {
-  const primary = isMacPlatform()
-    ? shortcut.meta && !shortcut.ctrl
-    : shortcut.ctrl && !shortcut.meta
-  return (
-    primary &&
-    !shortcut.alt &&
-    ((!shortcut.shift &&
-      ['a', 'c', 'f', 'm', 'v', 'x', 'y', 'z'].includes(shortcut.key)) ||
-      (shortcut.shift && shortcut.key === 'z'))
-  )
+  if (parsed.ctrl) displayParts.push('Ctrl')
+  if (parsed.meta) displayParts.push(isMacPlatform() ? 'Cmd' : 'Meta')
+  if (parsed.alt) displayParts.push(isMacPlatform() ? 'Option' : 'Alt')
+  if (parsed.shift) displayParts.push('Shift')
+  displayParts.push(keyLabel(parsed.key))
+  return { ...parsed, display: displayParts.join('+') }
 }
 
 function eventKey(event: KeyboardEvent): string | null {
@@ -225,7 +81,7 @@ function eventKey(event: KeyboardEvent): string | null {
     return event.code.toLowerCase()
   }
   const codeKey = CODE_KEYS[event.code]
-  return codeKey || normalizeKey(event.key)
+  return codeKey || normalizeToolbarShortcutKey(event.key)
 }
 
 function matchesEvent(
@@ -404,7 +260,12 @@ export function installToolbarShortcutController(): ToolbarShortcutController {
           continue
         }
         const shortcut = parseShortcut(configured)
-        if (!shortcut || isReservedShortcut(shortcut)) continue
+        if (
+          !shortcut ||
+          isReservedToolbarShortcut(shortcut, isMacPlatform())
+        ) {
+          continue
+        }
         const action = id as ToolbarActionId
         next.set(action, shortcut)
         const ids = assignments.get(shortcut.canonical) || []

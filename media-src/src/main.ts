@@ -20,6 +20,7 @@ import {
 import { initTableContextMenu } from './table-context-menu'
 import { initBlockContextMenu } from './block-context-menu'
 import { disposeFloatingPanels } from './floating-panel'
+import { disposeMenuControllers } from './menu-controller'
 import {
   closeActiveWysiwygPopover,
   customizeWysiwygPopover,
@@ -262,6 +263,7 @@ window.addEventListener(
     codeCopyController.dispose()
     imageViewerController.dispose()
     disposeWysiwygDom()
+    disposeMenuControllers()
     disposeFloatingPanels()
     disposeWysiwygPopover()
   },

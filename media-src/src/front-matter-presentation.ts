@@ -82,7 +82,23 @@ function appendRows(
   }
 }
 
-/** Builds the shared read-only Front Matter table/error presentation. */
+export type FrontMatterPresentationMode = 'table' | 'codeBlock'
+
+/** Builds the shared read-only Front Matter table or code presentation. */
+export function buildFrontMatterPresentation(
+  source: string,
+  mode: FrontMatterPresentationMode
+): HTMLElement {
+  if (mode === 'codeBlock') {
+    const raw = document.createElement('pre')
+    raw.className = 'vmd-front-matter__code'
+    raw.textContent = source
+    return raw
+  }
+  return buildFrontMatterTable(source)
+}
+
+/** Builds the parsed Front Matter table/error presentation. */
 export function buildFrontMatterTable(source: string): HTMLElement {
   const { entries, error } = parseFrontMatter(source)
 

@@ -14,11 +14,8 @@ import {
 } from './alert-presentation'
 import type { ParsedAlertMarker } from './alert-presentation'
 import { findInnermostDetailsBlocks } from './wysiwyg-details'
-import {
-  activateFloatingPanel,
-  deactivateFloatingPanel,
-  positionFloatingPanelAtTarget,
-} from './floating-panel'
+import { positionFloatingPanelAtTarget } from './floating-panel'
+import { createMenuController } from './menu-controller'
 import { registerWysiwygDomFeature } from './wysiwyg-dom'
 import {
   commitVditorWysiwygDomEdit,
@@ -318,7 +315,7 @@ export function initWysiwygAlerts(): void {
   function hideMenu(): void {
     const current = state
     const initial = initialMarkerText
-    deactivateFloatingPanel(menu)
+    menuController.close()
     current?.title.setAttribute('aria-expanded', 'false')
     state = null
     initialMarkerText = null
@@ -352,8 +349,7 @@ export function initWysiwygAlerts(): void {
     customTitleInput.removeAttribute('aria-invalid')
     state.title.setAttribute('aria-expanded', 'true')
     setCurrentType(state.type)
-    activateFloatingPanel({
-      panel: menu,
+    menuController.open({
       safeTargets: [state.title],
       onDismiss: hideMenu,
     })
@@ -453,75 +449,32 @@ export function initWysiwygAlerts(): void {
     hideMenu()
   }
 
+  const menuController = createMenuController<HTMLButtonElement>({
+    itemSelector: 'button[data-alert-type]',
+    menu,
+    onActivate: (button) => {
+      const type = alertType(button.dataset.alertType)
+      if (type) applyType(type)
+    },
+  })
+
   customTitleInput.addEventListener('input', (event) => {
     if (event instanceof InputEvent && event.isComposing) return
     updateCustomTitle()
   })
   customTitleInput.addEventListener('compositionend', updateCustomTitle)
-
-  menu.addEventListener('pointerdown', (event) => {
-    if (event.target === customTitleInput) {
+  customTitleInput.addEventListener('keydown', (event) => {
+    if (event.isComposing || event.keyCode === 229) {
       event.stopPropagation()
       return
     }
-    event.preventDefault()
-    event.stopPropagation()
-  })
-  menu.addEventListener('click', (event) => {
-    if (event.target === customTitleInput) {
-      event.stopPropagation()
-      return
-    }
-    event.preventDefault()
-    event.stopPropagation()
-    const target = event.target instanceof Element ? event.target : null
-    const button = target?.closest<HTMLButtonElement>(
-      'button[data-alert-type]'
-    )
-    const type = alertType(button?.dataset.alertType)
-    if (type) applyType(type)
-  })
-  menu.addEventListener('keydown', (event) => {
-    if (event.target === customTitleInput) {
-      if (event.isComposing || event.keyCode === 229) {
-        event.stopPropagation()
-        return
-      }
-      if (event.key === 'Escape' || event.key === 'Enter') {
-        event.preventDefault()
-        event.stopPropagation()
-        hideMenu()
-        return
-      }
-      event.stopPropagation()
-      return
-    }
-
-    const buttons = Array.from(
-      menu.querySelectorAll<HTMLButtonElement>('button[data-alert-type]')
-    )
-    const activeIndex = document.activeElement instanceof HTMLButtonElement
-      ? buttons.indexOf(document.activeElement)
-      : -1
-    let nextIndex = -1
-    if (event.key === 'ArrowDown') {
-      nextIndex = (Math.max(0, activeIndex) + 1) % buttons.length
-    } else if (event.key === 'ArrowUp') {
-      nextIndex = (activeIndex <= 0 ? buttons.length : activeIndex) - 1
-    } else if (event.key === 'Home') {
-      nextIndex = 0
-    } else if (event.key === 'End') {
-      nextIndex = buttons.length - 1
-    } else if (event.key === 'Escape') {
+    if (event.key === 'Escape' || event.key === 'Enter') {
       event.preventDefault()
       event.stopPropagation()
       hideMenu()
       return
     }
-    if (nextIndex < 0) return
-    event.preventDefault()
     event.stopPropagation()
-    buttons[nextIndex]?.focus()
   })
 
   registerWysiwygDomFeature({
@@ -544,6 +497,7 @@ export function initWysiwygAlerts(): void {
     },
     dispose: () => {
       hideMenu()
+      menuController.dispose()
       menu.remove()
       root = null
     },

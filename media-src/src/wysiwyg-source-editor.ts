@@ -6,6 +6,7 @@ import {
   refreshVditorWysiwygMathPreview,
 } from './vditor-adapter'
 import { registerWysiwygDomFeature } from './wysiwyg-dom'
+import { getWysiwygBlockParts } from './wysiwyg-atomic-block'
 import {
   hideWysiwygSerializerSource,
   openWysiwygSourceEditSession,
@@ -60,14 +61,20 @@ function sourcePartsForOwner(owner: HTMLElement): SourceParts | null {
       : null
   }
 
-  if (
-    type !== 'math-block' &&
-    type !== 'math-inline' &&
-    type !== 'html-block' &&
-    type !== 'html-entity'
-  ) {
-    return null
+  if (type === 'math-block' || type === 'html-block') {
+    const parts = getWysiwygBlockParts(owner)
+    return parts
+      ? {
+        kind: type,
+        owner,
+        source: parts.source,
+        code: parts.sourceCode,
+        preview: parts.preview,
+      }
+      : null
   }
+
+  if (type !== 'math-inline' && type !== 'html-entity') return null
   const preview = owner.querySelector<HTMLElement>(
     ':scope > .vditor-wysiwyg__preview'
   )
@@ -124,9 +131,6 @@ export function initWysiwygSourceEditors(): void {
           if (!parts) return
           hideWysiwygSerializerSource(parts.source)
           owner.classList.add('vmd-source-owned')
-          if (parts.kind === 'html-block' && parts.preview) {
-            parts.preview.classList.add('vmd-html-transparent-preview')
-          }
         })
     } finally {
       writing = false

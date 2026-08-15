@@ -237,6 +237,17 @@ function testPage() {
       if (!condition) throw new Error(message);
     };
     const lines = (...values) => values.join(String.fromCharCode(10));
+    const hasLocalizedDefaultAlert = (value, before, after = '') => {
+      const normalized = value.replace(/\\n+$/, '');
+      const start = before + '\\n\\n> [!NOTE]\\n> ';
+      const end = after ? '\\n\\n' + after : '';
+      if (!normalized.startsWith(start) || (end && !normalized.endsWith(end))) {
+        return false;
+      }
+      const bodyEnd = end ? normalized.length - end.length : normalized.length;
+      const body = normalized.slice(start.length, bodyEnd);
+      return !!body.trim() && !body.includes('\\n');
+    };
     const removedModeName = ['i', 'r'].join('');
 
     let testCheckpoint = 'startup';
@@ -388,8 +399,10 @@ function testPage() {
         document.querySelector('.vditor-toolbar [data-type="vmd-alert"]').click();
         await pause(80);
         expect(
-          window.vditor.getValue().replace(/\\n+$/, '') ===
-            'before consecutive blanks\\n\\n> [!NOTE]\\n> Alert content',
+          hasLocalizedDefaultAlert(
+            window.vditor.getValue(),
+            'before consecutive blanks'
+          ),
           'Alert on consecutive blank paragraphs converted the previous content: ' +
             JSON.stringify(window.vditor.getValue())
         );
@@ -684,23 +697,29 @@ function testPage() {
             codePreviewCode.contains(guardedCodeRange.startContainer),
           'ordinary code interaction or arrow-key release exposed source'
         );
+        const codeBlockRectBeforePopover = codeBlock.getBoundingClientRect();
         codeEditButton.click();
         await pause();
         const codeLanguageInput = sourcePopover.querySelector('[name="language"]');
         const codeContentInput = sourcePopover.querySelector('[name="content"]');
         const codePopoverRect = sourcePopover.getBoundingClientRect();
-        const codeEditButtonRect = codeEditButton.getBoundingClientRect();
         expect(
           sourcePopover.style.display === 'block' &&
-            sourcePopover.dataset.vmdPosition === 'below' &&
-            Math.abs(codePopoverRect.right - codeEditButtonRect.right) <= 2 &&
-            Math.abs(codePopoverRect.top - codeEditButtonRect.bottom - 6) <= 2 &&
+            sourcePopover.dataset.vmdPosition === 'code-overlay' &&
+            sourcePopover.classList.contains('vmd-source-popover--code-overlay') &&
+            Math.abs(codePopoverRect.left - codeBlockRectBeforePopover.left) <= 2 &&
+            Math.abs(codePopoverRect.top - codeBlockRectBeforePopover.top) <= 2 &&
+            Math.abs(codePopoverRect.width - codeBlockRectBeforePopover.width) <= 2 &&
+            Math.abs(codePopoverRect.height - codeBlockRectBeforePopover.height) <= 2 &&
             sourcePopover.querySelectorAll('.vmd-source-popover__field').length === 2 &&
             codeLanguageInput.value === 'js' &&
             codeContentInput.value === 'const a = 1;' &&
             document.activeElement === codeContentInput,
-          'the code edit button did not open the required two-row shared popover: ' + JSON.stringify({
+          'the ordinary code edit button did not open an exact in-place editor: ' + JSON.stringify({
             display: sourcePopover?.style.display,
+            position: sourcePopover?.dataset.vmdPosition,
+            block: codeBlockRectBeforePopover,
+            popover: codePopoverRect,
             fields: sourcePopover?.querySelectorAll('.vmd-source-popover__field').length,
             language: codeLanguageInput?.value,
             content: codeContentInput?.value,
@@ -716,16 +735,17 @@ function testPage() {
           fontFamily: compactContentStyle.fontFamily,
         };
         expect(
-          Number.parseFloat(compactPopoverStyle.maxHeight) > 310 &&
-            Number.parseFloat(compactPopoverStyle.maxHeight) <= 620 &&
-            codeContentInput.rows === 8 &&
+          compactPopoverStyle.display === 'grid' &&
+            compactPopoverStyle.maxHeight === 'none' &&
+            codeContentInput.clientHeight > 0 &&
             Number.parseFloat(compactContentStyle.fontSize) <= 12 &&
             Number.parseFloat(compactContentStyle.lineHeight) /
               Number.parseFloat(compactContentStyle.fontSize) <= 1.31,
-          'the shared source popover did not double its height while preserving compact typography: ' +
+          'the in-place code editor did not preserve compact typography and usable content space: ' +
             JSON.stringify({
+              display: compactPopoverStyle.display,
               maxHeight: compactPopoverStyle.maxHeight,
-              rows: codeContentInput.rows,
+              clientHeight: codeContentInput.clientHeight,
               fontSize: compactContentStyle.fontSize,
               lineHeight: compactContentStyle.lineHeight,
             })
@@ -805,6 +825,57 @@ function testPage() {
           'the heading-level change could not be undone in one step'
         );
 
+        const keyboardHeadingButton = root().querySelector(
+          'h1 .vmd-heading-level-button'
+        );
+        keyboardHeadingButton.click();
+        await pause();
+        const keyboardHeadingMenu = document.getElementById('vmd-heading-level-menu');
+        const headingArrowDown = new KeyboardEvent('keydown', {
+          key: 'ArrowDown',
+          bubbles: true,
+          cancelable: true,
+        });
+        document.dispatchEvent(headingArrowDown);
+        expect(
+          headingArrowDown.defaultPrevented &&
+            document.activeElement?.dataset.headingLevel === '1',
+          'ArrowDown did not enter the heading menu at its first item'
+        );
+        document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'End',
+          bubbles: true,
+          cancelable: true,
+        }));
+        expect(
+          document.activeElement?.dataset.headingLevel === '6',
+          'End did not focus the last heading menu item'
+        );
+        document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Home',
+          bubbles: true,
+          cancelable: true,
+        }));
+        document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'ArrowDown',
+          bubbles: true,
+          cancelable: true,
+        }));
+        const headingSpace = new KeyboardEvent('keydown', {
+          key: ' ',
+          bubbles: true,
+          cancelable: true,
+        });
+        document.activeElement.dispatchEvent(headingSpace);
+        await pause(100);
+        expect(
+          headingSpace.defaultPrevented &&
+            keyboardHeadingMenu.style.display === 'none' &&
+            root().querySelector('h2')?.textContent === 'Heading' &&
+            window.vditor.getValue().includes('## Heading'),
+          'shared menu keyboard navigation did not apply the selected heading level'
+        );
+
         await setMarkdown(markerFence + 'math\\nx^2\\n' + markerFence);
         await pause(80);
         const richCodeBlock = root().querySelector(
@@ -827,10 +898,13 @@ function testPage() {
         );
         richEditButton.click();
         await pause();
+        const richSourcePopover = document.querySelector('.vmd-source-popover');
         expect(
-          document.querySelector('.vmd-source-popover [name="language"]')?.value === 'math' &&
+          richSourcePopover?.querySelector('[name="language"]')?.value === 'math' &&
+            richSourcePopover.dataset.vmdPosition !== 'code-overlay' &&
+            !richSourcePopover.classList.contains('vmd-source-popover--code-overlay') &&
             getComputedStyle(richCodeSource).display === 'none',
-          'the rich renderer hover edit button did not open the shared code popover'
+          'the rich renderer changed to the ordinary in-place code editor'
         );
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
@@ -1012,8 +1086,8 @@ function testPage() {
           htmlContextMenu?.dataset.kind === 'html-block' &&
             getComputedStyle(htmlContextMenu).display !== 'none' &&
             visibleHtmlActions.length === 2 &&
-            htmlEditSource?.textContent.trim() === 'Edit HTML source' &&
-            htmlDeleteBlock?.textContent.trim() === 'Delete HTML block',
+            !!htmlEditSource?.textContent.trim() &&
+            !!htmlDeleteBlock?.textContent.trim(),
           'the HTML context menu did not expose complete edit and delete actions: ' +
             JSON.stringify(visibleHtmlActions.map((button) => button.textContent.trim()))
         );
@@ -2678,8 +2752,10 @@ function testPage() {
         document.querySelector('.vditor-toolbar [data-type="vmd-alert"]').click();
         await pause(80);
         expect(
-          window.vditor.getValue().replace(/\\n+$/, '') ===
-            'previous alert line\\n\\n> [!NOTE]\\n> Alert content',
+          hasLocalizedDefaultAlert(
+            window.vditor.getValue(),
+            'previous alert line'
+          ),
           'Alert on a blank line converted the previous line: ' +
             JSON.stringify(window.vditor.getValue())
         );
@@ -2705,8 +2781,11 @@ function testPage() {
         document.querySelector('.vditor-toolbar [data-type="vmd-alert"]').click();
         await pause(80);
         expect(
-          window.vditor.getValue().replace(/\\n+$/, '') ===
-            'before blank alert\\n\\n> [!NOTE]\\n> Alert content\\n\\nafter blank alert',
+          hasLocalizedDefaultAlert(
+            window.vditor.getValue(),
+            'before blank alert',
+            'after blank alert'
+          ),
           'Alert on a middle blank line changed adjacent content: ' +
             JSON.stringify(window.vditor.getValue())
         );
@@ -2868,7 +2947,31 @@ function testPage() {
           getComputedStyle(alertTypeMenu).display !== 'none',
           'the Alert type menu was not visible before its Escape check'
         );
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        const alertArrowDown = new KeyboardEvent('keydown', {
+          key: 'ArrowDown',
+          bubbles: true,
+          cancelable: true,
+        });
+        document.dispatchEvent(alertArrowDown);
+        expect(
+          alertArrowDown.defaultPrevented &&
+            document.activeElement?.dataset.alertType === 'NOTE',
+          'ArrowDown did not enter the Alert menu at its first item'
+        );
+        document.activeElement.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'End',
+          bubbles: true,
+          cancelable: true,
+        }));
+        expect(
+          document.activeElement?.dataset.alertType === 'CAUTION',
+          'End did not focus the last Alert menu item'
+        );
+        document.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }));
         expect(
           getComputedStyle(alertTypeMenu).display === 'none' &&
             window.vditor.getValue() === serializedAlerts,
@@ -3072,7 +3175,11 @@ function testPage() {
             JSON.stringify(window.vditor.getValue())
         );
 
-        const deleteThroughBlockMenu = async (target, expectedKind) => {
+        const deleteThroughBlockMenu = async (
+          target,
+          expectedKind,
+          useKeyboard = false
+        ) => {
           target.dispatchEvent(new MouseEvent('contextmenu', {
             bubbles: true,
             cancelable: true,
@@ -3102,13 +3209,48 @@ function testPage() {
           );
           const button = menu.querySelector('button[data-type="delete-block"]');
           expect(button, 'the block context menu has no whole-region delete action');
-          button.click();
+          if (useKeyboard) {
+            const selectionBeforeMenuPointer = window.getSelection()?.rangeCount
+              ? window.getSelection().getRangeAt(0).cloneRange()
+              : null;
+            const menuPointerDown = new PointerEvent('pointerdown', {
+              bubbles: true,
+              cancelable: true,
+              pointerType: 'mouse',
+            });
+            button.dispatchEvent(menuPointerDown);
+            const selectionAfterMenuPointer = window.getSelection();
+            expect(
+              menuPointerDown.defaultPrevented &&
+                (!selectionBeforeMenuPointer ||
+                  (selectionAfterMenuPointer?.rangeCount &&
+                    selectionAfterMenuPointer.getRangeAt(0)
+                      .compareBoundaryPoints(Range.START_TO_START, selectionBeforeMenuPointer) === 0)),
+              'pressing a menu item did not preserve the editor selection'
+            );
+            document.dispatchEvent(new KeyboardEvent('keydown', {
+              key: 'ArrowDown',
+              bubbles: true,
+              cancelable: true,
+            }));
+            expect(
+              document.activeElement === button,
+              'ArrowDown did not focus the first block menu action'
+            );
+            button.dispatchEvent(new KeyboardEvent('keydown', {
+              key: 'Enter',
+              bubbles: true,
+              cancelable: true,
+            }));
+          } else {
+            button.click();
+          }
           await pause(80);
         };
 
         await setMarkdown('before delete quote\\n\\n> quote first\\n> quote second\\n\\nafter delete quote');
         const deletedQuote = root().querySelector(':scope > blockquote');
-        await deleteThroughBlockMenu(deletedQuote, 'quote');
+        await deleteThroughBlockMenu(deletedQuote, 'quote', true);
         expect(
           window.vditor.getValue().replace(/\\n+$/, '') ===
             'before delete quote\\n\\nafter delete quote',
@@ -3258,8 +3400,34 @@ function testPage() {
               .classList.contains('vmd-table-context-menu__current'),
           'the table menu lost priority or did not recognize implicit default alignment'
         );
-        tableContextMenu.querySelector('[data-type="center"]').click();
+        const tableMenuArrowDown = () =>
+          (document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : document
+          ).dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'ArrowDown',
+            bubbles: true,
+            cancelable: true,
+          }));
+        tableMenuArrowDown();
+        tableMenuArrowDown();
+        tableMenuArrowDown();
+        const keyboardCenterAction = document.activeElement;
+        expect(
+          keyboardCenterAction?.dataset.type === 'center',
+          'table menu arrow navigation did not reach center alignment'
+        );
+        const tableMenuSpace = new KeyboardEvent('keydown', {
+          key: ' ',
+          bubbles: true,
+          cancelable: true,
+        });
+        keyboardCenterAction.dispatchEvent(tableMenuSpace);
         await pause(100);
+        expect(
+          tableMenuSpace.defaultPrevented,
+          'Space did not execute the focused table menu action'
+        );
         let alignedTable = root().querySelector('table');
         expect(
           Array.from(alignedTable.rows).every(
@@ -3696,9 +3864,10 @@ function testPage() {
           'the WYSIWYG toolbar lost the middle-document caret and appended details at the end'
         );
 
-        // A caret can land inside serializer-owned code previews. The first
-        // destructive key must select the complete source block without editing
-        // it; a repeated key can then remove the selected block deliberately.
+        // A caret can land inside serializer-owned ordinary-code previews.
+        // Destructive input now opens the exact in-place editor and edits at
+        // that caret; whole-block clipboard/deletion remains available after an
+        // explicit complete-code selection.
         const protectedCodeMarkdown =
           markerFence + 'js\\nconst protectedValue = true;\\n' + markerFence;
         await setMarkdown(protectedCodeMarkdown);
@@ -3720,16 +3889,46 @@ function testPage() {
         protectedCodeBlock = root().querySelector(
           ':scope > .vditor-wysiwyg__block[data-type="code-block"]'
         );
+        const protectedSourcePopover = document.querySelector(
+          '.vmd-source-popover--code-overlay'
+        );
         expect(
           firstProtectedDelete.defaultPrevented &&
-            window.vditor.getValue().replace(/\\n+$/, '') === protectedCodeMarkdown &&
-            protectedCodeBlock?.classList.contains('vmd-code-block--selected'),
-          'the first destructive key inside a code preview did not select the whole block safely: ' +
+            protectedSourcePopover?.style.display === 'block' &&
+            protectedSourcePopover.querySelector('[name="content"]')?.value ===
+              'constprotectedValue = true;' &&
+            !protectedCodeBlock?.classList.contains('vmd-code-block--selected'),
+          'Backspace inside ordinary code did not edit at the caret in place: ' +
             JSON.stringify({
               prevented: firstProtectedDelete.defaultPrevented,
               value: window.vditor.getValue(),
               block: protectedCodeBlock?.outerHTML.slice(0, 1200),
+              popover: protectedSourcePopover?.outerHTML.slice(0, 800),
             })
+        );
+        document.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause(80);
+        window.vditor.vditor.undo.undo(window.vditor.vditor);
+        await pause(100);
+        protectedCodeBlock = root().querySelector(
+          ':scope > .vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        const protectedVisibleCode = protectedCodeBlock.querySelector(
+          ':scope > .vditor-wysiwyg__preview > code'
+        );
+        const protectedWholeRange = document.createRange();
+        protectedWholeRange.selectNodeContents(protectedVisibleCode);
+        const protectedWholeSelection = window.getSelection();
+        protectedWholeSelection.removeAllRanges();
+        protectedWholeSelection.addRange(protectedWholeRange);
+        await pause(40);
+        expect(
+          protectedCodeBlock.classList.contains('vmd-code-block--selected'),
+          'an explicit complete ordinary-code selection did not select its block'
         );
         const protectedCopyTransfer = new DataTransfer();
         const protectedCopy = new ClipboardEvent('copy', {
@@ -3825,15 +4024,15 @@ function testPage() {
         protectedCodeBlock = root().querySelector(
           ':scope > .vditor-wysiwyg__block[data-type="code-block"]'
         );
-        const repeatedDeleteText = textNode(
-          protectedCodeBlock.querySelector(':scope > .vditor-wysiwyg__preview > code')
+        const repeatedDeleteCode = protectedCodeBlock.querySelector(
+          ':scope > .vditor-wysiwyg__preview > code'
         );
-        select(repeatedDeleteText, 5, repeatedDeleteText, 5);
-        repeatedDeleteText.dispatchEvent(new KeyboardEvent('keydown', {
-          key: 'Delete',
-          bubbles: true,
-          cancelable: true,
-        }));
+        const repeatedDeleteRange = document.createRange();
+        repeatedDeleteRange.selectNodeContents(repeatedDeleteCode);
+        const repeatedDeleteSelection = window.getSelection();
+        repeatedDeleteSelection.removeAllRanges();
+        repeatedDeleteSelection.addRange(repeatedDeleteRange);
+        await pause(40);
         root().dispatchEvent(new KeyboardEvent('keydown', {
           key: 'Delete',
           bubbles: true,
@@ -3844,7 +4043,7 @@ function testPage() {
           !window.vditor.getValue().trim() &&
             !root().querySelector('[data-type="code-block"]') &&
             root().firstElementChild?.tagName === 'P',
-          'the repeated destructive key did not remove only the selected code block'
+          'Delete did not remove only an explicitly selected code block'
         );
 
         const cutBlockMarkdown =
@@ -3853,15 +4052,15 @@ function testPage() {
         const cutCodeBlock = root().querySelector(
           ':scope > .vditor-wysiwyg__block[data-type="code-block"]'
         );
-        const cutCodeText = textNode(
-          cutCodeBlock.querySelector(':scope > .vditor-wysiwyg__preview > code')
+        const cutCode = cutCodeBlock.querySelector(
+          ':scope > .vditor-wysiwyg__preview > code'
         );
-        select(cutCodeText, 3, cutCodeText, 3);
-        cutCodeText.dispatchEvent(new KeyboardEvent('keydown', {
-          key: 'Backspace',
-          bubbles: true,
-          cancelable: true,
-        }));
+        const cutCodeRange = document.createRange();
+        cutCodeRange.selectNodeContents(cutCode);
+        const cutCodeSelection = window.getSelection();
+        cutCodeSelection.removeAllRanges();
+        cutCodeSelection.addRange(cutCodeRange);
+        await pause(40);
         const wholeBlockCutTransfer = new DataTransfer();
         const wholeBlockCut = new ClipboardEvent('cut', {
           bubbles: true,
@@ -4785,6 +4984,80 @@ function testPage() {
             Math.abs(codeBlock.getBoundingClientRect().height - codeRectBeforeEdit.height) < 2,
           'clicking highlighted code or its language opened an editor or exposed source'
         );
+
+        // Delete and printable input at a rendered-code selection enter the
+        // exact in-place editor and apply the triggering key. They must not use
+        // the atomic block's former select-first deletion path.
+        selectTextOccurrence(codePreviewCode, 'a');
+        const deleteTargetRect = codeBlock.getBoundingClientRect();
+        codePreviewCode.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Delete',
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause();
+        sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        let keyboardContent = sourcePopover.querySelector('[name="content"]');
+        let keyboardPopoverRect = sourcePopover.getBoundingClientRect();
+        expect(
+          sourcePopover.dataset.vmdPosition === 'code-overlay' &&
+            keyboardContent.value.includes('const  = 1;') &&
+            !codeBlock.classList.contains('vmd-code-block--selected') &&
+            Math.abs(keyboardPopoverRect.left - deleteTargetRect.left) <= 2 &&
+            Math.abs(keyboardPopoverRect.top - deleteTargetRect.top) <= 2 &&
+            Math.abs(keyboardPopoverRect.width - deleteTargetRect.width) <= 2 &&
+            Math.abs(keyboardPopoverRect.height - deleteTargetRect.height) <= 2,
+          'Delete inside ordinary code selected the whole block or failed to open an exact editor: ' +
+            JSON.stringify({
+              content: keyboardContent?.value,
+              selected: codeBlock.className,
+              blockBefore: deleteTargetRect,
+              blockCurrent: codeBlock.getBoundingClientRect(),
+              popover: keyboardPopoverRect,
+              popoverStyle: {
+                width: sourcePopover.style.width,
+                computedWidth: getComputedStyle(sourcePopover).width,
+                maxWidth: getComputedStyle(sourcePopover).maxWidth,
+              },
+            })
+        );
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await pause(100);
+        window.vditor.vditor.undo.undo(window.vditor.vditor);
+        await pause(100);
+
+        codeBlock = root().querySelector(
+          '.vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        codeSource = codeBlock.querySelector(':scope > pre:not(.vditor-wysiwyg__preview)');
+        codePreview = codeBlock.querySelector(':scope > .vditor-wysiwyg__preview');
+        codePreviewCode = codePreview.querySelector(':scope > code');
+        selectTextOccurrence(codePreviewCode, 'const a', true);
+        codePreviewCode.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'X',
+          bubbles: true,
+          cancelable: true,
+        }));
+        await pause();
+        sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        keyboardContent = sourcePopover.querySelector('[name="content"]');
+        expect(
+          sourcePopover.dataset.vmdPosition === 'code-overlay' &&
+            keyboardContent.value.includes('const aX = 1;') &&
+            document.activeElement === keyboardContent,
+          'printable input inside ordinary code did not enter editing at the rendered caret'
+        );
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await pause(100);
+        window.vditor.vditor.undo.undo(window.vditor.vditor);
+        await pause(100);
+
+        codeBlock = root().querySelector(
+          '.vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        codeSource = codeBlock.querySelector(':scope > pre:not(.vditor-wysiwyg__preview)');
+        codePreview = codeBlock.querySelector(':scope > .vditor-wysiwyg__preview');
+        codePreviewCode = codePreview.querySelector(':scope > code');
         codeBlock.querySelector('.vmd-source-edit-button').click();
         await pause();
         sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
@@ -4805,8 +5078,10 @@ function testPage() {
         await pause(100);
         expect(
           getComputedStyle(codeSource).display === 'none' &&
-            codePreview.textContent.includes('const edited = 2;'),
-          'popover code input did not refresh its preview while keeping source hidden'
+            codeSource.textContent.includes('const edited = 2;') &&
+            !codePreview.textContent.includes('const edited = 2;') &&
+            Math.abs(codeBlock.getBoundingClientRect().height - codeRectBeforeEdit.height) < 2,
+          'the in-place code input did not retain its draft without moving the rendered block'
         );
         document.dispatchEvent(new KeyboardEvent('keydown', {
           key: 'Escape',
@@ -4822,8 +5097,9 @@ function testPage() {
         expect(
           window.vditor.getValue().includes(markerFence + 'objective-c\\nconst edited = 2;') &&
             getComputedStyle(codeSource).display === 'none' &&
+            codePreview.textContent.includes('const edited = 2;') &&
             sourcePopover.style.display === 'none',
-          'Escape did not commit the current legal code popover draft'
+          'Escape did not commit and render the current legal in-place code draft'
         );
 
         const directCopyButton = codeBlock.querySelector(
@@ -4871,6 +5147,75 @@ function testPage() {
             ).display === 'none',
           'one undo did not restore the complete pre-popover code session'
         );
+
+        // An editor taller than the viewport remains exactly as tall as its
+        // rendered block and follows that block when the document scrolls.
+        testCheckpoint = 'oversized in-place code editor';
+        const tallCodeLines = Array.from(
+          { length: 80 },
+          (_, index) => 'const tallLine' + index + ' = ' + index + ';'
+        );
+        await setMarkdown(
+          'Before tall code\\n\\n' + markerFence + 'js\\n' +
+            tallCodeLines.join('\\n') + '\\n' + markerFence +
+            '\\n\\nAfter tall code'
+        );
+        await pause(140);
+        const tallEditorRoot = root();
+        const tallCodeBlock = tallEditorRoot.querySelector(
+          '.vditor-wysiwyg__block[data-type="code-block"]'
+        );
+        const tallBlockRectBefore = tallCodeBlock.getBoundingClientRect();
+        tallCodeBlock.querySelector('.vmd-source-edit-button').click();
+        await pause();
+        sourcePopover = document.querySelector('.vditor-wysiwyg > .vmd-source-popover');
+        const tallPopoverRectBefore = sourcePopover.getBoundingClientRect();
+        expect(
+          tallBlockRectBefore.height > tallEditorRoot.clientHeight &&
+            Math.abs(tallPopoverRectBefore.left - tallBlockRectBefore.left) <= 2 &&
+            Math.abs(tallPopoverRectBefore.top - tallBlockRectBefore.top) <= 2 &&
+            Math.abs(tallPopoverRectBefore.width - tallBlockRectBefore.width) <= 2 &&
+            Math.abs(tallPopoverRectBefore.height - tallBlockRectBefore.height) <= 2,
+          'an oversized ordinary code editor was capped or displaced: ' +
+            JSON.stringify({
+              rootHeight: tallEditorRoot.clientHeight,
+              rootScrollTop: tallEditorRoot.scrollTop,
+              blockBefore: tallBlockRectBefore,
+              blockCurrent: tallCodeBlock.getBoundingClientRect(),
+              popover: tallPopoverRectBefore,
+              popoverStyle: {
+                top: sourcePopover.style.top,
+                left: sourcePopover.style.left,
+              },
+            })
+        );
+        const tallScrollTop = Math.min(
+          180,
+          tallEditorRoot.scrollHeight - tallEditorRoot.clientHeight
+        );
+        tallEditorRoot.scrollTop = tallScrollTop;
+        tallEditorRoot.dispatchEvent(new Event('scroll'));
+        await pause();
+        const tallBlockRectAfter = tallCodeBlock.getBoundingClientRect();
+        const tallPopoverRectAfter = sourcePopover.getBoundingClientRect();
+        expect(
+          tallScrollTop > 0 &&
+            tallBlockRectAfter.top < tallBlockRectBefore.top &&
+            Math.abs(tallPopoverRectAfter.left - tallBlockRectAfter.left) <= 2 &&
+            Math.abs(tallPopoverRectAfter.top - tallBlockRectAfter.top) <= 2 &&
+            Math.abs(tallPopoverRectAfter.width - tallBlockRectAfter.width) <= 2 &&
+            Math.abs(tallPopoverRectAfter.height - tallBlockRectAfter.height) <= 2,
+          'the oversized in-place editor did not remain synchronized while scrolling: ' +
+            JSON.stringify({
+              scrollTop: tallEditorRoot.scrollTop,
+              blockBefore: tallBlockRectBefore,
+              blockAfter: tallBlockRectAfter,
+              popoverBefore: tallPopoverRectBefore,
+              popoverAfter: tallPopoverRectAfter,
+            })
+        );
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await pause();
 
         // This reproduces 00-docs/代码修复-20260813-031654.md: multiple ordinary
         // code blocks placed down the WYSIWYG document used to let Vditor's
