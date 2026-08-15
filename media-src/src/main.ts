@@ -749,11 +749,13 @@ function initVditor(msg) {
   const defaultOptions: any = {
     _lutePath: localVditorAsset('lute.min.js'),
     ...vditorOptions,
-    // Lute appends /<name>.png, so this stays a directory URL with no trailing
-    // slash, matching the CDN default it replaces.
+    // The editor has no emoji picker or shortcode support. An array replaces
+    // Vditor's default emoji object during its deep merge, while the bundled
+    // runtime also clears Lute's much larger built-in shortcode map.
     hint: {
-      emojiPath: localVditorAsset('emoji'),
       ...receivedHint,
+      emoji: [],
+      emojiPath: '',
     },
     preview: {
       ...receivedPreview,

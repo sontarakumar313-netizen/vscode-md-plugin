@@ -374,9 +374,6 @@ function testPage() {
           !document.querySelector('script[id^="vditorI18nScript"]'),
           'Vditor fetched a locale script despite the inlined bundle'
         );
-        // Lute renders a handful of shortcodes as images rather than Unicode.
-        // :octocat: is ordinary GitHub-flavored Markdown, so it must resolve to
-        // the copy shipped in media/dist and not to the CDN.
         await setMarkdown('before consecutive blanks');
         const consecutiveBlankText = textNode(root().querySelector(':scope > p'));
         select(
@@ -408,14 +405,21 @@ function testPage() {
         );
 
 
-        await setMarkdown('emoji :octocat: check');
-        const emojiImage = root().querySelector('img');
-        expect(emojiImage, ':octocat: did not render as an image');
+        await setMarkdown('emoji :octocat: :smile: check');
         expect(
-          emojiImage.src === new URL('emoji/octocat.png', document.querySelector('script[src$="main.js"]').src).toString(),
-          'the emoji image did not resolve next to main.js: ' + emojiImage.src
+          !root().querySelector('img.emoji'),
+          'an emoji shortcode rendered as an image'
         );
-        expect(!/unpkg|cdn\./.test(emojiImage.src), 'the emoji image was fetched from a CDN');
+        expect(
+          root().textContent.includes(':octocat:') &&
+            root().textContent.includes(':smile:'),
+          'emoji shortcodes did not remain literal text: ' + root().textContent
+        );
+        expect(
+          window.vditor.getValue().includes(':octocat: :smile:'),
+          'literal emoji shortcodes were changed during serialization: ' +
+            JSON.stringify(window.vditor.getValue())
+        );
 
         // WYSIWYG gutter markers: the "</>" and "$$" block symbols are hidden,
         // while the heading labels stay. Removing them has to take the marker

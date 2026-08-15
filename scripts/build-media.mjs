@@ -1,4 +1,4 @@
-import { copyFile, cp, mkdir, readdir, readFile, rm } from 'node:fs/promises'
+import { copyFile, mkdir, readdir, readFile, rm } from 'node:fs/promises'
 import { basename, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build, context } from 'esbuild'
@@ -20,6 +20,9 @@ if (!watch) {
   await rm(outputDirectory, { recursive: true, force: true })
 }
 await mkdir(outputDirectory, { recursive: true })
+// Emoji shortcodes are intentionally unsupported. Remove assets left by an
+// older build even in watch mode, where the rest of dist remains in place.
+await rm(resolve(outputDirectory, 'emoji'), { recursive: true, force: true })
 
 const vditorDistDirectory = resolve(vditorPackageDirectory, 'dist')
 
@@ -37,16 +40,6 @@ await Promise.all([
     resolve(outputDirectory, 'lute.LICENSE.txt')
   ),
 ])
-
-// Most emoji shortcodes parse to Unicode text, but Lute renders 18 of them as
-// images from whatever emoji site it is given, including :octocat: and
-// :trollface:. Those are ordinary GitHub-flavored Markdown, so the images ship
-// with the extension instead of being fetched per document.
-await cp(
-  resolve(vditorDistDirectory, 'images', 'emoji'),
-  resolve(outputDirectory, 'emoji'),
-  { recursive: true }
-)
 
 const i18nAssignment = /^\s*window\.VditorI18n\s*=\s*/
 
@@ -83,6 +76,31 @@ const vditorSourcePlugin = {
           )
         }
         return { contents: compatible, loader: 'ts' }
+      }
+    )
+  },
+}
+
+// Lute starts with roughly 1,500 built-in emoji shortcodes. Replace that map
+// before Vditor renders any document so strings such as :smile: and :octocat:
+// remain literal Markdown and never trigger an image request.
+const disableVditorEmojiPlugin = {
+  name: 'disable-vditor-emoji',
+  setup(pluginBuild) {
+    pluginBuild.onLoad(
+      { filter: /[\\/]vditor[\\/]src[\\/]ts[\\/]markdown[\\/]setLute\.ts$/ },
+      async (args) => {
+        const source = await readFile(args.path, 'utf8')
+        const withoutEmoji = source.replace(
+          'lute.PutEmojis(options.emojis);',
+          'lute.SetEmojis({});'
+        )
+        if (withoutEmoji === source) {
+          throw new Error(
+            'Vditor emoji initialization changed; update the disable-vditor-emoji plugin in scripts/build-media.mjs'
+          )
+        }
+        return { contents: withoutEmoji, loader: 'ts' }
       }
     )
   },
@@ -144,7 +162,11 @@ const options = {
   define: {
     VDITOR_VERSION: JSON.stringify(vditorPackage.version),
   },
-  plugins: [vditorSourcePlugin, vditorI18nPlugin],
+  plugins: [
+    vditorSourcePlugin,
+    disableVditorEmojiPlugin,
+    vditorI18nPlugin,
+  ],
   outfile: resolve(outputDirectory, 'main.js'),
   logLevel: 'info',
 }

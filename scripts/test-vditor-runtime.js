@@ -1,5 +1,5 @@
 const assert = require('assert')
-const { readFileSync } = require('fs')
+const { existsSync, readFileSync } = require('fs')
 const path = require('path')
 
 const root = path.resolve(__dirname, '..')
@@ -14,6 +14,12 @@ const officialLute = read(
 const bundledLicense = read('media/dist/lute.LICENSE.txt')
 const upstreamLicense = read('media-src/vendor/lute.LICENSE.txt')
 const sourceMap = JSON.parse(read('media/dist/main.js.map'))
+
+assert.strictEqual(
+  existsSync(path.join(root, 'media/dist/emoji')),
+  false,
+  'emoji assets must not be emitted into media/dist'
+)
 
 assert.strictEqual(
   bundledLute,
@@ -55,6 +61,15 @@ assert.ok(
 assert.ok(
   bundledSources.some((source) => source.includes('/vditor/src/ts/ir/')),
   'the official Vditor runtime was physically stripped of IR mode'
+)
+const setLuteSourceIndex = bundledSources.findIndex((source) =>
+  source.endsWith('/vditor/src/ts/markdown/setlute.ts')
+)
+assert.ok(setLuteSourceIndex >= 0, 'the bundled Lute setup source is missing')
+assert.match(
+  sourceMap.sourcesContent[setLuteSourceIndex],
+  /lute\.SetEmojis\(\{\}\)/,
+  'the bundled editor did not disable emoji shortcodes'
 )
 assert.match(
   mainCss,
