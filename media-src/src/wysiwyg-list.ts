@@ -1,14 +1,133 @@
 import {
+  focusVditorRange,
   getVditorInternals,
   indentVditorList,
   outdentVditorList,
 } from './vditor-adapter'
+import { registerWysiwygDomFeature } from './wysiwyg-dom'
 
 type ListCommand = 'list' | 'ordered-list' | 'check'
 
 type SelectionMarkers = {
   start: HTMLElement
   end?: HTMLElement
+}
+
+const LIST_ITEM_SELECTOR = 'li'
+const LIST_INTERACTIVE_SELECTOR =
+  'a, button, input, select, textarea, summary, audio, video, img, [contenteditable="false"]'
+const LIST_NON_TEXT_SELECTOR =
+  'button, input, select, textarea, summary, [contenteditable="false"]'
+
+function eventElement(event: Event): Element | null {
+  if (event.target instanceof Element) return event.target
+  return event.target instanceof Node ? event.target.parentElement : null
+}
+
+function listItemAtPoint(
+  event: MouseEvent,
+  root: HTMLElement
+): HTMLElement | null {
+  const targetItem = eventElement(event)?.closest<HTMLElement>(LIST_ITEM_SELECTOR)
+  const pointRange = document.caretRangeFromPoint?.(
+    event.clientX,
+    event.clientY
+  )
+  const pointElement = pointRange
+    ? pointRange.startContainer instanceof Element
+      ? pointRange.startContainer
+      : pointRange.startContainer.parentElement
+    : null
+  const pointItem = pointElement?.closest<HTMLElement>(LIST_ITEM_SELECTOR)
+
+  if (targetItem && root.contains(targetItem)) {
+    // A nested list can paint over its parent LI. In that case the point
+    // resolver identifies the inner row; otherwise trust the actual hit target
+    // so an ambiguous blank area cannot jump to a neighboring list item.
+    if (pointItem && targetItem.contains(pointItem)) return pointItem
+    return targetItem
+  }
+  return pointItem && root.contains(pointItem) ? pointItem : null
+}
+
+function listItemTextNodes(item: HTMLElement): Text[] {
+  const nodes: Text[] = []
+  const walker = document.createTreeWalker(item, NodeFilter.SHOW_TEXT)
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node as Text
+    if (!text.textContent) continue
+    const owner = text.parentElement?.closest<HTMLElement>(LIST_ITEM_SELECTOR)
+    if (owner !== item) continue
+    if (text.parentElement?.closest(LIST_NON_TEXT_SELECTOR)) continue
+    nodes.push(text)
+  }
+  return nodes
+}
+
+function itemLineRects(item: HTMLElement): DOMRect[] {
+  const rects: DOMRect[] = []
+  for (const text of listItemTextNodes(item)) {
+    const range = document.createRange()
+    range.selectNodeContents(text)
+    rects.push(...Array.from(range.getClientRects()))
+  }
+  return rects
+}
+
+function isTrailingBlankPoint(
+  item: HTMLElement,
+  event: PointerEvent | MouseEvent
+): boolean {
+  const target = eventElement(event)
+  if (target?.closest(LIST_INTERACTIVE_SELECTOR)) return false
+
+  const rects = itemLineRects(item)
+  const lineRects = rects.filter(
+    (rect) =>
+      event.clientY >= rect.top - 1 && event.clientY <= rect.bottom + 1
+  )
+  if (lineRects.length === 0) return false
+  const lineRight = Math.max(...lineRects.map((rect) => rect.right))
+  return event.clientX > lineRight + 2
+}
+
+function placeCaretAtListItemEnd(item: HTMLElement, root: HTMLElement): void {
+  const textNodes = listItemTextNodes(item)
+  const range = document.createRange()
+  const lastText = textNodes[textNodes.length - 1]
+  if (lastText) {
+    range.setStart(lastText, lastText.length)
+    range.collapse(true)
+  } else {
+    range.selectNodeContents(item)
+    range.collapse(false)
+  }
+  root.focus({ preventScroll: true })
+  focusVditorRange(range)
+}
+
+export function initWysiwygListCaretPlacement(): void {
+  registerWysiwygDomFeature({
+    refresh: () => {},
+    onPointerDown: (event, root) => {
+      if (event.button !== 0) return false
+      const item = listItemAtPoint(event, root)
+      if (!item || !isTrailingBlankPoint(item, event)) return false
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      placeCaretAtListItemEnd(item, root)
+      return true
+    },
+    onClick: (event, root) => {
+      if (event.button !== 0) return false
+      const item = listItemAtPoint(event, root)
+      if (!item || !isTrailingBlankPoint(item, event)) return false
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      placeCaretAtListItemEnd(item, root)
+      return true
+    },
+  })
 }
 
 function getWysiwygEditor(internal: any): HTMLElement | null {

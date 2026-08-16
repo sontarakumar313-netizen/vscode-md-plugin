@@ -1,17 +1,14 @@
-import { positionFloatingPanelAtTarget } from './floating-panel'
+import { positionFloatingPanelAtPoint } from './floating-panel'
 import { createMenuController } from './menu-controller'
 import { t } from './lang'
 import { commitVditorWysiwygHeadingEdit } from './vditor-adapter'
 import { registerWysiwygDomFeature } from './wysiwyg-dom'
 
-const BUTTON_CLASS = 'vmd-heading-level-button'
-const DECORATED_CLASS = 'vmd-heading-level--decorated'
 const MENU_ID = 'vmd-heading-level-menu'
 const CURRENT_CLASS = 'vmd-heading-level-menu__current'
 const HEADING_SELECTOR = 'h1[data-block="0"], h2[data-block="0"], h3[data-block="0"], h4[data-block="0"], h5[data-block="0"], h6[data-block="0"]'
 
 interface MenuState {
-  button: HTMLButtonElement
   caretOffset: number
   heading: HTMLHeadingElement
   level: number
@@ -20,42 +17,6 @@ interface MenuState {
 function headingLevel(heading: Element): number | null {
   const match = /^H([1-6])$/.exec(heading.tagName)
   return match ? Number(match[1]) : null
-}
-
-/**
- * The level label is absolutely positioned outside the editable heading box.
- * The small gap between that label and the heading still hit-tests as the
- * heading, so Chromium can place a caret at offset zero there. Treat the
- * complete label/gutter strip as a non-editable hit area as well.
- */
-function headingAtGutterPoint(
-  root: HTMLElement,
-  event: MouseEvent
-): HTMLHeadingElement | null {
-  const headings = root.querySelectorAll<HTMLHeadingElement>(HEADING_SELECTOR)
-  for (const heading of Array.from(headings)) {
-    const button = heading.querySelector<HTMLButtonElement>(
-      `:scope > .${BUTTON_CLASS}`
-    )
-    if (!button) continue
-    const headingRect = heading.getBoundingClientRect()
-    const buttonRect = button.getBoundingClientRect()
-    const left = Math.min(headingRect.left, buttonRect.left)
-    const right = Math.max(headingRect.left, buttonRect.right)
-    if (
-      event.clientX >= left &&
-      event.clientX <= right &&
-      event.clientY >= buttonRect.top &&
-      event.clientY <= buttonRect.bottom
-    ) {
-      return heading
-    }
-  }
-  return null
-}
-
-function isControlText(node: Node): boolean {
-  return !!node.parentElement?.closest(`.${BUTTON_CLASS}`)
 }
 
 function caretOffsetInHeading(heading: HTMLHeadingElement): number {
@@ -67,7 +28,6 @@ function caretOffsetInHeading(heading: HTMLHeadingElement): number {
   const walker = document.createTreeWalker(heading, NodeFilter.SHOW_TEXT)
   let offset = 0
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    if (isControlText(node)) continue
     const text = node as Text
     if (text === range.startContainer) {
       return offset + Math.min(range.startOffset, text.length)
@@ -85,7 +45,6 @@ function restoreCaretOffset(
   let remaining = Math.max(0, requestedOffset)
   let lastText: Text | null = null
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    if (isControlText(node)) continue
     const text = node as Text
     lastText = text
     if (remaining <= text.length) {
@@ -127,124 +86,55 @@ function createMenu(): HTMLDivElement {
   return menu
 }
 
-/** Adds an accessible H1-H6 menu to rendered WYSIWYG heading gutter labels. */
+/** Displays heading levels with Vditor's native pseudo labels. */
 export function initWysiwygHeadingLevels(): void {
   const menu = createMenu()
   let root: HTMLElement | null = null
   let state: MenuState | null = null
 
-  const hideMenu = (restoreFocus = false): void => {
+  const hideMenu = (): void => {
     menuController.close()
-    const previous = state
     state = null
     menu.style.display = 'none'
     menu.style.visibility = ''
-    previous?.button.setAttribute('aria-expanded', 'false')
-    if (restoreFocus && previous?.button.isConnected) {
-      previous.button.focus({ preventScroll: true })
-    }
-  }
-
-  const decorateHeading = (heading: HTMLHeadingElement): void => {
-    const level = headingLevel(heading)
-    if (!level) return
-    heading.classList.add(DECORATED_CLASS)
-    let button = heading.querySelector<HTMLButtonElement>(
-      `:scope > .${BUTTON_CLASS}`
-    )
-    if (!button) {
-      button = document.createElement('button')
-      button.type = 'button'
-      button.className = BUTTON_CLASS
-      button.setAttribute('contenteditable', 'false')
-      button.setAttribute('data-render', '1')
-      button.setAttribute('aria-haspopup', 'menu')
-      button.setAttribute('aria-expanded', 'false')
-      heading.prepend(button)
-    }
-    const label = `H${level}`
-    if (button.childNodes.length > 0) button.replaceChildren()
-    button.dataset.label = label
-    button.dataset.headingLevel = String(level)
-    button.setAttribute('aria-label', `${t('changeHeadingLevel')}: H${level}`)
   }
 
   const refresh = (targetRoot: HTMLElement): void => {
     root = targetRoot
-    targetRoot.querySelectorAll<HTMLHeadingElement>(HEADING_SELECTOR).forEach(
-      decorateHeading
-    )
-    if (state && (!state.heading.isConnected || !state.button.isConnected)) {
+    if (state && (!state.heading.isConnected || !root.contains(state.heading))) {
       hideMenu()
-    }
-  }
-
-  const showMenu = (
-    heading: HTMLHeadingElement,
-    button: HTMLButtonElement,
-    focusCurrent = false
-  ): void => {
-    const level = headingLevel(heading)
-    if (!level) return
-    if (state?.button === button && menu.style.display === 'block') {
-      hideMenu(true)
-      return
-    }
-    hideMenu()
-    state = {
-      button,
-      caretOffset: caretOffsetInHeading(heading),
-      heading,
-      level,
-    }
-    menu.querySelectorAll<HTMLButtonElement>('button[data-heading-level]')
-      .forEach((item) => {
-        const current = item.dataset.headingLevel === String(level)
-        item.classList.toggle(CURRENT_CLASS, current)
-        item.setAttribute('aria-checked', String(current))
-      })
-    button.setAttribute('aria-expanded', 'true')
-    menuController.open({
-      safeTargets: [button],
-      onDismiss: (reason) => hideMenu(reason === 'escape'),
-    })
-    positionFloatingPanelAtTarget(menu, button)
-    if (focusCurrent) {
-      requestAnimationFrame(() => {
-        menu.querySelector<HTMLButtonElement>(`.${CURRENT_CLASS}`)?.focus()
-      })
     }
   }
 
   const applyLevel = (requestedLevel: number): void => {
     const current = state
     if (!current || requestedLevel < 1 || requestedLevel > 6) return
+    const heading = current.heading
+    if (!heading.isConnected) {
+      hideMenu()
+      return
+    }
+
     if (requestedLevel === current.level) {
       hideMenu()
       root?.focus({ preventScroll: true })
-      restoreCaretOffset(current.heading, current.caretOffset)
-      return
-    }
-    if (!current.heading.isConnected) {
-      hideMenu()
+      restoreCaretOffset(heading, current.caretOffset)
       return
     }
 
     const replacement = document.createElement(
       `h${requestedLevel}`
     ) as HTMLHeadingElement
-    for (const attribute of Array.from(current.heading.attributes)) {
+    for (const attribute of Array.from(heading.attributes)) {
       replacement.setAttribute(attribute.name, attribute.value)
     }
-    replacement.classList.remove(DECORATED_CLASS)
-    for (const child of Array.from(current.heading.childNodes)) {
-      if (child === current.button) continue
-      replacement.appendChild(child)
+    while (heading.firstChild) {
+      replacement.appendChild(heading.firstChild)
     }
-    current.heading.replaceWith(replacement)
+    heading.replaceWith(replacement)
     hideMenu()
     if (!commitVditorWysiwygHeadingEdit(window.vditor)) return
-    decorateHeading(replacement)
+
     const restoreCaret = (): void => {
       if (!replacement.isConnected) return
       root?.focus({ preventScroll: true })
@@ -263,59 +153,52 @@ export function initWysiwygHeadingLevels(): void {
     },
   })
 
+  const showMenu = (heading: HTMLHeadingElement, event: MouseEvent): void => {
+    const level = headingLevel(heading)
+    if (!level) return
+    hideMenu()
+    state = {
+      caretOffset: caretOffsetInHeading(heading),
+      heading,
+      level,
+    }
+    menu.querySelectorAll<HTMLButtonElement>('button[data-heading-level]')
+      .forEach((item) => {
+        const current = item.dataset.headingLevel === String(level)
+        item.classList.toggle(CURRENT_CLASS, current)
+        item.setAttribute('aria-checked', String(current))
+      })
+    menuController.open({
+      safeTargets: [heading],
+      onDismiss: hideMenu,
+    })
+    positionFloatingPanelAtPoint(menu, event.clientX, event.clientY)
+  }
+
+  const onContextMenu = (event: MouseEvent): void => {
+    const target = event.target instanceof Element ? event.target : null
+    if (target?.closest(`#${MENU_ID}`)) return
+
+    const heading = target?.closest<HTMLHeadingElement>(HEADING_SELECTOR)
+    if (!heading || !root?.contains(heading)) {
+      hideMenu()
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    showMenu(heading, event)
+  }
+
+  document.addEventListener('contextmenu', onContextMenu, true)
+
   registerWysiwygDomFeature({
     refresh,
-    beforeRebind: () => hideMenu(),
-    onPointerDown: (event, rootElement) => {
-      const target = event.target instanceof Element
-        ? event.target.closest<HTMLButtonElement>(`.${BUTTON_CLASS}`)
-        : null
-      if (target || headingAtGutterPoint(rootElement, event)) {
-        event.preventDefault()
-        event.stopImmediatePropagation()
-        return true
-      }
-      return false
-    },
-    onClick: (event, rootElement) => {
-      const button = event.target instanceof Element
-        ? event.target.closest<HTMLButtonElement>(`.${BUTTON_CLASS}`)
-        : null
-      const heading = button?.closest<HTMLHeadingElement>(HEADING_SELECTOR)
-      if (button && heading) {
-        event.preventDefault()
-        event.stopImmediatePropagation()
-        showMenu(heading, button)
-        return true
-      }
-      if (headingAtGutterPoint(rootElement, event)) {
-        event.preventDefault()
-        event.stopImmediatePropagation()
-        return true
-      }
-      return false
-    },
-    onKeydown: (event) => {
-      const button = event.target instanceof Element
-        ? event.target.closest<HTMLButtonElement>(`.${BUTTON_CLASS}`)
-        : null
-      const heading = button?.closest<HTMLHeadingElement>(HEADING_SELECTOR)
-      if (!button || !heading) return false
-      if (
-        event.key !== 'Enter' &&
-        event.key !== ' ' &&
-        event.key !== 'ArrowDown'
-      ) {
-        return false
-      }
-      event.preventDefault()
-      event.stopImmediatePropagation()
-      showMenu(heading, button, true)
-      return true
-    },
+    beforeRebind: hideMenu,
     dispose: () => {
       hideMenu()
       menuController.dispose()
+      document.removeEventListener('contextmenu', onContextMenu, true)
       menu.remove()
       root = null
     },

@@ -1165,55 +1165,9 @@ textarea.vmd-source-popover__input {
   display: none;
 }
 
-/* Real heading-level controls replace Vditor's non-interactive H1-H6 pseudo
-   labels. They are serializer-ignored preview nodes positioned in the gutter. */
-.vditor-wysiwyg .vditor-reset :is(h1, h2, h3, h4, h5, h6).vmd-heading-level--decorated {
-  position: relative;
-}
-.vditor-wysiwyg
-  .vditor-reset
-  :is(h1, h2, h3, h4, h5, h6).vmd-heading-level--decorated::before {
-  display: none !important;
-}
-.vditor-wysiwyg .vditor-reset .vmd-heading-level-button {
-  position: absolute;
-  z-index: 1;
-  top: 0.25rem;
-  left: -31px;
-  display: inline-flex;
-  width: 27px;
-  min-width: 27px;
-  height: 22px;
-  min-height: 22px;
-  margin: 0;
-  padding: 0 2px;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  align-items: center;
-  justify-content: center;
-  color: var(--vscode-descriptionForeground, var(--second-color));
-  background: transparent;
-  font: 11px/1 var(--vscode-font-family, sans-serif);
-  cursor: pointer;
-  user-select: none;
-}
-.vditor-wysiwyg .vditor-reset .vmd-heading-level-button::before {
-  content: attr(data-label);
-}
-.vditor-wysiwyg
-  .vditor-reset
-  .vmd-details-content--open
-  > .vmd-heading-level-button {
-  left: 0.25rem;
-}
-.vditor-wysiwyg .vditor-reset .vmd-heading-level-button:hover,
-.vditor-wysiwyg .vditor-reset .vmd-heading-level-button:focus-visible {
-  border-color: var(--vscode-focusBorder, var(--toolbar-icon-hover-color));
-  color: var(--vscode-foreground, var(--textarea-text-color));
-  background: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.15));
-  outline: none;
-}
-
+/* Heading levels use Vditor's native H1-H6 pseudo labels. They remain
+   generated content rather than editable children of the heading. The custom
+   level menu is opened from the heading's context menu. */
 #vmd-heading-level-menu {
   position: fixed;
   z-index: 10001;

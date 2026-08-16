@@ -776,17 +776,21 @@ function testPage() {
           'the popover code-language change could not be undone in one step'
         );
 
-        // Heading labels are real controls rather than non-interactive pseudo text.
-        const heading = root().querySelector('h1');
-        const headingLevelButton = heading?.querySelector('.vmd-heading-level-button');
-        expect(heading && headingLevelButton, 'the heading level control was not rendered');
+        // Heading labels remain Vditor's non-editable pseudo elements. The
+        // heading-level menu is opened from the heading's context menu rather
+        // than by placing a real control inside the editable heading.
+        let heading = root().querySelector('h1');
+        expect(heading, 'the Markdown heading was not rendered');
         expect(
-          window.getComputedStyle(heading, '::before').display === 'none' &&
-            headingLevelButton.dataset.label === 'H1' &&
-            headingLevelButton.textContent === '' &&
-            headingLevelButton.getAttribute('aria-haspopup') === 'menu',
-          'the heading pseudo label was not replaced by an accessible level control'
+          window.getComputedStyle(heading, '::before').display !== 'none' &&
+            window.getComputedStyle(heading, '::before').content === '"H1"' &&
+            !heading.querySelector('.vmd-heading-level-button'),
+          'the heading level was not rendered by the Vditor pseudo label'
         );
+        const headingText = Array.from(heading.childNodes).find(
+          (node) => node.nodeType === Node.TEXT_NODE && node.textContent.includes('Heading')
+        );
+        select(headingText, 3, headingText, 3);
         heading.dispatchEvent(new MouseEvent('contextmenu', {
           bubbles: true,
           cancelable: true,
@@ -795,23 +799,14 @@ function testPage() {
           clientY: 44,
         }));
         await pause();
+        const headingLevelMenu = document.getElementById('vmd-heading-level-menu');
         expect(
           getComputedStyle(
             document.getElementById('vmd-block-context-menu')
-          ).display === 'none',
-          'a Markdown heading exposed the removed block context menu'
-        );
-        const headingText = Array.from(heading.childNodes).find(
-          (node) => node.nodeType === Node.TEXT_NODE && node.textContent.includes('Heading')
-        );
-        select(headingText, 3, headingText, 3);
-        headingLevelButton.click();
-        await pause();
-        const headingLevelMenu = document.getElementById('vmd-heading-level-menu');
-        expect(
-          headingLevelMenu?.style.display === 'block' &&
+          ).display === 'none' &&
+            headingLevelMenu?.style.display === 'block' &&
             headingLevelMenu.querySelector('[data-heading-level="1"]').getAttribute('aria-checked') === 'true',
-          'clicking the heading gutter control did not open an H1-H6 menu'
+          'right-clicking a heading did not open its H1-H6 menu'
         );
         headingLevelMenu.querySelector('[data-heading-level="3"]').click();
         await pause(100);
@@ -823,7 +818,7 @@ function testPage() {
             !window.vditor.getValue().includes('vmd-heading') &&
             changedSelection?.rangeCount &&
             changedHeading.contains(changedSelection.getRangeAt(0).startContainer),
-          'changing the gutter heading level lost text, caret, or leaked controls into Markdown: ' +
+          'changing the context-menu heading level lost text, caret, or leaked controls into Markdown: ' +
             JSON.stringify({
               value: window.vditor.getValue(),
               heading: changedHeading?.outerHTML,
@@ -837,16 +832,22 @@ function testPage() {
         );
         window.vditor.vditor.undo.undo(window.vditor.vditor);
         await pause(100);
+        heading = root().querySelector('h1');
         expect(
-          root().querySelector('h1 .vmd-heading-level-button') &&
+          heading &&
+            !heading.querySelector('.vmd-heading-level-button') &&
+            window.getComputedStyle(heading, '::before').content === '"H1"' &&
             window.vditor.getValue().includes('# Heading'),
-          'the heading-level change could not be undone in one step'
+          'the context-menu heading-level change could not be undone in one step'
         );
 
-        const keyboardHeadingButton = root().querySelector(
-          'h1 .vmd-heading-level-button'
-        );
-        keyboardHeadingButton.click();
+        heading.dispatchEvent(new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          button: 2,
+          clientX: 44,
+          clientY: 44,
+        }));
         await pause();
         const keyboardHeadingMenu = document.getElementById('vmd-heading-level-menu');
         const headingArrowDown = new KeyboardEvent('keydown', {
@@ -2251,6 +2252,53 @@ function testPage() {
         expect(root().querySelector(':scope > blockquote > ul > li')?.textContent.includes('first'), 'list conversion did not preserve the blockquote contents');
 
         await setMarkdown('- first\\n- second\\n- third');
+        const caretItems = Array.from(root().querySelectorAll(':scope > ul > li'));
+        for (const item of caretItems) {
+          const itemText = textNode(item);
+          const textRange = document.createRange();
+          textRange.selectNodeContents(itemText);
+          const textRect = Array.from(textRange.getClientRects())[0];
+          const itemRect = item.getBoundingClientRect();
+          const blankX = Math.min(itemRect.right - 4, textRect.right + 24);
+          const blankY = textRect.top + textRect.height / 2;
+          expect(
+            blankX > textRect.right + 2,
+            'the list fixture did not expose a trailing blank area for caret placement'
+          );
+          select(itemText, 0, itemText, 0);
+          const pointerDown = new PointerEvent('pointerdown', {
+            bubbles: true,
+            cancelable: true,
+            button: 0,
+            clientX: blankX,
+            clientY: blankY,
+          });
+          item.dispatchEvent(pointerDown);
+          const click = new MouseEvent('click', {
+            bubbles: true,
+            cancelable: true,
+            button: 0,
+            clientX: blankX,
+            clientY: blankY,
+          });
+          item.dispatchEvent(click);
+          const caret = window.getSelection()?.rangeCount
+            ? window.getSelection().getRangeAt(0)
+            : null;
+          expect(
+            pointerDown.defaultPrevented &&
+              click.defaultPrevented &&
+              caret?.collapsed &&
+              caret.startContainer === itemText &&
+              caret.startOffset === itemText.length,
+            'clicking after a list item did not place the caret at its end: ' +
+              JSON.stringify({
+                text: itemText.textContent,
+                container: caret?.startContainer.parentElement?.outerHTML,
+                offset: caret?.startOffset,
+              })
+          );
+        }
         let items = Array.from(root().querySelectorAll(':scope > ul > li'));
         const secondText = textNode(items[1]);
         select(secondText, 1, secondText, 1);

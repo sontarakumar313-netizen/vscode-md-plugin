@@ -28,6 +28,7 @@ import {
 } from './wysiwyg-popover'
 import {
   handleRenderedListTab,
+  initWysiwygListCaretPlacement,
   installWysiwygListCommands,
 } from './wysiwyg-list'
 import { initWysiwygDetails } from './wysiwyg-details'
@@ -247,6 +248,7 @@ function initializeWysiwygFeatures(display: FrontMatterDisplay): void {
     initWysiwygSourceEditors()
     initWysiwygHtmlPresentation()
     initWysiwygHeadingLevels()
+    initWysiwygListCaretPlacement()
     frontMatterController = initWysiwygFrontMatter(display)
     wysiwygFeaturesInitialized = true
   } else {
