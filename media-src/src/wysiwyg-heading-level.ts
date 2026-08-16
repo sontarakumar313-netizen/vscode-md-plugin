@@ -22,6 +22,38 @@ function headingLevel(heading: Element): number | null {
   return match ? Number(match[1]) : null
 }
 
+/**
+ * The level label is absolutely positioned outside the editable heading box.
+ * The small gap between that label and the heading still hit-tests as the
+ * heading, so Chromium can place a caret at offset zero there. Treat the
+ * complete label/gutter strip as a non-editable hit area as well.
+ */
+function headingAtGutterPoint(
+  root: HTMLElement,
+  event: MouseEvent
+): HTMLHeadingElement | null {
+  const headings = root.querySelectorAll<HTMLHeadingElement>(HEADING_SELECTOR)
+  for (const heading of Array.from(headings)) {
+    const button = heading.querySelector<HTMLButtonElement>(
+      `:scope > .${BUTTON_CLASS}`
+    )
+    if (!button) continue
+    const headingRect = heading.getBoundingClientRect()
+    const buttonRect = button.getBoundingClientRect()
+    const left = Math.min(headingRect.left, buttonRect.left)
+    const right = Math.max(headingRect.left, buttonRect.right)
+    if (
+      event.clientX >= left &&
+      event.clientX <= right &&
+      event.clientY >= buttonRect.top &&
+      event.clientY <= buttonRect.bottom
+    ) {
+      return heading
+    }
+  }
+  return null
+}
+
 function isControlText(node: Node): boolean {
   return !!node.parentElement?.closest(`.${BUTTON_CLASS}`)
 }
@@ -234,25 +266,34 @@ export function initWysiwygHeadingLevels(): void {
   registerWysiwygDomFeature({
     refresh,
     beforeRebind: () => hideMenu(),
-    onPointerDown: (event) => {
+    onPointerDown: (event, rootElement) => {
       const target = event.target instanceof Element
         ? event.target.closest<HTMLButtonElement>(`.${BUTTON_CLASS}`)
         : null
-      if (!target) return false
-      event.preventDefault()
-      event.stopImmediatePropagation()
-      return true
+      if (target || headingAtGutterPoint(rootElement, event)) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        return true
+      }
+      return false
     },
-    onClick: (event) => {
+    onClick: (event, rootElement) => {
       const button = event.target instanceof Element
         ? event.target.closest<HTMLButtonElement>(`.${BUTTON_CLASS}`)
         : null
       const heading = button?.closest<HTMLHeadingElement>(HEADING_SELECTOR)
-      if (!button || !heading) return false
-      event.preventDefault()
-      event.stopImmediatePropagation()
-      showMenu(heading, button)
-      return true
+      if (button && heading) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        showMenu(heading, button)
+        return true
+      }
+      if (headingAtGutterPoint(rootElement, event)) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        return true
+      }
+      return false
     },
     onKeydown: (event) => {
       const button = event.target instanceof Element
