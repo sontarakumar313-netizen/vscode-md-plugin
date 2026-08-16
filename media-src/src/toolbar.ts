@@ -601,7 +601,6 @@ const toolbarItems: Array<string | ToolbarDefinition> = [
 				},
 			},
 			'devtools',
-			'info',
 			'help',
 		],
 	},

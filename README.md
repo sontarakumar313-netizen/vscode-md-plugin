@@ -189,10 +189,10 @@ pnpm build
 
 ## 自定义样式
 
-扩展内置浅色和深色两套主题，并随 VS Code 当前主题自动切换。还可以为每个工作区提供完整的自定义 CSS：
+扩展内置浅色和深色两套主题，并随 VS Code 当前主题自动切换。还可以为每个工作区提供只包含基本样式设置的 CSS：
 
 1. 在命令面板运行 **Markdown Interactor: Generate Default Workspace CSS**。
-2. 编辑生成的 `.vscode/markdown-interactor.css`。
+2. 编辑生成的 `.vscode/markdown-interactor.css`，按段落调整字体、字号、间距、颜色和功能块的基本值。复杂的布局与交互由插件内置 CSS 统一负责。
 3. 在编辑器顶部的 **More** 菜单中选择 **Reload workspace CSS**。
 
 扩展只读取当前 Markdown 文件所属工作区中的 `.vscode/markdown-interactor.css`，不会向父目录继续查找。样式文件不会自动监听，修改后需要手动重新加载。

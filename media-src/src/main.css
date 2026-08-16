@@ -45,8 +45,10 @@ body,
    while a large document's content was still settling. Our own restore logic already
    handles reapplying a saved position across those same layout shifts explicitly. */
 .vditor-wysiwyg .vditor-reset {
-  --vmd-details-gutter: 2rem;
-  --vmd-details-inline-end: 0.6rem;
+  --vmd-details-gutter: var(--my-details-gutter, 2rem);
+  --vmd-details-inline-end: var(--my-details-inline-end, 0.6rem);
+  --vmd-details-block-gap: var(--my-details-block-gap, 1em);
+  --vmd-details-edge-gap: var(--my-details-edge-gap, 0.3em);
   overflow-anchor: none;
 }
 .vmd-confirm-dialog {
@@ -488,6 +490,68 @@ textarea.vmd-source-popover__input {
   padding-right: var(--vmd-details-inline-end);
   overflow-wrap: anywhere;
 }
+/* The list frame is inset by one details gutter. Move the list contents by
+   that same amount so the marker, text, and frame remain one visual unit. */
+.vditor-wysiwyg
+  .vditor-reset
+  :is(ul, ol).vmd-details-content--open[data-block="0"]:not(li *) {
+  padding-left: calc(var(--vmd-details-gutter) + var(--vmd-details-gutter));
+  padding-right: var(--vmd-details-inline-end);
+  position: relative;
+  outline: 0;
+  outline-offset: 0;
+}
+/* Nested lists keep their normal list indentation inside the details frame;
+   the top-level list rule above owns only the outer list as a single block. */
+.vditor-wysiwyg
+  .vditor-reset
+  :is(ul, ol).vmd-details-content--open
+  :is(ul, ol) {
+  margin: 0.2em 0;
+  padding-left: 1.6em;
+  padding-right: 0;
+}
+.vditor-wysiwyg
+  .vditor-reset
+  :is(ul, ol).vmd-details-content--open[data-block="0"]:not(li *)
+  > li:last-child {
+  margin-bottom: 0;
+}
+.vditor-wysiwyg
+  .vditor-reset
+  :is(ul, ol).vmd-details-content--open[data-block="0"]:not(li *)::after {
+  position: absolute;
+  top: 0;
+  right: var(--vmd-details-inline-end);
+  bottom: 0;
+  left: var(--vmd-details-gutter);
+  box-sizing: border-box;
+  border: 1px solid
+    var(--my-border-faint, var(--vscode-editorWidget-border, var(--border-color, rgba(127, 127, 127, 0.55))));
+  border-radius: 3px;
+  pointer-events: none;
+  content: '';
+}
+.vditor-wysiwyg
+  .vditor-reset
+  :is(ul, ol).vmd-details-content--open[data-block="0"]:not(li *):focus-within::after {
+  border-color: var(--vscode-focusBorder, var(--vscode-editorWidget-border, #007fd4));
+}
+.vditor-wysiwyg
+  .vditor-reset
+  :is(ul, ol).vmd-details-content--open[data-block="0"]:not(li *):not(.vmd-details-content--last)::after {
+  bottom: var(--vmd-details-block-gap);
+}
+.vditor-wysiwyg
+  .vditor-reset
+  :is(ul, ol).vmd-details-content--open[data-block="0"]:not(li *).vmd-details-content--last::after {
+  bottom: var(--vmd-details-edge-gap);
+}
+.vditor-wysiwyg
+  .vditor-reset
+  :is(ul, ol).vmd-details-content--open[data-block="0"]:not(li *).vmd-details-content--first::after {
+  top: var(--vmd-details-edge-gap);
+}
 .vditor-wysiwyg
   .vditor-reset
   .vmd-details-content--open:is(h1, h2, h3, h4, h5, h6)::before {
@@ -496,13 +560,6 @@ textarea.vmd-source-popover__input {
      that same float into this virtual document's reserved gutter instead. */
   margin-left: calc(0.4rem - var(--vmd-details-gutter));
   padding-right: 0.4rem;
-}
-/* Top-level list outlines normally expand four pixels beyond their block. In a
-   details virtual document the outline belongs inside its local boundary. */
-.vditor-wysiwyg
-  .vditor-reset
-  :is(ul, ol).vmd-details-content--open[data-block="0"]:not(li *) {
-  outline-offset: -4px;
 }
 /* Built-in rich blocks must resolve percentage sizing against the virtual
    document's content box and keep their own scrolling inside that box. */
@@ -669,14 +726,19 @@ textarea.vmd-source-popover__input {
   font-size: 0.9em;
   white-space: pre-wrap;
 }
-/* Draw one boundary around an entire list region. Nested UL/OL elements remain
-   visually part of that region instead of looking like separately boxed lists. */
-.vditor-wysiwyg .vditor-reset :is(ul, ol)[data-block="0"]:not(li *) {
-  outline: 1px solid var(--vscode-editorWidget-border, var(--border-color, rgba(127, 127, 127, 0.55)));
+/* Draw one boundary around an entire top-level list region. Details use their
+   own inset frame so the shared outer boundary remains continuous. */
+.vditor-wysiwyg
+  .vditor-reset
+  :is(ul, ol)[data-block="0"]:not(li *):not(.vmd-details-content--open) {
+  outline: 1px solid
+    var(--vscode-editorWidget-border, var(--border-color, rgba(127, 127, 127, 0.55)));
   outline-offset: 3px;
   border-radius: 3px;
 }
-.vditor-wysiwyg .vditor-reset :is(ul, ol)[data-block="0"]:not(li *):focus-within {
+.vditor-wysiwyg
+  .vditor-reset
+  :is(ul, ol)[data-block="0"]:not(li *):not(.vmd-details-content--open):focus-within {
   outline-color: var(--vscode-focusBorder, var(--vscode-editorWidget-border, #007fd4));
 }
 
@@ -836,29 +898,24 @@ textarea.vmd-source-popover__input {
 /* GitHub Alerts remain ordinary blockquotes in Markdown. Visual mode keeps a
    hidden serializer marker; Split View modifies only its disposable preview. */
 .vditor .vditor-reset blockquote.vmd-alert {
-  --vmd-alert-color: #0969da;
-  --vmd-alert-background: rgba(9, 105, 218, 0.08);
+  --vmd-alert-color: var(--my-alert-note, #0969da);
   margin: 1em 0;
   padding: 0.75em 1em;
   border-left: 4px solid var(--vmd-alert-color);
   color: inherit;
-  background: var(--vmd-alert-background);
+  background-color: color-mix(in srgb, var(--vmd-alert-color) 10%, var(--my-bg, #ffffff));
 }
 .vditor .vditor-reset blockquote.vmd-alert--tip {
-  --vmd-alert-color: #1a7f37;
-  --vmd-alert-background: rgba(26, 127, 55, 0.08);
+  --vmd-alert-color: var(--my-alert-tip, #1a7f37);
 }
 .vditor .vditor-reset blockquote.vmd-alert--important {
-  --vmd-alert-color: #8250df;
-  --vmd-alert-background: rgba(130, 80, 223, 0.08);
+  --vmd-alert-color: var(--my-alert-important, #8250df);
 }
 .vditor .vditor-reset blockquote.vmd-alert--warning {
-  --vmd-alert-color: #9a6700;
-  --vmd-alert-background: rgba(154, 103, 0, 0.09);
+  --vmd-alert-color: var(--my-alert-warning, #9a6700);
 }
 .vditor .vditor-reset blockquote.vmd-alert--caution {
-  --vmd-alert-color: #cf222e;
-  --vmd-alert-background: rgba(207, 34, 46, 0.08);
+  --vmd-alert-color: var(--my-alert-caution, #cf222e);
 }
 .vditor .vditor-reset .vmd-alert-marker {
   display: none;

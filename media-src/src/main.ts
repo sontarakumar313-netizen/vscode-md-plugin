@@ -68,6 +68,7 @@ import { vditorI18n } from 'virtual:vditor-i18n'
 import './themes/light.css'
 import './themes/dark.css'
 import './main.css'
+import './default-style.css'
 
 // Captured while this script is still executing, because document.currentScript
 // is null by the time the host's initialize message arrives. scripts/build-media.mjs

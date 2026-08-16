@@ -39,7 +39,6 @@ export const TOOLBAR_ACTION_IDS = [
   'normalize-formatting',
   'reset-config',
   'devtools',
-  'info',
   'help',
 ] as const
 

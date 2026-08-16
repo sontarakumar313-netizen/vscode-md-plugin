@@ -1,200 +1,122 @@
 /*
- * Markdown Interactor custom CSS template
+ * Markdown Interactor — basic workspace settings
  *
- * Copy this file to `.vscode/markdown-interactor.css` in the project root. The editor
- * is powered by Vditor, so use `.vditor` / `.vditor-reset` selectors rather
- * than Obsidian selectors.
+ * This file intentionally contains only theme, typography, spacing, and color
+ * values. Layout, editor behavior, details borders, code toolbars, math, HTML,
+ * tables, and other component design live in the extension's built-in CSS.
  *
- * Theme classes:
- *   .vditor          light editor
- *   .vditor--dark    dark editor
+ * Copy this file to `.vscode/markdown-interactor.css` and reload workspace CSS
+ * after editing it. Each section below is safe to customize independently.
  */
 
-/* Theme variables. Keep them on .vditor so they are inherited by the toolbar,
-   editor, panels, outline, and rendered Markdown. */
 .vditor {
-  --my-editor-background: var(--vscode-editor-background, #ffffff);
-  --my-editor-foreground: var(--vscode-editor-foreground, #222222);
-  --my-muted-foreground: var(--vscode-descriptionForeground, #707070);
+  /* ── 1. Editor surfaces and semantic colors ──────────────────────────── */
+  --my-bg: var(--vscode-editor-background, #ffffff);
+  --my-surface: var(--my-bg);
+  --my-fg: var(--vscode-editor-foreground, #24292f);
+  --my-muted: var(--vscode-descriptionForeground, #6e7781);
   --my-border: var(--vscode-editorWidget-border, #d4d4d4);
-  --my-accent: var(--vscode-textLink-foreground, #086ddd);
-  --my-code-background: var(--vscode-textCodeBlock-background, #f0f2f5);
-  --my-font-text: var(--vscode-editor-font-family, system-ui, sans-serif);
-  --my-font-code: var(--vscode-editor-font-family, Consolas, monospace);
+  --my-border-faint: rgba(140, 149, 159, 0.14);
+  --my-accent: var(--vscode-textLink-foreground, #0969da);
+  --my-accent-hover: var(--vscode-textLink-activeForeground, #0550ae);
+  --my-selection-bg: var(--vscode-editor-selectionBackground, rgba(0, 106, 177, 0.22));
 
-  /* Vditor's own theme variables can be overridden here. */
-  --panel-background-color: var(--my-editor-background);
-  --toolbar-background-color: var(--my-editor-background);
-  --textarea-background-color: var(--my-editor-background);
-  --textarea-text-color: var(--my-editor-foreground);
+  /* ── 2. Text and code fonts ──────────────────────────────────────────── */
+  --my-font-text: var(--vscode-editor-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Microsoft YaHei', sans-serif);
+  --my-font-code: var(--vscode-editor-font-family, ui-monospace, SFMono-Regular, Consolas, monospace);
+  --my-font-size: 15px;
+  --my-line-height: 1.68;
+  --my-letter-spacing: 0.01em;
+
+  /* ── 3. Editor and block spacing ────────────────────────────────────── */
+  --my-content-indent: 16px;
+  --my-editor-padding-top: 14px;
+  --my-editor-padding-bottom: 32px;
+  --my-block-gap: 1em;
+  --my-paragraph-gap: 0.6em;
+  --my-quote-padding: 0.5em 1em;
+  --my-details-gutter: 2rem;
+  --my-details-inline-end: 0.6rem;
+  --my-details-block-gap: 0.6em;
+  --my-details-edge-gap: 0.6em;
+
+  /* ── 4. Headings and ordinary text ──────────────────────────────────── */
+  --my-heading-1-size: 1.85rem;
+  --my-heading-2-size: 1.45rem;
+  --my-heading-3-size: 1.2rem;
+  --my-heading-4-size: 1.05rem;
+  --my-heading-5-size: 0.95rem;
+  --my-heading-6-size: 0.95rem;
+  --my-heading-weight: 600;
+  --my-link-color: var(--my-accent);
+  --my-link-hover-color: var(--my-accent-hover);
+  --my-heading-border: var(--my-border-faint);
+
+  /* ── 5. Quote, alert, and marker colors ─────────────────────────────── */
+  --my-quote-bg: var(--vscode-textBlockQuote-background, rgba(140, 149, 159, 0.06));
+  --my-alert-note: #0969da;
+  --my-alert-tip: #1a7f37;
+  --my-alert-important: #8250df;
+  --my-alert-warning: #9a6700;
+  --my-alert-caution: #cf222e;
+  --my-list-marker: var(--my-accent);
+
+  /* ── 6. Inline code, fenced code, math, and diagrams ────────────────── */
+  --my-code-bg: var(--vscode-textCodeBlock-background, rgba(175, 184, 193, 0.12));
+  --my-code-fg: var(--my-fg);
+  --my-code-size: 0.92em;
+  --my-inline-code-size: 0.88em;
+  --my-code-line-height: 1.55;
+  --my-code-padding: 7px 11px;
+  --my-code-toolbar-bg: var(--my-quote-bg);
+  --my-code-toolbar-fg: var(--my-muted);
+  --my-math-bg: transparent;
+  --my-diagram-bg: var(--my-code-bg);
+
+  /* ── 7. HTML and YAML front matter ───────────────────────────────────── */
+  --my-html-bg: transparent;
+  --my-front-matter-bg: var(--my-code-bg);
+  --my-front-matter-fg: var(--my-fg);
+
+  /* ── 8. Tables and media ────────────────────────────────────────────── */
+  --my-table-zebra: rgba(140, 149, 159, 0.03);
+  --my-table-cell-padding: 7px 12px;
+  --my-media-radius: 0;
+  --my-component-radius: 6px;
+
+  /* ── 9. Toolbar, panels, outline, and controls ──────────────────────── */
+  --my-panel-bg: var(--my-bg);
+  --my-toolbar-bg: var(--my-bg);
+  --my-toolbar-fg: var(--my-muted);
+  --my-toolbar-hover-bg: var(--my-quote-bg);
+  --my-scrollbar-thumb: var(--my-border);
+  --my-scrollbar-thumb-hover: var(--my-accent);
+  --my-toolbar-radius: 6px;
+  --my-panel-radius: 8px;
+  --my-control-radius: 4px;
+
+  /* ── 10. Split View source settings ─────────────────────────────────── */
+  --my-source-bg: var(--my-bg);
+  --my-source-fg: var(--my-fg);
+  --my-source-marker: var(--my-muted);
+
+  /* Vditor semantic variables used by its own controls and menus. */
+  --panel-background-color: var(--my-panel-bg);
+  --toolbar-background-color: var(--my-toolbar-bg);
+  --textarea-background-color: var(--my-bg);
+  --textarea-text-color: var(--my-fg);
   --border-color: var(--my-border);
-  --toolbar-icon-color: var(--my-muted-foreground);
+  --toolbar-icon-color: var(--my-toolbar-fg);
   --toolbar-icon-hover-color: var(--my-accent);
-  --heading-border-color: var(--my-border);
-  --blockquote-color: var(--my-muted-foreground);
+  --heading-border-color: var(--my-heading-border);
+  --blockquote-color: var(--my-muted);
 }
 
-/* Main editor surface */
-#app.vditor,
-#app .vditor-content,
-#app .vditor-reset {
-  color: var(--my-editor-foreground);
-  background-color: var(--my-editor-background);
+/* The declarations below are deliberately limited to basic typography. */
+#app.vditor .vditor-reset,
+#app.vditor .vditor-sv {
   font-family: var(--my-font-text);
+  font-size: var(--my-font-size);
+  line-height: var(--my-line-height);
+  letter-spacing: var(--my-letter-spacing);
 }
-
-#app.vditor .vditor-reset {
-  font-size: 16px;
-  line-height: 1.6;
-}
-
-/* Headings */
-#app.vditor .vditor-reset h1,
-#app.vditor .vditor-reset h2,
-#app.vditor .vditor-reset h3,
-#app.vditor .vditor-reset h4,
-#app.vditor .vditor-reset h5,
-#app.vditor .vditor-reset h6 {
-  color: var(--my-editor-foreground);
-  font-family: var(--my-font-text);
-}
-
-#app.vditor .vditor-reset h1 {
-  font-size: 1.7rem;
-  font-weight: 700;
-}
-
-#app.vditor .vditor-reset h2 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  border-bottom: 2px solid var(--my-border);
-  padding-bottom: 2px;
-}
-
-#app.vditor .vditor-reset h3 {
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: var(--my-accent);
-}
-
-#app.vditor .vditor-reset h4 {
-  font-size: 1.1rem;
-  font-weight: 500;
-  text-transform: uppercase;
-}
-
-#app.vditor .vditor-reset h5 {
-  font-size: 1rem;
-  font-weight: 500;
-}
-
-#app.vditor .vditor-reset h6 {
-  font-size: 0.9rem;
-  font-weight: 400;
-  color: var(--my-muted-foreground);
-}
-
-/* Inline text */
-#app.vditor .vditor-reset a {
-  color: var(--my-accent);
-  text-decoration: underline;
-}
-
-#app.vditor .vditor-reset strong {
-  color: #ff82b2;
-}
-
-#app.vditor .vditor-reset em {
-  color: #ff82b2;
-}
-
-#app.vditor .vditor-reset blockquote {
-  color: #3eb4bf;
-  background: transparent;
-  border-left-color: #3eb4bf;
-}
-
-#app.vditor .vditor-reset mark {
-  background-color: rgba(255, 208, 0, 0.4);
-  color: inherit;
-}
-
-/* Inline code and fenced code blocks */
-#app.vditor .vditor-reset code:not(pre code):not(.hljs):not(.highlight-chroma) {
-  font-family: var(--my-font-code);
-  background-color: var(--my-code-background);
-  border-radius: 4px;
-}
-
-#app.vditor .vditor-reset pre {
-  background-color: var(--my-code-background);
-  border: 1px solid var(--my-border);
-  border-radius: 4px;
-}
-
-#app.vditor .vditor-reset pre > code {
-  font-family: var(--my-font-code);
-}
-
-/* Tables */
-#app.vditor .vditor-reset table tr {
-  background-color: var(--my-editor-background);
-  border-top-color: var(--my-border);
-}
-
-#app.vditor .vditor-reset table tr:nth-child(2n) {
-  background-color: rgba(0, 0, 0, 0.04);
-}
-
-#app.vditor .vditor-reset table td,
-#app.vditor .vditor-reset table th {
-  border-color: var(--my-border);
-}
-
-/* Images and task checkboxes */
-#app.vditor .vditor-reset img {
-  border-radius: 4px;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 12%), 0 1px 2px rgb(0 0 0 / 24%);
-}
-
-#app.vditor .vditor-reset .vditor-task input[type='checkbox'] {
-  accent-color: var(--my-accent);
-}
-
-#app.vditor .vditor-reset .vditor-task input[type='checkbox']:checked {
-  accent-color: var(--my-accent);
-}
-
-/* Toolbar, menus, outline */
-#app.vditor .vditor-toolbar {
-  background-color: var(--toolbar-background-color);
-  border-bottom-color: var(--border-color);
-}
-
-#app.vditor .vditor-toolbar__item .vditor-tooltipped {
-  color: var(--toolbar-icon-color);
-}
-
-#app.vditor .vditor-toolbar__item .vditor-tooltipped:hover,
-#app.vditor .vditor-menu--current {
-  color: var(--toolbar-icon-hover-color) !important;
-}
-
-#app.vditor .vditor-panel,
-#app.vditor .vditor-hint,
-#app.vditor .vditor-outline {
-  color: var(--textarea-text-color);
-  background-color: var(--panel-background-color);
-  border-color: var(--border-color);
-}
-
-#app.vditor .vditor-outline__title {
-  color: var(--toolbar-icon-color);
-  border-bottom-color: var(--border-color);
-}
-
-#app.vditor .vditor-outline li > span:hover {
-  color: var(--toolbar-icon-hover-color);
-}
-
-/* Remove or edit the rules above to create your own theme. */

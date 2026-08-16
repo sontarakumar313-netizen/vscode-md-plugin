@@ -54,7 +54,6 @@ export const DEFAULT_TOOLBAR_SHORTCUTS: ToolbarShortcutMap = {
   'normalize-formatting': '',
   'reset-config': '',
   devtools: '',
-  info: '',
   help: '',
 }
 

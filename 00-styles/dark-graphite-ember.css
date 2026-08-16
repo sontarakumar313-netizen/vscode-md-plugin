@@ -1,463 +1,108 @@
 /*
- * Graphite Ember — 石墨余烬暗色主题
+ * Graphite Ember — basic dark theme settings
  *
- * 使用：复制本文件为项目根目录 `.vscode/markdown-interactor.css`，然后在编辑器
- * “更多”菜单中执行“刷新加载工作区 CSS”。
- *
- * 设计目标：低饱和暖黑背景、琥珀色强调、青绿色链接，适合长时间写作。
+ * Copy this file to `.vscode/markdown-interactor.css` to use it as a
+ * workspace theme. The extension owns component layout and interaction;
+ * this file only supplies fonts, sizes, spacing, and colors.
  */
 
-:root {
-  --ember-bg: #161513;
-  --ember-surface: #1e1c19;
-  --ember-surface-2: #27231f;
-  --ember-surface-3: #302a24;
-  --ember-text: #e8e2d8;
-  --ember-muted: #9d9488;
-  --ember-faint: #686159;
-  --ember-border: #3a342e;
-  --ember-accent: #e6a15c;
-  --ember-accent-soft: rgba(230, 161, 92, 0.13);
-  --ember-teal: #71c4b4;
-  --ember-green: #9fca78;
-  --ember-yellow: #e7c66a;
-  --ember-red: #e17a72;
-  --ember-purple: #b59bd8;
-  --ember-code: #12110f;
-  --ember-shadow: 0 16px 42px rgba(0, 0, 0, 0.46);
-  --ember-font: 'IBM Plex Sans', Inter, -apple-system, BlinkMacSystemFont,
-    'Segoe UI', 'Microsoft YaHei UI', sans-serif;
-  --ember-mono: 'IBM Plex Mono', 'JetBrains Mono', 'Cascadia Code', Consolas,
-    monospace;
-}
-
-html,
-body {
-  background: var(--ember-bg);
-}
-
-#app.vditor {
-  color-scheme: dark;
-  --border-color: var(--ember-border);
-  --second-color: rgba(157, 148, 136, 0.4);
-  --panel-background-color: var(--ember-surface-2);
-  --panel-shadow: var(--ember-shadow);
-  --toolbar-background-color: var(--ember-surface);
-  --toolbar-icon-color: var(--ember-muted);
-  --toolbar-icon-hover-color: var(--ember-accent);
-  --textarea-background-color: var(--ember-bg);
-  --textarea-text-color: var(--ember-text);
-  --resize-icon-color: var(--ember-muted);
-  --resize-background-color: var(--ember-surface);
-  --resize-hover-icon-color: #1a1714;
-  --resize-hover-background-color: var(--ember-accent);
-  --count-background-color: rgba(230, 161, 92, 0.15);
-  --heading-border-color: var(--ember-border);
-  --blockquote-color: var(--ember-muted);
-  --sv-heading-color: var(--ember-purple);
-  --sv-title-color: var(--ember-muted);
-  --sv-bi-color: var(--ember-accent);
-  --sv-link-color: var(--ember-green);
-  --sv-bracket-color: var(--ember-teal);
-  --sv-paren-color: var(--ember-yellow);
-
-  color: var(--ember-text);
-  background: var(--ember-bg);
-  border: 0;
-  border-radius: 0;
-  font-family: var(--ember-font);
-}
-
-/* ── Editor and preview ────────────────────────────────────────────────── */
-#app .vditor-content,
-#app .vditor-wysiwyg,
-#app .vditor-sv,
-#app .vditor-preview,
-#app .vditor-reset {
-  color: var(--ember-text);
-  background: var(--ember-bg);
-}
-
-#app.vditor .vditor-reset,
-#app.vditor .vditor-sv {
-  font-family: var(--ember-font);
-  font-size: 16px;
-  line-height: 1.68;
-  caret-color: var(--ember-accent);
-}
-
-#app .vditor-preview {
-  border-left-color: var(--ember-border);
-  box-shadow: inset 1px 0 rgba(255, 255, 255, 0.015);
-}
-
-#app .vditor-wysiwyg pre.vditor-reset:focus,
-#app .vditor-sv:focus {
-  background: var(--ember-bg);
-}
-
-#app.vditor *::selection {
-  color: #fff8ed;
-  background: rgba(230, 161, 92, 0.25);
-}
-
-/* ── Toolbar, menus and tooltips ───────────────────────────────────────── */
-#app.vditor .vditor-toolbar {
-  background: #1b1917;
-  border-bottom: 1px solid var(--ember-border);
-  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.18);
-}
-
-#app.vditor .vditor-toolbar__divider {
-  border-left-color: #443d35;
-}
-
-#app.vditor .vditor-toolbar__item .vditor-tooltipped {
-  color: var(--ember-muted);
-  border-radius: 4px;
-}
-
-#app.vditor .vditor-toolbar__item .vditor-tooltipped:hover,
-#app.vditor .vditor-toolbar__item .vditor-tooltipped:focus,
-#app.vditor .vditor-menu--current {
-  color: var(--ember-accent) !important;
-  background: var(--ember-accent-soft);
-}
-
-#app.vditor .vditor-tooltipped::after {
-  color: #f4ede3;
-  background: #302b26;
-  border: 1px solid #4c433a;
-  box-shadow: var(--ember-shadow);
-}
-
-#app.vditor .vditor-tooltipped__s::before,
-#app.vditor .vditor-tooltipped__se::before,
-#app.vditor .vditor-tooltipped__sw::before {
-  border-bottom-color: #4c433a;
-}
-
-#app.vditor .vditor-panel,
-#app.vditor .vditor-hint,
-#app.vditor .vditor-tip,
-#app.vditor .vditor-upload,
-#app.vditor .vditor-devtools {
-  color: var(--ember-text);
-  background: var(--ember-surface-2);
-  border-color: var(--ember-border);
-  box-shadow: var(--ember-shadow);
-}
-
-#app.vditor .vditor-panel::after {
-  color: var(--ember-muted);
-  background: var(--ember-surface-2);
-}
-
-#app.vditor .vditor-hint button,
-#app.vditor .vditor-panel button {
-  color: var(--ember-text);
-  background: transparent;
-}
-
-#app.vditor .vditor-hint button:hover,
-#app.vditor .vditor-panel button:hover,
-#app.vditor .vditor-hint--current {
-  color: #ffd09c;
-  background: var(--ember-surface-3);
-}
-
-/* ── Outline ───────────────────────────────────────────────────────────── */
-#app.vditor .vditor-outline {
-  color: var(--ember-muted);
-  background: #1a1816;
-  border-color: var(--ember-border);
-}
-
-#app.vditor .vditor-outline__title {
-  color: var(--ember-accent);
-  border-bottom-color: var(--ember-border);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-}
-
-#app.vditor .vditor-outline li > span {
-  border-radius: 4px;
-}
-
-#app.vditor .vditor-outline li > span:hover {
-  color: var(--ember-text);
-  background: var(--ember-accent-soft);
-}
-
-/* ── Typography ────────────────────────────────────────────────────────── */
-#app.vditor .vditor-reset h1,
-#app.vditor .vditor-reset h2,
-#app.vditor .vditor-reset h3,
-#app.vditor .vditor-reset h4,
-#app.vditor .vditor-reset h5,
-#app.vditor .vditor-reset h6 {
-  font-family: var(--ember-font);
-  font-weight: 700;
-  color: var(--ember-text);
-  letter-spacing: -0.012em;
-}
-
-#app.vditor .vditor-reset h1 {
-  color: #f4ede3;
-  font-size: 1.92em;
-  padding-bottom: 0.3em;
-  border-bottom: 2px solid #4a3c30;
-}
-
-#app.vditor .vditor-reset h2 {
-  color: #f0b679;
-  font-size: 1.52em;
-  padding-bottom: 0.22em;
-  border-bottom: 1px solid var(--ember-border);
-}
-
-#app.vditor .vditor-reset h3 {
-  color: var(--ember-teal);
-  font-size: 1.28em;
-}
-
-#app.vditor .vditor-reset h4 {
-  color: var(--ember-yellow);
-}
-
-#app.vditor .vditor-reset h5 {
-  color: var(--ember-purple);
-}
-
-#app.vditor .vditor-reset h6 {
-  color: var(--ember-muted);
-  letter-spacing: 0.06em;
-}
-
-#app.vditor .vditor-reset p,
-#app.vditor .vditor-reset li {
-  color: var(--ember-text);
-}
-
-#app.vditor .vditor-reset a {
-  color: var(--ember-teal);
-  text-decoration-color: rgba(113, 196, 180, 0.45);
-  text-underline-offset: 0.18em;
-}
-
-#app.vditor .vditor-reset a:hover {
-  color: #a3dfd2;
-  text-decoration-color: #a3dfd2;
-}
-
-#app.vditor .vditor-reset strong {
-  color: #fff0dc;
-  font-weight: 750;
-}
-
-#app.vditor .vditor-reset em {
-  color: #e9ba8b;
-}
-
-#app.vditor .vditor-reset del {
-  color: var(--ember-faint);
-}
-
-#app.vditor .vditor-reset mark {
-  color: #fff0c2;
-  background: rgba(231, 198, 106, 0.18);
-  border-bottom: 1px solid rgba(231, 198, 106, 0.72);
-  border-radius: 2px;
-  padding: 0 0.16em;
-}
-
-#app.vditor .vditor-reset blockquote {
-  color: #c5bbb0;
-  background: rgba(230, 161, 92, 0.07);
-  border-left: 3px solid var(--ember-accent);
-  border-radius: 0 5px 5px 0;
-  padding: 0.7em 1em;
-}
-
-#app.vditor .vditor-reset hr {
-  height: 1px;
-  border: 0;
-  background: linear-gradient(90deg, transparent, #51463c, transparent);
-}
-
-#app.vditor .vditor-reset ul > li::marker {
-  color: var(--ember-accent);
-}
-
-#app.vditor .vditor-reset ol > li::marker {
-  color: var(--ember-teal);
-  font-weight: 700;
-}
-
-/* ── Code ──────────────────────────────────────────────────────────────── */
-#app.vditor .vditor-reset code:not(.hljs):not(.highlight-chroma) {
-  color: #f2bd86;
-  background: rgba(230, 161, 92, 0.1) !important;
-  border: 1px solid rgba(230, 161, 92, 0.2);
-  border-radius: 4px;
-  padding: 0.12em 0.34em;
-  font-family: var(--ember-mono);
-  font-size: 0.9em;
-}
-
-#app.vditor .vditor-reset pre {
-  color: #e4ddd2;
-  background: var(--ember-code);
-  border: 1px solid #38312a;
-  border-radius: 7px;
-  box-shadow: inset 0 1px rgba(255, 255, 255, 0.025),
-    0 9px 24px rgba(0, 0, 0, 0.24);
-}
-
-#app.vditor .vditor-reset pre > code,
-#app.vditor .vditor-reset pre code.hljs {
-  color: #e4ddd2;
-  background: transparent !important;
-  border: 0;
-  font-family: var(--ember-mono);
-}
-
-#app.vditor .hljs-comment,
-#app.vditor .hljs-quote {
-  color: #766f66;
-  font-style: italic;
-}
-
-#app.vditor .hljs-keyword,
-#app.vditor .hljs-selector-tag,
-#app.vditor .hljs-literal {
-  color: var(--ember-purple);
-}
-
-#app.vditor .hljs-string,
-#app.vditor .hljs-regexp,
-#app.vditor .hljs-addition {
-  color: var(--ember-green);
-}
-
-#app.vditor .hljs-number,
-#app.vditor .hljs-meta,
-#app.vditor .hljs-built_in {
-  color: var(--ember-yellow);
-}
-
-#app.vditor .hljs-title,
-#app.vditor .hljs-section,
-#app.vditor .hljs-function {
-  color: var(--ember-accent);
-}
-
-#app.vditor .hljs-variable,
-#app.vditor .hljs-attr,
-#app.vditor .hljs-attribute {
-  color: var(--ember-teal);
-}
-
-#app.vditor .hljs-deletion,
-#app.vditor .hljs-error {
-  color: var(--ember-red);
-}
-
-/* ── Diagrams, tables, media and controls ─────────────────────────────── */
-#app.vditor .vditor-reset .language-mermaid,
-#app.vditor .vditor-reset .language-echarts,
-#app.vditor .vditor-reset .language-graphviz,
-#app.vditor .vditor-reset .language-flowchart,
-#app.vditor .vditor-reset .language-mindmap,
-#app.vditor .vditor-reset .language-markmap,
-#app.vditor .vditor-reset .language-plantuml {
-  background: var(--ember-surface);
-  border: 1px solid var(--ember-border);
-  border-radius: 7px;
-  padding: 0.85em;
-  overflow: auto;
-}
-
-#app.vditor .vditor-reset .language-math {
-  background: transparent;
-}
-
-#app.vditor .vditor-reset table {
-  border-collapse: separate;
-  border-spacing: 0;
-  overflow: hidden;
-  border: 1px solid var(--ember-border);
-  border-radius: 6px;
-}
-
-#app.vditor .vditor-reset table tr {
-  background: var(--ember-bg);
-  border-top-color: var(--ember-border);
-}
-
-#app.vditor .vditor-reset table tr:nth-child(2n) {
-  background: rgba(39, 35, 31, 0.72);
-}
-
-#app.vditor .vditor-reset table th {
-  color: #f0b679;
-  background: var(--ember-surface-2);
-  font-weight: 700;
-}
-
-#app.vditor .vditor-reset table td,
-#app.vditor .vditor-reset table th {
-  border-color: var(--ember-border);
-}
-
-#app.vditor .vditor-reset img {
-  border: 1px solid var(--ember-border);
-  border-radius: 6px;
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.32);
-}
-
-#app.vditor .vditor-reset kbd {
-  color: var(--ember-text);
-  background: var(--ember-surface-3);
-  border: 1px solid #51483f;
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  box-shadow: none;
-  font-family: var(--ember-mono);
-}
-
-#app.vditor input[type='checkbox'] {
-  accent-color: var(--ember-accent);
-}
-
-/* ── Source markers ───────────────────────────────────────────────────── */
-#app.vditor .vditor-sv__marker {
-  color: var(--ember-faint);
-  font-family: var(--ember-mono);
-}
-
-#app.vditor .vditor-sv {
-  color: #dbd3c8;
-  font-family: var(--ember-mono);
-}
-
-/* ── Scrollbars ────────────────────────────────────────────────────────── */
-#app.vditor *::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-#app.vditor *::-webkit-scrollbar-track {
-  background: var(--ember-bg);
-}
-
-#app.vditor *::-webkit-scrollbar-thumb {
-  background: #403a33;
-  border: 2px solid var(--ember-bg);
-  border-radius: 999px;
-}
-
-#app.vditor *::-webkit-scrollbar-thumb:hover {
-  background: #574c40;
+.vditor {
+  /* ── 1. Editor surfaces and semantic colors ──────────────────────────── */
+  --my-bg: #161513;
+  --my-surface: #1e1c19;
+  --my-fg: #e8e2d8;
+  --my-muted: #9d9488;
+  --my-border: #3a342e;
+  --my-border-faint: rgba(58, 52, 46, 0.86);
+  --my-accent: #e6a15c;
+  --my-accent-hover: #ffd09c;
+  --my-selection-bg: rgba(230, 161, 92, 0.25);
+
+  /* ── 2. Text and code fonts ──────────────────────────────────────────── */
+  --my-font-text: 'IBM Plex Sans', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
+  --my-font-code: 'IBM Plex Mono', 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --my-font-size: 16px;
+  --my-line-height: 1.68;
+  --my-letter-spacing: 0;
+
+  /* ── 3. Editor and block spacing ────────────────────────────────────── */
+  --my-content-indent: 16px;
+  --my-editor-padding-top: 14px;
+  --my-editor-padding-bottom: 32px;
+  --my-block-gap: 1em;
+  --my-paragraph-gap: 0.7em;
+  --my-quote-padding: 0.7em 1em;
+  --my-details-gutter: 2rem;
+  --my-details-inline-end: 0.6rem;
+  --my-details-block-gap: 0.6em;
+  --my-details-edge-gap: 0.6em;
+
+  /* ── 4. Headings and ordinary text ──────────────────────────────────── */
+  --my-heading-1-size: 1.92em;
+  --my-heading-2-size: 1.52em;
+  --my-heading-3-size: 1.28em;
+  --my-heading-4-size: 1.08em;
+  --my-heading-5-size: 1em;
+  --my-heading-6-size: 0.95em;
+  --my-heading-weight: 700;
+  --my-heading-border: #4a3c30;
+
+  /* ── 5. Quote, alert, and marker colors ─────────────────────────────── */
+  --my-quote-bg: rgba(230, 161, 92, 0.07);
+  --my-alert-note: #e6a15c;
+  --my-alert-tip: #9fca78;
+  --my-alert-important: #b59bd8;
+  --my-alert-warning: #e7c66a;
+  --my-alert-caution: #e17a72;
+  --my-list-marker: #e6a15c;
+
+  /* ── 6. Inline code, fenced code, math, and diagrams ────────────────── */
+  --my-code-bg: #12110f;
+  --my-code-fg: #e4ddd2;
+  --my-code-size: 0.92em;
+  --my-inline-code-size: 0.9em;
+  --my-code-line-height: 1.55;
+  --my-code-padding: 7px 11px;
+  --my-code-toolbar-bg: #27231f;
+  --my-code-toolbar-fg: #9d9488;
+  --my-math-bg: transparent;
+  --my-diagram-bg: #1e1c19;
+
+  /* ── 7. HTML and YAML front matter ───────────────────────────────────── */
+  --my-html-bg: transparent;
+  --my-front-matter-bg: #12110f;
+  --my-front-matter-fg: #e4ddd2;
+
+  /* ── 8. Tables and media ────────────────────────────────────────────── */
+  --my-table-zebra: rgba(39, 35, 31, 0.72);
+  --my-table-cell-padding: 7px 12px;
+  --my-media-radius: 6px;
+  --my-component-radius: 7px;
+
+  /* ── 9. Toolbar, panels, outline, and controls ──────────────────────── */
+  --my-panel-bg: #27231f;
+  --my-toolbar-bg: #1e1c19;
+  --my-toolbar-fg: #9d9488;
+  --my-toolbar-hover-bg: rgba(230, 161, 92, 0.13);
+  --my-scrollbar-thumb: #403a33;
+  --my-scrollbar-thumb-hover: #574c40;
+  --my-toolbar-radius: 4px;
+  --my-panel-radius: 6px;
+  --my-control-radius: 5px;
+
+  /* ── 10. Split View source settings ─────────────────────────────────── */
+  --my-source-bg: #12110f;
+  --my-source-fg: #dbd3c8;
+  --my-source-marker: #686159;
+
+  /* Vditor semantic variables. */
+  --panel-background-color: var(--my-panel-bg);
+  --toolbar-background-color: var(--my-toolbar-bg);
+  --textarea-background-color: var(--my-bg);
+  --textarea-text-color: var(--my-fg);
+  --border-color: var(--my-border);
+  --toolbar-icon-color: var(--my-toolbar-fg);
+  --toolbar-icon-hover-color: var(--my-accent);
+  --heading-border-color: var(--my-heading-border);
+  --blockquote-color: var(--my-muted);
 }

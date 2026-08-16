@@ -162,7 +162,7 @@ mindmap
 
 > 如果 Git 图或思维导图无法显示，而前面的 Mermaid 图可以显示，请记录所加载 Mermaid 版本及对应语法支持情况。
 
-## 2. Graphviz（Vditor 扩展）
+## 2. Graphviz
 
 ```graphviz
 digraph MarkdownPipeline {
@@ -179,7 +179,7 @@ digraph MarkdownPipeline {
 }
 ```
 
-## 3. ECharts（Vditor 扩展）
+## 3. ECharts
 
 ### 3.1 柱状图与折线图
 

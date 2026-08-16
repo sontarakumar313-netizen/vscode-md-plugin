@@ -59,7 +59,7 @@ export async function generateWorkspaceStyle(
   try {
     await vscode.workspace.fs.stat(target)
     const overwrite = await vscode.window.showWarningMessage(
-      `${target.fsPath} already exists. Overwrite it with the default CSS?`,
+      `${target.fsPath} already exists. Overwrite it with the basic workspace CSS settings?`,
       { modal: true },
       'Overwrite'
     )
@@ -85,6 +85,6 @@ export async function generateWorkspaceStyle(
   const document = await vscode.workspace.openTextDocument(target)
   await vscode.window.showTextDocument(document)
   vscode.window.showInformationMessage(
-    `Generated ${target.fsPath}. Use “Reload workspace CSS” in the editor's More menu to apply it.`
+    `Generated ${target.fsPath} with basic style settings. Use “Reload workspace CSS” in the editor's More menu to apply it.`
   )
 }

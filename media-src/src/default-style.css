@@ -1,0 +1,586 @@
+/*
+ * Markdown Interactor built-in default presentation.
+ *
+ * This is the former workspace theme moved into the extension. It owns the
+ * complex layout and component rules; workspace CSS only supplies the basic
+ * --my-* values used below.
+ */
+
+/* ── 1. Default theme values ──────────────────────────────────────────── */
+.vditor {
+  --my-bg: var(--vscode-editor-background, var(--panel-background-color, #ffffff));
+  --my-fg: var(--vscode-editor-foreground, var(--textarea-text-color, #24292f));
+  --my-muted: var(--vscode-descriptionForeground, var(--blockquote-color, #6e7781));
+  --my-border: var(--vscode-editorWidget-border, var(--border-color, rgba(140, 149, 159, 0.2)));
+  --my-border-faint: rgba(140, 149, 159, 0.14);
+  --my-accent: var(--vscode-textLink-foreground, var(--toolbar-icon-hover-color, #0969da));
+  --my-accent-hover: var(--vscode-textLink-activeForeground, var(--toolbar-icon-hover-color, #0550ae));
+  --my-content-indent: 16px;
+  --my-code-bg: var(--vscode-textCodeBlock-background, var(--vmd-content-code-background, rgba(175, 184, 193, 0.12)));
+  --my-code-fg: var(--my-fg);
+  --my-quote-bg: var(--vscode-textBlockQuote-background, var(--vmd-content-subtle-background, rgba(140, 149, 159, 0.06)));
+  --my-table-zebra: rgba(140, 149, 159, 0.03);
+  --my-selection-bg: var(--vscode-editor-selectionBackground, rgba(0, 106, 177, 0.22));
+
+  --my-font-text: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  --my-font-code: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --my-font-size: 15px;
+  --my-line-height: 1.68;
+  --my-letter-spacing: 0.01em;
+  --my-editor-padding-top: 14px;
+  --my-editor-padding-bottom: 32px;
+  --my-paragraph-gap: 0.6em;
+  --my-quote-padding: 0.5em 1em;
+  --my-block-gap: 1em;
+
+  --my-details-gutter: 2rem;
+  --my-details-inline-end: 0.6rem;
+  --my-details-block-gap: 0.6em;
+  --my-details-edge-gap: 0.6em;
+
+  --my-heading-1-size: 1.85rem;
+  --my-heading-2-size: 1.45rem;
+  --my-heading-3-size: 1.2rem;
+  --my-heading-4-size: 1.05rem;
+  --my-heading-5-size: 0.95rem;
+  --my-heading-6-size: 0.95rem;
+  --my-heading-weight: 600;
+  --my-heading-border: var(--my-border-faint);
+  --my-link-color: var(--my-accent);
+  --my-link-hover-color: var(--my-accent-hover);
+  --my-list-marker: var(--my-accent);
+
+  --my-alert-note: #0969da;
+  --my-alert-tip: #1a7f37;
+  --my-alert-important: #8250df;
+  --my-alert-warning: #9a6700;
+  --my-alert-caution: #cf222e;
+
+  --my-code-size: 0.92em;
+  --my-inline-code-size: 0.88em;
+  --my-code-line-height: 1.55;
+  --my-code-padding: 7px 11px;
+  --my-code-toolbar-bg: var(--my-quote-bg);
+  --my-code-toolbar-fg: var(--my-muted);
+  --my-math-bg: transparent;
+  --my-diagram-bg: var(--my-code-bg);
+  --my-html-bg: transparent;
+  --my-front-matter-bg: var(--my-code-bg);
+  --my-front-matter-fg: var(--my-code-fg);
+  --my-source-bg: var(--my-bg);
+  --my-source-fg: var(--my-fg);
+  --my-source-marker: var(--my-muted);
+
+  --my-table-cell-padding: 7px 12px;
+  --my-media-radius: 0;
+  --my-component-radius: 6px;
+  --my-panel-bg: var(--my-bg);
+  --my-toolbar-bg: var(--my-bg);
+  --my-toolbar-fg: var(--my-muted);
+  --my-toolbar-hover-bg: var(--my-quote-bg);
+  --my-scrollbar-thumb: rgba(140, 149, 159, 0.25);
+  --my-scrollbar-thumb-hover: rgba(140, 149, 159, 0.45);
+  --my-toolbar-radius: 6px;
+  --my-panel-radius: 8px;
+  --my-control-radius: 6px;
+}
+
+/* ── 2. Editor canvas and base typography ─────────────────────────────── */
+#app.vditor,
+#app .vditor-content,
+#app .vditor-wysiwyg,
+#app .vditor-sv,
+#app .vditor-preview,
+#app .vditor-reset {
+  color: var(--my-fg);
+  background-color: var(--my-bg);
+  font-family: var(--my-font-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+#app.vditor .vditor-reset,
+#app.vditor .vditor-sv {
+  font-size: var(--my-font-size);
+  line-height: var(--my-line-height);
+  letter-spacing: var(--my-letter-spacing);
+  caret-color: var(--my-accent);
+  padding-top: var(--my-editor-padding-top) !important;
+  padding-bottom: var(--my-editor-padding-bottom) !important;
+}
+
+#app.vditor .vditor-reset > :is(:first-child, [data-type='html-block']:first-child) {
+  margin-top: 0 !important;
+}
+
+#app .vditor-preview {
+  border-left-color: var(--my-border);
+}
+
+#app.vditor *::selection {
+  color: var(--my-fg);
+  background: var(--my-selection-bg);
+}
+
+/* ── 3. Global block alignment ────────────────────────────────────────── */
+#app.vditor .vditor-reset > :is(
+    pre,
+    blockquote,
+    ul,
+    ol,
+    [data-type='code-block'],
+    [data-type='math-block'],
+    [data-type='yaml-front-matter'],
+    .vmd-code-block--ordinary,
+    .vmd-code-block--rich
+  ):not(.vmd-details-content--open) {
+  margin-left: var(--my-content-indent) !important;
+  margin-right: var(--my-content-indent) !important;
+  width: auto !important;
+  max-width: none !important;
+  box-sizing: border-box !important;
+}
+
+#app.vditor .vditor-reset table:not(.vmd-details-content--open) {
+  display: table !important;
+  margin: 1em var(--my-content-indent) !important;
+  width: calc(100% - (var(--my-content-indent) * 2)) !important;
+  max-width: calc(100% - (var(--my-content-indent) * 2)) !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+  border-radius: var(--my-component-radius);
+  overflow: hidden;
+  border: 1px solid var(--my-border-faint) !important;
+  box-sizing: border-box !important;
+}
+
+/* ── 4. Headings and ordinary text ────────────────────────────────────── */
+#app.vditor .vditor-reset :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--my-fg);
+  font-family: var(--my-font-text);
+  font-weight: var(--my-heading-weight);
+  line-height: 1.35;
+  margin: 1.1em 0 0.4em;
+}
+#app.vditor .vditor-reset h1 {
+  font-size: var(--my-heading-1-size);
+  font-weight: 700;
+  border-bottom: 1px solid var(--my-heading-border);
+  padding-bottom: 0.25em;
+  margin-top: 0.8em;
+}
+#app.vditor .vditor-reset h2 {
+  font-size: var(--my-heading-2-size);
+  border-bottom: 1px solid var(--my-heading-border);
+  padding-bottom: 0.2em;
+}
+#app.vditor .vditor-reset h3 { font-size: var(--my-heading-3-size); }
+#app.vditor .vditor-reset h4 { font-size: var(--my-heading-4-size); }
+#app.vditor .vditor-reset :is(h5, h6) {
+  font-size: var(--my-heading-5-size);
+  color: var(--my-muted);
+}
+#app.vditor .vditor-reset :is(h1 + h2, h2 + h3, h3 + h4) {
+  margin-top: 0.35em !important;
+}
+#app.vditor .vditor-reset p {
+  margin: 0 0 var(--my-paragraph-gap);
+  line-height: var(--my-line-height);
+}
+
+/* ── 5. HTML blocks, links, quotes, and alerts ─────────────────────────── */
+#app.vditor .vditor-reset :is(
+    [data-type='html-block'],
+    .vditor-wysiwyg__block[data-type='html-block']
+  ) {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+#app.vditor .vditor-reset [data-type='html-block'] > .vditor-wysiwyg__preview,
+#app.vditor .vditor-reset .vmd-html-transparent-preview,
+#app.vditor .vmd-html-transparent-preview,
+.vditor-wysiwyg__preview.vmd-html-transparent-preview {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  background: var(--my-html-bg) !important;
+  background-color: var(--my-html-bg) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+#app.vditor .vditor-reset :is(
+    [data-type='html-block'],
+    .vditor-wysiwyg__block[data-type='html-block'],
+    .vmd-html-transparent-preview,
+    .vmd-html-align-center,
+    [align='center' i],
+    [align='center' i] > *
+  ) {
+  margin-top: 0.06em !important;
+  margin-bottom: 0.1em !important;
+  line-height: 1.35 !important;
+}
+#app.vditor .vditor-reset :is(h1[align='center' i], h1.vmd-html-align-center, [data-type='html-block'] h1) {
+  margin-top: 0.15em !important;
+  margin-bottom: 0.08em !important;
+  border-bottom: none !important;
+  padding: 0 !important;
+}
+#app.vditor .vditor-reset [data-type='html-block'] :is(p, div, span, h1, h2, h3) {
+  margin-top: 0.04em !important;
+  margin-bottom: 0.06em !important;
+}
+#app.vditor .vditor-reset :is(a > img, [align='center' i] img, .vmd-html-align-center img) {
+  margin: 1px 2px !important;
+  vertical-align: middle !important;
+  box-shadow: none !important;
+}
+#app.vditor .vditor-reset :is([data-type='html-block'], [align='center' i], .vmd-html-align-center) + :is(h1, h2, h3) {
+  margin-top: 0.7em !important;
+}
+#app.vditor .vditor-reset a {
+  color: var(--my-link-color);
+  text-decoration: none !important;
+  border-bottom: none !important;
+}
+#app.vditor .vditor-reset a:hover {
+  color: var(--my-link-hover-color);
+  opacity: 0.85;
+}
+#app.vditor .vditor-reset strong { font-weight: 600; color: var(--my-fg); }
+#app.vditor .vditor-reset em { font-style: italic; opacity: 0.9; }
+#app.vditor .vditor-reset hr {
+  height: 1px;
+  background: var(--my-border-faint);
+  border: none;
+  margin: 1.5em 0;
+}
+#app.vditor .vditor-reset blockquote:not(.vmd-alert) {
+  margin: 0.9em var(--my-content-indent) !important;
+  padding: var(--my-quote-padding);
+  color: var(--my-muted);
+  background: var(--my-quote-bg);
+  border-left: 3.5px solid var(--my-accent);
+  border-radius: 0 var(--my-component-radius) var(--my-component-radius) 0;
+}
+#app.vditor .vditor-reset blockquote:not(.vmd-alert) p { margin: 0; }
+
+/* ── 6. Inline code and formulas ───────────────────────────────────────── */
+#app.vditor .vditor-reset code:not(pre code):not(.hljs):not(.highlight-chroma):not([data-type='html-entity'] *):not([data-type='html-inline']) {
+  font-family: var(--my-font-code);
+  font-size: var(--my-inline-code-size);
+  background-color: var(--my-code-bg);
+  color: var(--my-accent);
+  padding: 0.12em 0.35em;
+  border-radius: 4px;
+}
+#app.vditor .vditor-reset span[data-type='math-inline'] {
+  display: inline-flex !important;
+  align-items: center !important;
+  vertical-align: middle !important;
+  padding: 0 2px !important;
+  margin: 0 1px !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  line-height: normal !important;
+  box-sizing: border-box !important;
+}
+#app.vditor .vditor-reset span[data-type='math-inline'] > .vditor-wysiwyg__preview {
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+}
+#app.vditor .vditor-reset span[data-type='math-inline'] .language-math {
+  background: var(--my-math-bg) !important;
+  background-image: none !important;
+}
+#app.vditor .vditor-reset span[data-type='math-inline'] .katex {
+  display: inline-flex !important;
+  align-items: center !important;
+  line-height: normal !important;
+  background: transparent !important;
+}
+#app.vditor .vditor-reset span[data-type='math-inline'] .katex-html {
+  display: inline-flex !important;
+  align-items: center !important;
+  overflow: visible !important;
+}
+#app.vditor .vditor-reset
+  .vditor-wysiwyg__block[data-type='math-block']
+  > .vditor-wysiwyg__preview {
+  text-align: center;
+}
+#app.vditor .vditor-reset
+  .vditor-wysiwyg__block[data-type='math-block']
+  > .vditor-wysiwyg__preview
+  > .language-math {
+  display: block;
+  text-align: center;
+  background: var(--my-math-bg) !important;
+  background-image: none !important;
+}
+#app.vditor .vditor-reset span[data-type='html-entity'] {
+  display: inline !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+#app.vditor .vditor-reset span[data-type='html-entity'] > .vditor-wysiwyg__preview,
+#app.vditor .vditor-reset span[data-type='html-entity'] > .vditor-wysiwyg__preview :is(code, span) {
+  display: inline !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+  width: auto !important;
+  max-width: none !important;
+  color: inherit !important;
+  font-family: inherit !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+
+/* ── 7. Code blocks, diagrams, and front matter ────────────────────────── */
+#app.vditor .vditor-reset :is(
+    pre:not(.vmd-html-transparent-preview),
+    [data-type='code-block'] > .vditor-wysiwyg__preview,
+    [data-type='math-block'] > .vditor-wysiwyg__preview,
+    [data-type='yaml-front-matter'] > .vditor-wysiwyg__preview,
+    .vmd-code-block--ordinary > .vditor-wysiwyg__preview,
+    .vmd-code-block--rich > .vditor-wysiwyg__preview
+  ) {
+  background-color: var(--my-code-bg);
+  border: 1px solid var(--my-border-faint);
+  border-radius: var(--my-component-radius);
+  box-shadow: none;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+#app.vditor .vditor-reset :is(
+    pre:not(.vmd-html-transparent-preview),
+    [data-type='code-block'] > .vditor-wysiwyg__preview > code,
+    .vmd-code-block--ordinary > .vditor-wysiwyg__preview > code,
+    .vmd-code-block--rich > .vditor-wysiwyg__preview > code
+  ) {
+  padding: var(--my-code-padding) !important;
+  font-family: var(--my-font-code);
+  font-size: var(--my-code-size);
+  line-height: var(--my-code-line-height);
+  overflow-x: auto;
+  box-sizing: border-box !important;
+}
+#app.vditor .vditor-reset pre > code {
+  padding: 0 !important;
+  background: transparent !important;
+}
+#app.vditor .vditor-reset [data-type='code-block'] pre {
+  margin: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+#app.vditor .vditor-reset :is(
+    .language-mermaid,
+    .language-echarts,
+    .language-graphviz,
+    .language-flowchart,
+    .language-mindmap,
+    .language-markmap,
+    .language-plantuml
+  ) {
+  background: var(--my-diagram-bg);
+  border-color: var(--my-border-faint);
+}
+#app.vditor .vditor-reset .vmd-code-toolbar {
+  min-height: 24px;
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--my-border-faint);
+  background: var(--my-code-toolbar-bg);
+  color: var(--my-code-toolbar-fg);
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+#app.vditor .vditor-reset .vmd-code-block--rich .vmd-code-toolbar {
+  position: absolute !important;
+  top: 4px;
+  right: 4px;
+  opacity: 1 !important;
+  min-height: 24px;
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--my-border-faint) !important;
+  border-top: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  background: var(--my-code-toolbar-bg) !important;
+  width: auto !important;
+  max-width: calc(100% - 8px);
+  box-sizing: border-box !important;
+}
+#app.vditor .vditor-reset [data-type='yaml-front-matter'] > .vditor-wysiwyg__preview {
+  color: var(--my-front-matter-fg);
+  background: var(--my-front-matter-bg);
+}
+
+/* ── 8. Tables, lists, and media ───────────────────────────────────────── */
+#app.vditor .vditor-reset table :is(th, td) {
+  padding: var(--my-table-cell-padding);
+  border-top: 1px solid var(--my-border-faint);
+  border-left: 1px solid var(--my-border-faint);
+  box-sizing: border-box;
+}
+#app.vditor .vditor-reset table tr:first-child th { border-top: none; }
+#app.vditor .vditor-reset table :is(th:first-child, td:first-child) { border-left: none; }
+#app.vditor .vditor-reset table th {
+  font-weight: 600;
+  background-color: var(--my-quote-bg);
+  color: var(--my-fg);
+}
+#app.vditor .vditor-reset table tr:nth-child(2n) { background-color: var(--my-table-zebra); }
+#app.vditor .vditor-reset table :is(th, td) { border-color: var(--my-border-faint) !important; }
+#app.vditor .vditor-reset :is(ul, ol) {
+  margin-top: 0.5em !important;
+  margin-bottom: 0.5em !important;
+  padding-left: 1.6em;
+}
+#app.vditor .vditor-reset :is(ul, ol) :is(ul, ol) {
+  margin: 0.2em 0 !important;
+  padding-left: 1.6em;
+}
+#app.vditor .vditor-reset li { margin-bottom: 0.3em; }
+#app.vditor .vditor-reset :is(ul, ol) > li:last-child { margin-bottom: 0; }
+#app.vditor .vditor-reset :is(ul, ol) > li::marker { color: var(--my-list-marker); }
+#app.vditor .vditor-reset .vditor-task input[type='checkbox'] {
+  accent-color: var(--my-accent);
+  margin-right: 0.5em;
+  cursor: pointer;
+}
+#app.vditor .vditor-reset img:not(.emoji) {
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+  border: 0;
+  border-radius: var(--my-media-radius);
+  box-shadow: none;
+}
+
+/* ── 9. Alerts and their basic colors ──────────────────────────────────── */
+#app.vditor .vditor-reset blockquote.vmd-alert {
+  margin: 0.9em var(--my-content-indent) !important;
+  padding: 0.6em 1.1em !important;
+  border-left: 4px solid var(--vmd-alert-color) !important;
+  background-color: color-mix(in srgb, var(--vmd-alert-color) 10%, var(--my-bg)) !important;
+  color: var(--my-fg) !important;
+  border-radius: 0 var(--my-component-radius) var(--my-component-radius) 0;
+}
+#app.vditor .vditor-reset .vmd-alert-title { color: var(--vmd-alert-color); }
+
+/* ── 10. Toolbar, panels, outline, and scrollbars ──────────────────────── */
+#app.vditor .vditor-toolbar {
+  background-color: var(--my-toolbar-bg);
+  border-bottom: 1px solid var(--my-border);
+  padding: 4px 8px;
+}
+#app.vditor .vditor-toolbar__item .vditor-tooltipped {
+  color: var(--my-toolbar-fg);
+  border-radius: var(--my-toolbar-radius);
+  transition: all 0.2s ease;
+}
+#app.vditor .vditor-toolbar__item .vditor-tooltipped:hover,
+#app.vditor .vditor-menu--current {
+  color: var(--my-accent) !important;
+  background-color: var(--my-toolbar-hover-bg);
+}
+#app.vditor :is(.vditor-panel, .vditor-hint, .vditor-outline) {
+  color: var(--my-fg);
+  background-color: var(--my-panel-bg);
+  border: 1px solid var(--my-border);
+  border-radius: var(--my-panel-radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+#app.vditor .vditor-outline__title {
+  color: var(--my-toolbar-fg);
+  border-bottom-color: var(--my-border);
+}
+#app.vditor ::-webkit-scrollbar { width: 7px; height: 7px; }
+#app.vditor ::-webkit-scrollbar-thumb {
+  background: var(--my-scrollbar-thumb);
+  border-radius: 4px;
+}
+#app.vditor ::-webkit-scrollbar-thumb:hover { background: var(--my-scrollbar-thumb-hover); }
+#app.vditor ::-webkit-scrollbar-track { background: transparent; }
+
+/* ── 11. Folded details and shared content boundary ────────────────────── */
+#app.vditor .vditor-reset .vmd-details-content--open {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  border-left: 1px solid var(--my-border-faint) !important;
+  border-right: 1px solid var(--my-border-faint) !important;
+  background-color: var(--my-quote-bg);
+  padding-left: var(--vmd-details-gutter) !important;
+  padding-right: var(--vmd-details-inline-end) !important;
+}
+#app.vditor .vditor-reset .vmd-details-content--first {
+  border-top: 1px solid var(--my-border-faint) !important;
+  border-top-left-radius: var(--my-component-radius) !important;
+  border-top-right-radius: var(--my-component-radius) !important;
+  padding-top: var(--vmd-details-edge-gap) !important;
+}
+#app.vditor .vditor-reset .vmd-details-content--last {
+  border-bottom: 1px solid var(--my-border-faint) !important;
+  border-bottom-left-radius: var(--my-component-radius) !important;
+  border-bottom-right-radius: var(--my-component-radius) !important;
+  padding-bottom: var(--vmd-details-edge-gap) !important;
+}
+#app.vditor .vditor-reset .vmd-details-content--first.vmd-details-content--last {
+  border-radius: var(--my-component-radius) !important;
+}
+#app.vditor .vditor-reset .vmd-details-content--open:not(.vmd-details-content--last) {
+  padding-bottom: var(--vmd-details-block-gap) !important;
+}
+#app.vditor .vditor-reset blockquote.vmd-details-content--open {
+  margin: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+#app.vditor .vditor-reset :is(ul, ol).vmd-details-content--open[data-block='0']:not(li *) {
+  padding-left: calc(var(--vmd-details-gutter) + var(--vmd-details-gutter)) !important;
+  padding-right: var(--vmd-details-inline-end) !important;
+}
+#app.vditor .vditor-reset :is(ul, ol).vmd-details-content--open :is(ul, ol) {
+  margin: 0.2em 0 !important;
+  padding-left: 1.6em !important;
+  padding-right: 0 !important;
+}
+#app.vditor .vditor-reset :is(ul, ol).vmd-details-content--open[data-block='0']:not(li *) > li:last-child {
+  margin-bottom: 0 !important;
+}
+#app.vditor .vditor-reset .vmd-details-summary {
+  font-weight: 600;
+  border-radius: 4px;
+}
+#app.vditor .vditor-reset details > summary.vmd-details-summary:hover {
+  background-color: var(--my-quote-bg);
+}
+
+/* ── 12. Split View source settings ────────────────────────────────────── */
+#app.vditor .vditor-sv {
+  color: var(--my-source-fg);
+  background: var(--my-source-bg);
+  font-family: var(--my-font-code);
+}
+#app.vditor .vditor-sv__marker { color: var(--my-source-marker); }
